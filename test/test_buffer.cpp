@@ -83,6 +83,13 @@ void test_typing() {
     check_eq(pe("su"), "su", "type su (no tone stays raw)");
     check_eq(pe("aceru/6aj4"), "acer螢幕", "type aceru/6aj4 (peel)");
     check_eq(pe("su3g4"), "你是", "type su3g4 (phrasing)");
+    // Bopomofo has no case: uppercase 注音 keys (Shift / Caps Lock) convert the
+    // same as lowercase. But uppercase that can't form Chinese stays English,
+    // preserving the original case (brand names, acronyms).
+    check_eq(pe("SU3"), "你", "type SU3 uppercase -> 你");
+    check_eq(pe("Su3CL3"), "你好", "type mixed-case 注音 -> 你好");
+    check_eq(pe("Acer"), "Acer", "uppercase-led English keeps its case");
+    check_eq(pe("API"), "API", "all-caps acronym stays English");
 }
 
 void test_keypad_literal() {
@@ -117,11 +124,14 @@ void test_backspace() {
     check_eq(s.preedit(), "你", "backspace deletes 好");
 }
 
+// Caret model: ←/→ move a caret between characters; ↓ opens the candidate window
+// for the character LEFT of the caret. After one Left the caret sits between 你
+// and 好, so ↓ re-picks 你.
 void test_phrase_priority() {
     Sim s;
     s.type("su3cl3");
-    s.key(FcitxKey_Left); // enter, cursor on 好
-    s.key(FcitxKey_Left); // cursor on 你
+    s.key(FcitxKey_Left); // caret between 你 and 好
+    s.key(FcitxKey_Down); // open candidates for 你
     auto c = s.cand();
     check(!c.empty() && c[0] == "你好", "phrase 你好 listed first");
     check(c.size() > 2 && c[2] == "你", "single 你 after phrases");
@@ -134,8 +144,8 @@ void test_live_matches_top_candidate() {
     Sim s;
     s.type("su3cl3");
     check_eq(s.preedit(), "你好", "live shows top candidate 你好");
-    s.key(FcitxKey_Left); // enter selection (last char)
-    s.key(FcitxKey_Left); // cursor on 你
+    s.key(FcitxKey_Left); // caret between 你 and 好
+    s.key(FcitxKey_Down); // open candidates for 你
     auto c = s.cand();
     check(!c.empty() && c[0] == "你好", "selection top candidate matches live");
 }
@@ -143,8 +153,8 @@ void test_live_matches_top_candidate() {
 void test_phrase_pick() {
     Sim s;
     s.type("su3cl3");
-    s.key(FcitxKey_Left);
-    s.key(FcitxKey_Left); // cursor on 你
+    s.key(FcitxKey_Left); // caret between 你 and 好
+    s.key(FcitxKey_Down); // open candidates for 你
     s.key('2');           // pick #2 = 妳好 (phrase)
     check_eq(s.preedit(), "妳好", "phrase pick rewrites both cells");
 }
@@ -152,34 +162,55 @@ void test_phrase_pick() {
 void test_pin_earlier_pick() {
     Sim s;
     s.type("su3cl3");
-    s.key(FcitxKey_Left);
-    s.key(FcitxKey_Left);  // cursor on 你
+    s.key(FcitxKey_Left);  // caret between 你 and 好
+    s.key(FcitxKey_Down);  // open candidates for 你 (hl0 你好)
     s.key(FcitxKey_Down);  // 妳好
     s.key(FcitxKey_Down);  // 你 (single)
     s.key(FcitxKey_Down);  // 妳 (single)
-    s.key(FcitxKey_Return);
+    s.key(FcitxKey_Return); // pick 妳; window advances to the next cell (好)
     check_eq(s.preedit(), "妳好", "picked 妳 single");
-    check(s.b.selectionChar() == -1, "selection ends after pick");
-    // Re-open selection to fix 好: the earlier 妳 pick must stay locked.
-    s.key(FcitxKey_Left);  // enter selection on the last cell (好)
+    check(s.b.selectionChar() == 1, "pick advances the window to the next cell");
+    // Still picking, now on 好: fix it to 郝. The earlier 妳 pick must stay locked.
     s.key(FcitxKey_Down);  // 郝
     s.key(FcitxKey_Return);
     check_eq(s.preedit(), "妳郝", "earlier 妳 stays locked after picking 郝");
 }
 
+// The headline fix: a 注音 syllable whose FIRST key is a number-row key (不 =
+// ㄅㄨˋ = "1j4") must insert at the caret, not get eaten as a candidate pick.
+void test_insert_chinese_midstring() {
+    Sim s;
+    s.type("su3cl3");       // 你好
+    s.key(FcitxKey_Left);   // caret between 你 and 好
+    s.key(FcitxKey_Left);   // caret before 你 (front)
+    s.type("1j4");          // ㄅㄨˋ = 不, leading digit must NOT pick a candidate
+    check_eq(s.preedit(), "不你好", "insert digit-led 注音 不 at the front");
+    check(s.b.caretChar() == 1, "caret sits after the inserted 不, not at end");
+    s.key(FcitxKey_Return);
+    check_eq(s.committed, "不你好", "commit includes inserted char + tail");
+
+    // Insert in the middle, not just the front.
+    Sim m;
+    m.type("su3cl3");       // 你好
+    m.key(FcitxKey_Left);   // caret between 你 and 好
+    m.type("1j4");          // insert 不 before 好
+    check_eq(m.preedit(), "你不好", "insert 不 between 你 and 好");
+    check(m.b.caretChar() == 2, "caret sits between 不 and 好, not at end");
+}
+
 void test_up_navigates_not_revert() {
     Sim s;
-    s.type("g4"); // 是 (no phrase)
-    s.key(FcitxKey_Left);
+    s.type("ji3");        // 我 (stable top candidate for ㄨㄛˇ)
+    s.key(FcitxKey_Down); // enter + open candidates for 我 (hl0)
     s.key(FcitxKey_Down); // hl1
     s.key(FcitxKey_Up);   // back to hl0 — must NOT revert to english
-    check_eq(s.preedit(), "是", "Up navigates candidates, no revert");
+    check_eq(s.preedit(), "我", "Up navigates candidates, no revert");
 }
 
 void test_revert_entry() {
     Sim s;
     s.type("su3");        // 你
-    s.key(FcitxKey_Left); // cursor on 你, highlight 0
+    s.key(FcitxKey_Down); // enter + open candidates for 你
     s.key(FcitxKey_Up);   // wrap to the last entry = raw-keys revert
     s.key(FcitxKey_Return);
     check_eq(s.preedit(), "su3", "revert entry explodes 你 -> su3");
@@ -189,28 +220,27 @@ void test_reinterpret() {
     Sim s;
     s.type("catsu3");     // cats以 (auto peel)
     check_eq(s.preedit(), "cats以", "catsu3 auto-guesses cats以");
-    s.key(FcitxKey_Left); // cursor on 以
-    s.key(FcitxKey_Left); // cursor on s (english)
-    s.key(FcitxKey_Up);   // reinterpret s+u3 -> 你
+    s.key(FcitxKey_Left); // caret between s and 以
+    s.key(FcitxKey_Up);   // reinterpret the s (+ 以) -> 你
     check_eq(s.preedit(), "cat你", "reinterpret recovers cat你");
 }
 
 void test_insert_while_selecting() {
     Sim s;
     s.type("fie");
-    s.key(FcitxKey_Left); // cursor on e
+    s.key(FcitxKey_Left); // caret between i and e
     s.key('l');           // insert before e
     check_eq(s.preedit(), "file", "insert l before e -> file");
 }
 
 void test_commit_after_pick() {
     // Picking then committing must output exactly the current pre-edit (the
-    // learning replay must not alter it). A pick ends selection; Enter commits.
+    // learning replay must not alter it). A pick drops to caret mode; Enter commits.
     Sim s;
     s.type("su3cl3");
-    s.key(FcitxKey_Left);
-    s.key(FcitxKey_Left);     // cursor on 你
-    s.key('2');               // pick the 2nd candidate (a phrase) -> ends selection
+    s.key(FcitxKey_Left);     // caret between 你 and 好
+    s.key(FcitxKey_Down);     // open candidates for 你
+    s.key('2');               // pick the 2nd candidate (a phrase 妳好)
     std::string chosen = s.preedit();
     s.key(FcitxKey_Return);   // commit
     check_eq(s.committed, chosen, "commit reflects current pre-edit");
@@ -220,10 +250,10 @@ void test_commit_after_pick() {
 void test_selection_backspace() {
     Sim s;
     s.type("su3cl3");          // 你好
-    s.key(FcitxKey_Left);      // enter selection on 好
-    s.key(FcitxKey_BackSpace); // delete focused char and leave selection
-    check_eq(s.preedit(), "你", "selection backspace deletes focused char");
-    check(s.b.selectionChar() == -1, "selection ends after backspace");
+    s.key(FcitxKey_Left);      // caret between 你 and 好
+    s.key(FcitxKey_BackSpace); // delete the char left of the caret (你)
+    check_eq(s.preedit(), "好", "caret backspace deletes the char before it");
+    check(s.b.selectionChar() == -1, "no candidate window after backspace");
 }
 
 void test_fullwidth_punct() {
@@ -272,6 +302,7 @@ int main() {
     test_live_matches_top_candidate();
     test_phrase_pick();
     test_pin_earlier_pick();
+    test_insert_chinese_midstring();
     test_up_navigates_not_revert();
     test_revert_entry();
     test_reinterpret();

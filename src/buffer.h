@@ -61,6 +61,10 @@ public:
     // Character index in the pre-edit currently being selected, or -1 when no
     // candidate window is open. Lets the UI highlight just that one character.
     int selectionChar() const;
+    // Character index where the pre-edit caret belongs, or -1 for the very end.
+    // Tracks the selected cell while selecting and the insertion point while
+    // typing mid-string, so the caret never jumps to the end during insertion.
+    int caretChar() const;
 
     // --- Configuration (driven by the fcitx5 addon config) ---
     // When on, non-注音 punctuation keys produce chewing's full-width Chinese
@@ -133,9 +137,19 @@ private:
         int idx = 0;
     };
 
-    // --- Selection mode: a global cursor over cells_, re-picking any 注音 cell ---
-    KeyResult enterSelection();             // freeze, then open the last Chinese cell
+    // --- Editing mode: a caret over cells_ with two sub-states ---
+    // Caret mode (candOpen_ == false): the caret sits BETWEEN characters; arrows
+    // move it, printable keys (digits included) insert as ordinary input, ↓/↑
+    // open the candidate window to re-pick the character left of the caret.
+    // Picking mode (candOpen_ == true): the classic candidate window over one
+    // cell; ↑↓ navigate, number keys pick, Esc returns to caret mode.
+    KeyResult enterSelection(const fcitx::Key &key); // freeze + enter caret mode
     KeyResult handleSelecting(const fcitx::Key &key);
+    KeyResult handleCaret(const fcitx::Key &key);    // caret mode dispatch
+    KeyResult handlePicking(const fcitx::Key &key);  // candidate-window dispatch
+    // Open the candidate window to re-pick the cell at `cell` (or, for an English
+    // cell on ↑, reinterpret it back into 注音). Enters picking mode.
+    KeyResult openCandidatesAt(int cell, bool reinterpret);
     void loadCellCandidates();              // build phrase+single candidates here
     // Feed the contiguous Chinese run [start..end] into chewing and park the
     // cursor on character `offset`. Returns the run length.
@@ -159,10 +173,18 @@ private:
     void applyRunToCells();
     KeyResult moveSelCursor(int delta);     // step to the adjacent cell
     KeyResult pickCandidate(int pageIndex); // pick a candidate on the current page
-    // Type while selecting: insert a literal character just before the cursor
-    // cell (e.g. fie -> on 'e' press 'l' -> file), staying in selection. Use ↑
-    // afterwards to fold inserted 注音 keys into a Chinese character.
-    KeyResult insertAtCursor(char c);
+    // Type while selecting: leave selection and resume the NORMAL typing path
+    // right at the cursor cell. Everything from the cursor onward is parked in
+    // tail_ so the keystroke (and whatever follows) composes exactly as it would
+    // at the end of the line — 注音 auto-splitting, candidates, English — only
+    // the result lands before the parked tail, which reconnects on commit /
+    // re-selection. This is the mid-string insertion point. `pos` is the cell
+    // index to insert before.
+    KeyResult beginInsert(int pos, const fcitx::Key &key);
+    // Fold the live typing tail into cells_, then re-append the parked tail_,
+    // reuniting the pre-edit into one cells_ list (used before commit and before
+    // re-entering selection).
+    void mergeTail();
     // ↑ on an English cell: gather this cell plus the next few cells' raw keys
     // and, if they form a 注音 syllable, merge them into one Chinese cell and
     // open its candidates — recovering "catsu3" -> cat + 你 when the syllable's
@@ -177,10 +199,14 @@ private:
     bool fullWidthPunct_ = false;
     Token token_ = Token::Chinese;
     std::vector<Cell> cells_;             // finalized pre-edit, before the live tail
+    std::vector<Cell> tail_;              // cells parked AFTER the live tail while
+                                          // inserting mid-string; empty otherwise
     std::vector<std::string> runReadings_; // readings parallel to the live run chars
     std::string englishBuf_;             // live English tail, after the chewing run
     std::string syl_;                    // raw keys of the in-progress 注音 syllable
-    bool selecting_ = false;             // candidate window open over a cell
+    bool selecting_ = false;             // editing mode active (caret or picking)
+    bool candOpen_ = false;              // picking mode: candidate window is open
+    int caretPos_ = 0;                   // caret BETWEEN cells, range [0, size]
     int selCursor_ = 0;                  // index into cells_ being re-selected
     int selRunStart_ = 0;                // contiguous Chinese run under the cursor
     int selRunEnd_ = 0;                  // (inclusive)

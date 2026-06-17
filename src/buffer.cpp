@@ -94,7 +94,12 @@ int slotOf(char c) {
         mark("3467", 3);                   // 聲調 ˇˋˊ˙
         return t;
     }();
+    // Bopomofo has no case: a 注音 key is the same key whether Shift / Caps Lock
+    // is on or not, so fold uppercase letters to lowercase before the lookup.
     unsigned char uc = static_cast<unsigned char>(c);
+    if (uc >= 'A' && uc <= 'Z') {
+        uc += 'a' - 'A';
+    }
     return uc < kSlot.size() ? kSlot[uc] : -1;
 }
 
@@ -104,6 +109,15 @@ bool isToneChar(char c) { return slotOf(c) == 3; }
 // stable sort by slot yields the order chewing expects.
 std::string canonical(const std::string &keys) {
     std::string out = keys;
+    // Fold to lowercase: these keys feed chewing (and become cell readings),
+    // which only understands the lowercase 大千 layout. Case is preserved
+    // separately on the English fallback path (syl_ / englishBuf_ keep the
+    // original characters), so uppercase still types English when it must.
+    for (char &c : out) {
+        if (c >= 'A' && c <= 'Z') {
+            c += 'a' - 'A';
+        }
+    }
     std::stable_sort(out.begin(), out.end(),
                      [](char a, char b) { return slotOf(a) < slotOf(b); });
     return out;
@@ -194,10 +208,13 @@ void Buffer::reset() {
     forcedEnglish_ = false;
     token_ = Token::Chinese;
     cells_.clear();
+    tail_.clear();
     runReadings_.clear();
     englishBuf_.clear();
     syl_.clear();
     selecting_ = false;
+    candOpen_ = false;
+    caretPos_ = 0;
     selCursor_ = 0;
     highlight_ = 0;
     selCands_.clear();
@@ -273,6 +290,10 @@ std::string Buffer::preeditText() const {
         out += englishBuf_;
         out += syl_;
     }
+    // Anything parked while inserting mid-string trails the live tail.
+    for (const Cell &c : tail_) {
+        out += c.text;
+    }
     return out;
 }
 
@@ -280,8 +301,8 @@ std::vector<std::string> Buffer::candidates() const {
     // The current page (9) of the merged phrase+single candidate list. Empty on
     // an English cell (cursor still visible, just nothing to pick).
     std::vector<std::string> out;
-    if (!selecting_) {
-        return out;
+    if (!selecting_ || !candOpen_) {
+        return out; // caret mode shows no candidate window
     }
     int start = selPage_ * inputer::kCandPerPage;
     for (int i = start;
@@ -298,15 +319,35 @@ int Buffer::highlight() const {
 }
 
 int Buffer::selectionChar() const {
-    if (!selecting_ || selCursor_ < 0 ||
+    if (!selecting_ || !candOpen_ || selCursor_ < 0 ||
         selCursor_ >= static_cast<int>(cells_.size())) {
-        return -1;
+        return -1; // only the picking-mode window highlights a single cell
     }
     int idx = 0;
     for (int i = 0; i < selCursor_; ++i) {
         idx += utf8Count(cells_[i].text);
     }
     return idx;
+}
+
+int Buffer::caretChar() const {
+    // Where the pre-edit caret should sit (character index), or -1 for "at the
+    // very end". While selecting, park it on the cell being edited; while
+    // inserting mid-string, park it at the insertion point — right after the
+    // head cells and the live typing tail, i.e. just before the parked tail_.
+    if (selecting_) {
+        // Picking mode parks on the cell being re-picked; caret mode shows the
+        // bare caret between cells (one codepoint per cell, so index == caretPos_).
+        return candOpen_ ? selectionChar() : caretPos_;
+    }
+    if (tail_.empty()) {
+        return -1;
+    }
+    int before = static_cast<int>(cells_.size()) // one codepoint per cell
+                 + utf8Count(zhuyin_.preedit())
+                 + static_cast<int>(englishBuf_.size())
+                 + static_cast<int>(syl_.size());
+    return before;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,14 +398,13 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
         return {false, false, {}, false};
     }
 
-    // Down / Left / Right open candidate re-selection over the whole pre-edit
-    // (positioning on the last Chinese character); once in selection mode
-    // Left/Right walk between characters. If there is no Chinese to select the
-    // arrow falls through to the application.
+    // Down / Left / Right enter caret-editing over the whole pre-edit (the caret
+    // lands at the end, then this very key moves it / opens candidates). If there
+    // is nothing pending the arrow falls through to the application.
     if ((sym == FcitxKey_Down || sym == FcitxKey_Left ||
          sym == FcitxKey_Right) &&
         !forcedEnglish_) {
-        return enterSelection();
+        return enterSelection(key);
     }
 
     if (int kp = keypadAscii(sym)) {
@@ -608,7 +648,7 @@ KeyResult Buffer::handleEnter() {
     if (out.empty()) {
         return {false, false, {}, false}; // nothing pending: let Enter through
     }
-    freezeAll();      // gather the live tail into cells_ so learning sees it all
+    mergeTail();      // gather the live tail + parked tail into cells_ for learning
     learnFromCells(); // teach chewing the chosen readings -> characters
     reset();
     return {true, true, out, true};
@@ -823,22 +863,24 @@ void Buffer::loadCellCandidates() {
     buildSelCands();
 }
 
-KeyResult Buffer::enterSelection() {
-    freezeAll();
+KeyResult Buffer::enterSelection(const fcitx::Key &key) {
+    mergeTail(); // reunite any mid-string insertion before re-opening editing
     if (cells_.empty()) {
         // Nothing pending: let the arrow key reach the application.
         return {false, false, {}, false};
     }
-    // Land on the last character (Chinese or English); ←/→ then walk over every
-    // cell uniformly.
+    // Enter caret mode with the caret at the very end, then let the triggering
+    // key (←/→/↓) act: ← steps it left, ↓ opens candidates on the last char.
     selecting_ = true;
-    selCursor_ = static_cast<int>(cells_.size()) - 1;
-    loadCellCandidates();
-    return {true, false, {}, true};
+    candOpen_ = false;
+    caretPos_ = static_cast<int>(cells_.size());
+    return handleSelecting(key);
 }
 
 void Buffer::exitSelection() {
     selecting_ = false;
+    candOpen_ = false;
+    caretPos_ = 0;
     highlight_ = 0;
     selPage_ = 0;
     selCands_.clear();
@@ -852,6 +894,7 @@ KeyResult Buffer::moveSelCursor(int delta) {
         return {true, false, {}, true}; // at an edge: stay put
     }
     selCursor_ = i; // step one cell at a time over every character, Chinese or not
+    runLoaded_ = false;
     loadCellCandidates();
     return {true, false, {}, true};
 }
@@ -859,7 +902,8 @@ KeyResult Buffer::moveSelCursor(int delta) {
 KeyResult Buffer::pickCandidate(int pageIndex) {
     int gi = selPage_ * inputer::kCandPerPage + pageIndex;
     if (gi < 0 || gi >= static_cast<int>(selCands_.size())) {
-        exitSelection();
+        candOpen_ = false; // no such candidate: fall back to caret mode
+        caretPos_ = selCursor_;
         return {true, false, {}, true};
     }
     SelCand sc = selCands_[gi];
@@ -890,18 +934,47 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
          ++j) {
         cells_[j].locked = true;
     }
-    // A pick finishes selection: close the candidate window and return to normal
-    // editing.
-    exitSelection();
+    // Advance past the characters this pick decided (one cell for a single,
+    // several for a phrase). If a character follows, keep the candidate window
+    // open on it so consecutive characters can be fixed; otherwise drop back to
+    // caret mode with the caret parked right after the picked text.
+    int next = selCursor_ + picked;
+    if (next < static_cast<int>(cells_.size())) {
+        selCursor_ = next;
+        caretPos_ = next;
+        runLoaded_ = false;
+        loadCellCandidates();
+        return {true, false, {}, true};
+    }
+    candOpen_ = false;
+    caretPos_ = static_cast<int>(cells_.size());
     return {true, false, {}, true};
 }
 
-KeyResult Buffer::insertAtCursor(char c) {
-    cells_.insert(cells_.begin() + selCursor_, {false, std::string(1, c), {}});
-    ++selCursor_;          // keep the cursor on the same original cell
-    runLoaded_ = false;    // cell layout changed: reload the run from scratch
-    loadCellCandidates();  // refresh candidates for the (unchanged) cursor cell
-    return {true, false, {}, true};
+void Buffer::mergeTail() {
+    freezeAll(); // fold the live typing at the insertion point into cells_ first
+    if (!tail_.empty()) {
+        cells_.insert(cells_.end(), tail_.begin(), tail_.end());
+        tail_.clear();
+    }
+}
+
+KeyResult Buffer::beginInsert(int pos, const fcitx::Key &key) {
+    // Park the cell at `pos` and everything after it as the tail, then drop out
+    // of editing and resume the normal typing path right there. The keystroke
+    // composes exactly as it would at the end of the line; its result lands
+    // before the parked tail, which reconnects on commit / re-selection.
+    if (pos < 0) {
+        pos = 0;
+    }
+    if (pos > static_cast<int>(cells_.size())) {
+        pos = static_cast<int>(cells_.size());
+    }
+    tail_.assign(cells_.begin() + pos, cells_.end());
+    cells_.erase(cells_.begin() + pos, cells_.end());
+    exitSelection();         // selecting_ = false; sel scratch + zhuyin_ reset
+    token_ = Token::Chinese; // a fresh syllable context at the insertion point
+    return handleAuto(key);  // compose the key as ordinary input
 }
 
 KeyResult Buffer::revertCellToEnglish() {
@@ -918,9 +991,10 @@ KeyResult Buffer::revertCellToEnglish() {
         cells_.insert(cells_.begin() + at, {false, std::string(1, c), {}});
         ++at;
     }
-    selCursor_ = at - 1;  // rest on the last exploded key
     runLoaded_ = false;   // cell layout changed
-    loadCellCandidates(); // English cell: clears the scratch, no candidate list
+    candOpen_ = false;    // back to caret mode, caret right after the exploded keys
+    caretPos_ = at;
+    selCursor_ = at - 1;
     return {true, false, {}, true};
 }
 
@@ -966,10 +1040,89 @@ KeyResult Buffer::reinterpretFromCell() {
 }
 
 KeyResult Buffer::handleSelecting(const fcitx::Key &key) {
-    auto sym = key.sym();
-    const bool onChinese = cells_[selCursor_].chinese;
+    // Two sub-modes: a bare caret between characters (insert / navigate) and the
+    // candidate window over one cell (re-pick). Number keys only ever pick in the
+    // latter, so 注音 starting with a number-row key inserts cleanly in the former.
+    return candOpen_ ? handlePicking(key) : handleCaret(key);
+}
 
-    // Left/Right walk the cursor over every cell — Chinese or English alike.
+KeyResult Buffer::handleCaret(const fcitx::Key &key) {
+    auto sym = key.sym();
+    const int N = static_cast<int>(cells_.size());
+
+    // Arrows move the caret between characters.
+    if (sym == FcitxKey_Left) {
+        if (caretPos_ > 0) {
+            --caretPos_;
+        }
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_Right) {
+        if (caretPos_ < N) {
+            ++caretPos_;
+        }
+        return {true, false, {}, true};
+    }
+    // ↓ / ↑ open the candidate window for the character LEFT of the caret (the
+    // one just passed); ↑ additionally reinterprets an English cell as 注音.
+    if (sym == FcitxKey_Down || sym == FcitxKey_Up) {
+        int cell = caretPos_ > 0 ? caretPos_ - 1 : 0;
+        return openCandidatesAt(cell, /*reinterpret=*/sym == FcitxKey_Up);
+    }
+    if (sym == FcitxKey_BackSpace) {
+        // Delete the character left of the caret (ordinary editing).
+        if (caretPos_ > 0) {
+            cells_.erase(cells_.begin() + caretPos_ - 1);
+            --caretPos_;
+        }
+        if (cells_.empty()) {
+            exitSelection();
+        }
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_Escape) {
+        exitSelection(); // keep the text; just leave editing
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter) {
+        exitSelection();      // leave editing; the pre-edit stays in cells_
+        return handleEnter(); // Enter is still the only commit point
+    }
+    // Any printable key (digits included) inserts at the caret as ordinary input
+    // — this is what makes mid-string 注音 like 這/段 work.
+    if (sym == FcitxKey_space || keypadAscii(sym) || (sym >= 33 && sym <= 126)) {
+        return beginInsert(caretPos_, key);
+    }
+    // Other control keys: leave editing and let the application handle them.
+    exitSelection();
+    return handleAuto(key);
+}
+
+KeyResult Buffer::openCandidatesAt(int cell, bool reinterpret) {
+    if (cell < 0 || cell >= static_cast<int>(cells_.size())) {
+        return {true, false, {}, true};
+    }
+    selCursor_ = cell;
+    runLoaded_ = false;
+    if (cells_[cell].chinese) {
+        candOpen_ = true;
+        loadCellCandidates();
+        return {true, false, {}, true};
+    }
+    // English cell: only ↑ acts — fold it (+ the next few) back into a 注音
+    // character and open its candidates. ↓ on English has nothing to pick.
+    if (reinterpret) {
+        KeyResult r = reinterpretFromCell();
+        candOpen_ = !selCands_.empty(); // false if nothing converted
+        return r;
+    }
+    return {true, false, {}, true};
+}
+
+KeyResult Buffer::handlePicking(const fcitx::Key &key) {
+    auto sym = key.sym();
+
+    // ←/→ step to the adjacent character's candidates (fix several in a row).
     if (sym == FcitxKey_Left) {
         return moveSelCursor(-1);
     }
@@ -977,43 +1130,12 @@ KeyResult Buffer::handleSelecting(const fcitx::Key &key) {
         return moveSelCursor(+1);
     }
     if (sym == FcitxKey_Escape) {
-        exitSelection(); // keep the current text; just close the window
-        return {true, false, {}, true};
-    }
-    if (sym == FcitxKey_BackSpace) {
-        // Delete the focused character, then return to normal editing.
-        if (selCursor_ >= 0 && selCursor_ < static_cast<int>(cells_.size())) {
-            cells_.erase(cells_.begin() + selCursor_);
-        }
-        exitSelection();
+        candOpen_ = false; // close the window, back to caret mode on this cell
+        caretPos_ = selCursor_;
         return {true, false, {}, true};
     }
     if (sym == FcitxKey_Return || sym == FcitxKey_KP_Enter) {
-        // On a Chinese cell, Enter commits the highlighted candidate; on an
-        // English cell there is nothing to pick, so it just closes selection.
-        return onChinese ? pickCandidate(highlight_)
-                         : (exitSelection(), KeyResult{true, false, {}, true});
-    }
-
-    // On an English cell: ↑ tries to re-read this cell (+ the next few) as a 注音
-    // syllable — recovering a 聲母 the English run swallowed. Other candidate
-    // keys are swallowed (cursor stays); anything else resumes normal typing.
-    if (!onChinese) {
-        if (sym == FcitxKey_Up) {
-            return reinterpretFromCell();
-        }
-        if (sym == FcitxKey_Down || sym == FcitxKey_space ||
-            sym == FcitxKey_Page_Up || sym == FcitxKey_Page_Down) {
-            return {true, false, {}, true};
-        }
-        if (int kp = keypadAscii(sym)) {
-            return insertAtCursor(static_cast<char>(kp));
-        }
-        if (sym >= 33 && sym <= 126) {
-            return insertAtCursor(static_cast<char>(sym));
-        }
-        exitSelection();
-        return handleAuto(key);
+        return pickCandidate(highlight_);
     }
 
     const int total = static_cast<int>(selCands_.size());
@@ -1084,11 +1206,13 @@ KeyResult Buffer::handleSelecting(const fcitx::Key &key) {
         return {true, false, {}, false};
     }
 
-    // Any other printable key: insert it before this character (typing while
-    // selecting). Non-printable control keys leave selection and re-process.
-    if (sym >= 33 && sym <= 126) {
-        return insertAtCursor(static_cast<char>(sym));
+    // Any other printable key: close the window and start inserting before this
+    // character, composed as normal input. Non-printable control keys leave
+    // editing and re-process.
+    if (keypadAscii(sym) || (sym >= 33 && sym <= 126)) {
+        return beginInsert(selCursor_, key);
     }
-    exitSelection();
+    candOpen_ = false;
+    caretPos_ = selCursor_;
     return handleAuto(key);
 }

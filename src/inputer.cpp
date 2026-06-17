@@ -61,15 +61,15 @@ std::size_t utf8Offset(const std::string &s, int n) {
 // a highlight would either vanish or bleed across everything. The caret, by
 // contrast, is honoured almost universally and (together with the candidate
 // window) clearly marks the character being edited.
-fcitx::Text buildPreedit(const std::string &text, int selChar) {
+fcitx::Text buildPreedit(const std::string &text, int caret) {
     fcitx::Text preedit;
     if (text.empty()) {
         return preedit;
     }
     preedit.append(text, fcitx::TextFormatFlag::Underline);
-    int cursor = selChar < 0
+    int cursor = caret < 0
                      ? static_cast<int>(text.size())
-                     : static_cast<int>(utf8Offset(text, selChar));
+                     : static_cast<int>(utf8Offset(text, caret));
     preedit.setCursor(cursor);
     return preedit;
 }
@@ -97,7 +97,9 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
 
     const std::string preeditStr = buffer.preeditText();
     const int selChar = buffer.selectionChar();
-    setPreedit(ic, buildPreedit(preeditStr, selChar));
+    // The caret follows the insertion point while typing mid-string (selChar is
+    // -1 then); the aux-line highlight below still keys off selChar.
+    setPreedit(ic, buildPreedit(preeditStr, buffer.caretChar()));
 
     // The inline pre-edit above is rendered by the client application, which may
     // ignore per-segment styling (some paint the whole pre-edit reversed). So we
