@@ -53,6 +53,10 @@ public:
     KeyResult handleKey(const fcitx::Key &key);
     void reset();
 
+    // Insert clipboard / external text at the caret (Ctrl+V): drops in as literal
+    // cells and leaves the caret right after them, so editing continues there.
+    void pasteAtCaret(const std::string &text);
+
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
     // Index (within the current candidate page) of the highlighted candidate,

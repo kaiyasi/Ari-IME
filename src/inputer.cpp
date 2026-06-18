@@ -13,6 +13,8 @@
 #include <fcitx/text.h>
 #include <fcitx/userinterfacemanager.h>
 
+#include <clipboard_public.h>
+
 #include "constants.h"
 
 namespace {
@@ -145,6 +147,14 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
     ic->updateUserInterface(fcitx::UserInterfaceComponent::InputPanel);
 }
 
+std::string InputerEngine::clipboardText(fcitx::InputContext *ic) {
+    auto *clipboard = instance_->addonManager().addon("clipboard", /*load=*/true);
+    if (!clipboard) {
+        return {}; // clipboard module unavailable: silently fall back
+    }
+    return clipboard->call<fcitx::IClipboard::clipboard>(ic);
+}
+
 void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
                              fcitx::KeyEvent &keyEvent) {
     if (keyEvent.isRelease()) {
@@ -157,6 +167,21 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
     // Apply current config (cheap + idempotent) so toggling it in configtool
     // takes effect on every context without per-state bookkeeping.
     state->buffer.setFullWidthPunct(*config_.fullWidthPunctuation);
+
+    // Ctrl+V / Shift+Insert while a pre-edit is active pastes the clipboard at the
+    // caret (everything is caret-relative). With no pre-edit, let the app paste.
+    const fcitx::Key &k = keyEvent.key();
+    if ((k.check(FcitxKey_v, fcitx::KeyState::Ctrl) ||
+         k.check(FcitxKey_Insert, fcitx::KeyState::Shift)) &&
+        !state->buffer.preeditText().empty()) {
+        std::string pasted = clipboardText(ic);
+        if (!pasted.empty()) {
+            state->buffer.pasteAtCaret(pasted);
+            updateUI(ic, state->buffer);
+            keyEvent.filterAndAccept();
+            return;
+        }
+    }
 
     KeyResult result = state->buffer.handleKey(keyEvent.key());
 

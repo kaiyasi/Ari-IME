@@ -56,6 +56,9 @@ public:
 
 private:
     void updateUI(fcitx::InputContext *ic, Buffer &buffer);
+    // Current clipboard contents (Ctrl+V), or empty if the clipboard module is
+    // unavailable. Loads the clipboard addon on demand.
+    std::string clipboardText(fcitx::InputContext *ic);
 
     fcitx::Instance *instance_;
     fcitx::FactoryFor<InputerState> factory_;

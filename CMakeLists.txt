@@ -10,6 +10,7 @@ set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 
 find_package(Fcitx5Core REQUIRED)
 find_package(Fcitx5Utils REQUIRED)
+find_package(Fcitx5ModuleClipboard REQUIRED) # clipboard_public.h for Ctrl+V paste
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Chewing REQUIRED IMPORTED_TARGET chewing)
@@ -26,6 +27,7 @@ target_link_libraries(inputer
     PRIVATE
         Fcitx5::Core
         Fcitx5::Utils
+        Fcitx5::Module::Clipboard
         PkgConfig::Chewing
 )
 

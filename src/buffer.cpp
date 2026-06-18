@@ -959,6 +959,48 @@ void Buffer::mergeTail() {
     }
 }
 
+void Buffer::pasteAtCaret(const std::string &text) {
+    if (text.empty()) {
+        return;
+    }
+    // Resolve a single insertion index, whatever state we're in: while editing,
+    // the caret position; while typing, the live tail folds into cells_ and the
+    // insertion point is just before any parked tail_.
+    int pos;
+    if (selecting_) {
+        pos = candOpen_ ? selCursor_ : caretPos_;
+    } else {
+        freezeAll();
+        pos = static_cast<int>(cells_.size());
+        if (!tail_.empty()) {
+            cells_.insert(cells_.end(), tail_.begin(), tail_.end());
+            tail_.clear();
+        }
+    }
+    if (pos < 0) {
+        pos = 0;
+    }
+    if (pos > static_cast<int>(cells_.size())) {
+        pos = static_cast<int>(cells_.size());
+    }
+    // Pasted text drops in as literal cells (no 注音 reading): it is finished
+    // text, not something to re-pick. Each codepoint becomes one cell.
+    std::vector<Cell> pasted;
+    for (const std::string &ch : splitUtf8(text)) {
+        if (ch == "\n" || ch == "\r" || ch == "\t") {
+            continue; // keep the pre-edit a single line
+        }
+        pasted.push_back({false, ch, {}});
+    }
+    cells_.insert(cells_.begin() + pos, pasted.begin(), pasted.end());
+    // Land in caret mode with the caret right after the pasted text, so further
+    // keys keep composing at that position.
+    selecting_ = true;
+    candOpen_ = false;
+    runLoaded_ = false;
+    caretPos_ = pos + static_cast<int>(pasted.size());
+}
+
 KeyResult Buffer::beginInsert(int pos, const fcitx::Key &key) {
     // Park the cell at `pos` and everything after it as the tail, then drop out
     // of editing and resume the normal typing path right there. The keystroke
@@ -1063,10 +1105,11 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
         }
         return {true, false, {}, true};
     }
-    // ↓ / ↑ open the candidate window for the character LEFT of the caret (the
-    // one just passed); ↑ additionally reinterprets an English cell as 注音.
+    // ↓ / ↑ open the candidate window for the character the caret points AT — the
+    // one to its RIGHT (at the end, the last character); ↑ additionally
+    // reinterprets an English cell as 注音.
     if (sym == FcitxKey_Down || sym == FcitxKey_Up) {
-        int cell = caretPos_ > 0 ? caretPos_ - 1 : 0;
+        int cell = caretPos_ < N ? caretPos_ : N - 1;
         return openCandidatesAt(cell, /*reinterpret=*/sym == FcitxKey_Up);
     }
     if (sym == FcitxKey_BackSpace) {

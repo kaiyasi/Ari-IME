@@ -125,13 +125,14 @@ void test_backspace() {
 }
 
 // Caret model: ←/→ move a caret between characters; ↓ opens the candidate window
-// for the character LEFT of the caret. After one Left the caret sits between 你
-// and 好, so ↓ re-picks 你.
+// for the character the caret points AT — the one to its RIGHT. To re-pick 你
+// the caret must sit before it (two Lefts to the front).
 void test_phrase_priority() {
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left); // caret between 你 and 好
-    s.key(FcitxKey_Down); // open candidates for 你
+    s.key(FcitxKey_Left); // caret before 你
+    s.key(FcitxKey_Down); // open candidates for 你 (the char to the right)
     auto c = s.cand();
     check(!c.empty() && c[0] == "你好", "phrase 你好 listed first");
     check(c.size() > 2 && c[2] == "你", "single 你 after phrases");
@@ -145,6 +146,7 @@ void test_live_matches_top_candidate() {
     s.type("su3cl3");
     check_eq(s.preedit(), "你好", "live shows top candidate 你好");
     s.key(FcitxKey_Left); // caret between 你 and 好
+    s.key(FcitxKey_Left); // caret before 你
     s.key(FcitxKey_Down); // open candidates for 你
     auto c = s.cand();
     check(!c.empty() && c[0] == "你好", "selection top candidate matches live");
@@ -154,6 +156,7 @@ void test_phrase_pick() {
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left); // caret between 你 and 好
+    s.key(FcitxKey_Left); // caret before 你
     s.key(FcitxKey_Down); // open candidates for 你
     s.key('2');           // pick #2 = 妳好 (phrase)
     check_eq(s.preedit(), "妳好", "phrase pick rewrites both cells");
@@ -163,6 +166,7 @@ void test_pin_earlier_pick() {
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left);  // caret between 你 and 好
+    s.key(FcitxKey_Left);  // caret before 你
     s.key(FcitxKey_Down);  // open candidates for 你 (hl0 你好)
     s.key(FcitxKey_Down);  // 妳好
     s.key(FcitxKey_Down);  // 你 (single)
@@ -198,6 +202,24 @@ void test_insert_chinese_midstring() {
     check(m.b.caretChar() == 2, "caret sits between 不 and 好, not at end");
 }
 
+// Paste lands at the caret like any other action, and typing continues there.
+void test_paste_at_caret() {
+    Sim s;
+    s.type("su3cl3");      // 你好
+    s.key(FcitxKey_Left);  // caret between 你 and 好
+    s.b.pasteAtCaret("ABC");
+    check_eq(s.preedit(), "你ABC好", "paste lands at the caret");
+    check(s.b.caretChar() == 4, "caret sits right after the pasted text");
+    s.type("1j4");         // keep composing at the caret -> insert 不 after ABC
+    check_eq(s.preedit(), "你ABC不好", "typing continues at the caret after paste");
+
+    // Pasting while typing at the end folds the live run in first.
+    Sim e;
+    e.type("su3");         // 你 (live)
+    e.b.pasteAtCaret("xy");
+    check_eq(e.preedit(), "你xy", "paste at the end appends after the run");
+}
+
 void test_up_navigates_not_revert() {
     Sim s;
     s.type("ji3");        // 我 (stable top candidate for ㄨㄛˇ)
@@ -221,6 +243,7 @@ void test_reinterpret() {
     s.type("catsu3");     // cats以 (auto peel)
     check_eq(s.preedit(), "cats以", "catsu3 auto-guesses cats以");
     s.key(FcitxKey_Left); // caret between s and 以
+    s.key(FcitxKey_Left); // caret before s (so ↑ targets s)
     s.key(FcitxKey_Up);   // reinterpret the s (+ 以) -> 你
     check_eq(s.preedit(), "cat你", "reinterpret recovers cat你");
 }
@@ -239,6 +262,7 @@ void test_commit_after_pick() {
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left);     // caret between 你 and 好
+    s.key(FcitxKey_Left);     // caret before 你
     s.key(FcitxKey_Down);     // open candidates for 你
     s.key('2');               // pick the 2nd candidate (a phrase 妳好)
     std::string chosen = s.preedit();
@@ -303,6 +327,7 @@ int main() {
     test_phrase_pick();
     test_pin_earlier_pick();
     test_insert_chinese_midstring();
+    test_paste_at_caret();
     test_up_navigates_not_revert();
     test_revert_entry();
     test_reinterpret();
