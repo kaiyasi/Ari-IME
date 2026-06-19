@@ -827,6 +827,34 @@ void test_reinterpret() {
     templateVar.key(FcitxKey_Up);
     check_eq(templateVar.preedit(), "su3}}",
              "reinterpret does not rewrite template variable");
+
+    Sim shellVar;
+    shellVar.b.pasteAtCaret("$su3");
+    move_caret_to(shellVar, 1); // before the shell variable name
+    shellVar.key(FcitxKey_Up);
+    check_eq(shellVar.preedit(), "$su3",
+             "reinterpret does not rewrite shell variable");
+
+    Sim envAssign;
+    envAssign.b.pasteAtCaret("su3=value");
+    move_caret_to(envAssign, 0); // before the environment variable name
+    envAssign.key(FcitxKey_Up);
+    check_eq(envAssign.preedit(), "su3=value",
+             "reinterpret does not rewrite environment assignment");
+
+    Sim templateFilter;
+    templateFilter.b.pasteAtCaret("su3|upper");
+    move_caret_to(templateFilter, 0); // before the template value
+    templateFilter.key(FcitxKey_Up);
+    check_eq(templateFilter.preedit(), "su3|upper",
+             "reinterpret does not rewrite template filter");
+
+    Sim route;
+    route.b.pasteAtCaret("/items/:su3");
+    move_caret_to(route, 8); // before the route parameter name
+    route.key(FcitxKey_Up);
+    check_eq(route.preedit(), "/items/:su3",
+             "reinterpret does not rewrite framework route parameter");
 }
 
 void test_insert_while_selecting() {
