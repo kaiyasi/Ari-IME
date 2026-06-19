@@ -212,6 +212,11 @@ bool isSingleAsciiLowerCell(const std::string &text) {
     return text.size() == 1 && isAsciiLower(text[0]);
 }
 
+bool isTechnicalLiteralSuffix(const std::string &text) {
+    return text == ":" || text == "=" || text == "+" || text == "*" ||
+           text == "?" || text == "{" || text == "[" || text == "|";
+}
+
 bool canPeelEnglishBody(const std::string &prefix, const std::string &body) {
     int nonToneSlots = 0;
     bool hasInitial = false;
@@ -1204,6 +1209,14 @@ KeyResult Buffer::reinterpretFromCell() {
     }
     if (consumeTo < 0) {
         return {true, false, {}, true}; // nothing forms a syllable: no-op
+    }
+    int next = consumeTo + 1;
+    while (next < static_cast<int>(cells_.size()) && cells_[next].text == " ") {
+        ++next;
+    }
+    if (next < static_cast<int>(cells_.size()) &&
+        isTechnicalLiteralSuffix(cells_[next].text)) {
+        return {true, false, {}, true};
     }
     // Replace the consumed cells with a single Chinese cell, then open its
     // candidates so the user can confirm or pick another homophone.

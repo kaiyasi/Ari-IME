@@ -764,6 +764,34 @@ void test_reinterpret() {
     css.key(FcitxKey_Up);
     check_eq(css.preedit(), ".btn-su3:hover { color: red; }",
              "reinterpret does not rewrite CSS selector segment");
+
+    Sim yaml;
+    yaml.b.pasteAtCaret("su3: enabled");
+    move_caret_to(yaml, 0); // before the YAML key
+    yaml.key(FcitxKey_Up);
+    check_eq(yaml.preedit(), "su3: enabled",
+             "reinterpret does not rewrite YAML key");
+
+    Sim toml;
+    toml.b.pasteAtCaret("su3 = true");
+    move_caret_to(toml, 0); // before the TOML key
+    toml.key(FcitxKey_Up);
+    check_eq(toml.preedit(), "su3 = true",
+             "reinterpret does not rewrite TOML key");
+
+    Sim docker;
+    docker.b.pasteAtCaret("su3:latest");
+    move_caret_to(docker, 0); // before the Docker image name
+    docker.key(FcitxKey_Up);
+    check_eq(docker.preedit(), "su3:latest",
+             "reinterpret does not rewrite Docker image tag");
+
+    Sim regex;
+    regex.b.pasteAtCaret("su3+");
+    move_caret_to(regex, 0); // before the regex atom
+    regex.key(FcitxKey_Up);
+    check_eq(regex.preedit(), "su3+",
+             "reinterpret does not rewrite regex token");
 }
 
 void test_insert_while_selecting() {
