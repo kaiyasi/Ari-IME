@@ -27,6 +27,7 @@
 - 英文 cell 重新解讀注音再補 YAML/TOML key、Docker image tag、regex token、Git ref、hostname/host:port，行首 technical literal 不會因 ↑ 被誤轉中文。
 - 英文 cell 重新解讀注音再補 Makefile target、IPv6-like literal、templating variable closing delimiter，避免行首 `su3` 類變數/target 被 ↑ 誤轉中文。
 - 英文 cell 重新解讀注音再補 shell variable、environment assignment、template filter、framework route parameter regression，固定更多開發者文字場景。
+- 英文 cell 重新解讀注音再補 glob pattern、Make/CMake variable expansion、Vue/React template expression regression。
 
 ### UX
 
@@ -80,7 +81,7 @@
 - 補上標點設定的 UI 說明，並持續擴充更多符號測試。
 - 若要加入快速切換全形標點，先設計可配置快捷鍵，不提供固定預設鍵；
   實作時需更新持久化 config 或明確標示為 per-context override，避免 buffer runtime 狀態被下一次 config 套用覆蓋。
-- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 glob pattern、Make/CMake variable expansion、Vue/React template syntax。
+- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 CSV/TSV data、spreadsheet-like formulas、LaTeX/Markdown extended syntax。
 
 ### P2: UX 細節
 

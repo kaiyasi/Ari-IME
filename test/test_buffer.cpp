@@ -855,6 +855,41 @@ void test_reinterpret() {
     route.key(FcitxKey_Up);
     check_eq(route.preedit(), "/items/:su3",
              "reinterpret does not rewrite framework route parameter");
+
+    Sim glob;
+    glob.b.pasteAtCaret("su3*");
+    move_caret_to(glob, 0); // before the glob stem
+    glob.key(FcitxKey_Up);
+    check_eq(glob.preedit(), "su3*",
+             "reinterpret does not rewrite glob pattern");
+
+    Sim makeVar;
+    makeVar.b.pasteAtCaret("$(su3)");
+    move_caret_to(makeVar, 2); // before the Make variable name
+    makeVar.key(FcitxKey_Up);
+    check_eq(makeVar.preedit(), "$(su3)",
+             "reinterpret does not rewrite Make variable expansion");
+
+    Sim cmakeVar;
+    cmakeVar.b.pasteAtCaret("${su3}");
+    move_caret_to(cmakeVar, 2); // before the CMake variable name
+    cmakeVar.key(FcitxKey_Up);
+    check_eq(cmakeVar.preedit(), "${su3}",
+             "reinterpret does not rewrite CMake variable expansion");
+
+    Sim vue;
+    vue.b.pasteAtCaret("{{ su3 | upper }}");
+    move_caret_to(vue, 3); // before the Vue template expression value
+    vue.key(FcitxKey_Up);
+    check_eq(vue.preedit(), "{{ su3 | upper }}",
+             "reinterpret does not rewrite Vue template expression");
+
+    Sim react;
+    react.b.pasteAtCaret("{su3 && item}");
+    move_caret_to(react, 1); // before the React expression identifier
+    react.key(FcitxKey_Up);
+    check_eq(react.preedit(), "{su3 && item}",
+             "reinterpret does not rewrite React expression identifier");
 }
 
 void test_insert_while_selecting() {
