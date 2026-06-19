@@ -42,6 +42,7 @@
 - 補強全形標點 regression 覆蓋，包含逗號、句號、問號、括號、角引號、雙角引號、驚嘆號與冒號。
 - 全形標點補上頓號與省略號 fallback，libchewing 未回傳中文標點時仍可輸出 `、` 與 `……`。
 - 全形標點補上常見 ASCII 符號全形化：`@ # $ % & * + = | ~`。
+- 全形標點補上 `_` 與反引號 fallback，避免 libchewing 將底線映射成破折號或讓反引號原樣通過。
 - 新增 `docs/manual-qa.md`，把 GTK/Qt/Electron、Wayland/X11、候選點選、剪貼簿、數字鍵盤、設定切換等實機驗證流程整理成 checklist。
 
 ### 效能與穩定性

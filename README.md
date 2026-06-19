@@ -26,9 +26,10 @@ phrasing and per-user learning.
 - **Full-width punctuation (optional)** — toggle in config; `<` → ，, `>` → 。,
   `?` → ？, `\` → 、, `^` → ……, `(` → （, `{` → 『, etc. It applies
   in mixed Chinese/English pre-edit text, including common symbols such as
-  `@` → ＠ and `%` → ％. Off by default (half-width), with a transient hint when
-  the setting changes. Ari IME deliberately does not reserve a fixed punctuation
-  toggle shortcut, so common application shortcuts such as `Ctrl+.` remain available.
+  `@` → ＠, `%` → ％, `_` → ＿ and `` ` `` → ｀. Off by default (half-width),
+  with a transient hint when the setting changes. Ari IME deliberately does not
+  reserve a fixed punctuation toggle shortcut, so common application shortcuts
+  such as `Ctrl+.` remain available.
 - **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
   up, and the mode persists until toggled again.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
