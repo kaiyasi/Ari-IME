@@ -8,6 +8,7 @@ build_dir="${INPUTER_BUILD_DIR:-build}"
 sanitize_dir="${INPUTER_SANITIZE_BUILD_DIR:-build-sanitize}"
 install_prefix="${INPUTER_INSTALL_PREFIX:-/tmp/inputer-install-check}"
 mode="${INPUTER_CHECK_MODE:-all}"
+build_type="${INPUTER_BUILD_TYPE:-Release}"
 
 run() {
     printf '\n==> %s\n' "$*"
@@ -79,7 +80,7 @@ release_checks() {
     local cmake_args=()
     mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$build_dir" "${cmake_args[@]}" \
-        -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+        -DCMAKE_BUILD_TYPE="$build_type" -DBUILD_TESTING=ON
     run cmake --build "$build_dir"
     run ctest --test-dir "$build_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
     run cmake --install "$build_dir" --prefix "$install_prefix"

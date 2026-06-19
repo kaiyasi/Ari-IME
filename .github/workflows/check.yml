@@ -7,13 +7,14 @@ on:
 
 jobs:
   release:
-    name: Release Build (${{ matrix.compiler.name }})
+    name: ${{ matrix.build_type }} Build (${{ matrix.compiler.name }})
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
     strategy:
       fail-fast: false
       matrix:
+        build_type: [Release, Debug]
         compiler:
           - name: GCC
             cc: gcc
@@ -43,6 +44,8 @@ jobs:
       - name: Run release checks
         run: >
           INPUTER_CHECK_MODE=release
+          INPUTER_BUILD_TYPE=${{ matrix.build_type }}
+          INPUTER_BUILD_DIR=build-${{ matrix.compiler.name }}-${{ matrix.build_type }}
           INPUTER_CC=${{ matrix.compiler.cc }}
           INPUTER_CXX=${{ matrix.compiler.cxx }}
           scripts/check.sh
