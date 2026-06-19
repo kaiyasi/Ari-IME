@@ -7,16 +7,27 @@ on:
 
 jobs:
   release:
-    name: Release Build
+    name: Release Build (${{ matrix.compiler.name }})
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - name: GCC
+            cc: gcc
+            cxx: g++
+          - name: Clang
+            cc: clang
+            cxx: clang++
 
     steps:
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
+            clang \
             cmake \
             extra-cmake-modules \
             fcitx5 \
@@ -30,7 +41,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run release checks
-        run: INPUTER_CHECK_MODE=release scripts/check.sh
+        run: >
+          INPUTER_CHECK_MODE=release
+          INPUTER_CC=${{ matrix.compiler.cc }}
+          INPUTER_CXX=${{ matrix.compiler.cxx }}
+          scripts/check.sh
 
   sanitize:
     name: Sanitizers

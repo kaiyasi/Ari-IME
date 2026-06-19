@@ -14,6 +14,15 @@ run() {
     "$@"
 }
 
+cmake_compiler_args() {
+    if [[ -n "${INPUTER_CC:-}" ]]; then
+        printf '%s\n' "-DCMAKE_C_COMPILER=$INPUTER_CC"
+    fi
+    if [[ -n "${INPUTER_CXX:-}" ]]; then
+        printf '%s\n' "-DCMAKE_CXX_COMPILER=$INPUTER_CXX"
+    fi
+}
+
 extract_cmake_version() {
     sed -n 's/^project(inputer VERSION \([^ ]*\) LANGUAGES CXX).*/\1/p' CMakeLists.txt
 }
@@ -67,7 +76,10 @@ check_srcinfo() {
 
 release_checks() {
     check_versions
-    run cmake -S . -B "$build_dir" -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    local cmake_args=()
+    mapfile -t cmake_args < <(cmake_compiler_args)
+    run cmake -S . -B "$build_dir" "${cmake_args[@]}" \
+        -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
     run cmake --build "$build_dir"
     run ctest --test-dir "$build_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
     run cmake --install "$build_dir" --prefix "$install_prefix"
@@ -76,7 +88,10 @@ release_checks() {
 }
 
 sanitize_checks() {
+    local cmake_args=()
+    mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$sanitize_dir" \
+        "${cmake_args[@]}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DINPUTER_ENABLE_SANITIZERS=ON \
         -DBUILD_TESTING=ON
