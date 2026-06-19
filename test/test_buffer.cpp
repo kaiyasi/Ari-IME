@@ -890,6 +890,41 @@ void test_reinterpret() {
     react.key(FcitxKey_Up);
     check_eq(react.preedit(), "{su3 && item}",
              "reinterpret does not rewrite React expression identifier");
+
+    Sim csv;
+    csv.b.pasteAtCaret("su3,amount");
+    move_caret_to(csv, 0); // before the CSV field
+    csv.key(FcitxKey_Up);
+    check_eq(csv.preedit(), "su3,amount",
+             "reinterpret does not rewrite CSV field");
+
+    Sim tsv;
+    tsv.b.pasteAtCaret("su3\tamount");
+    move_caret_to(tsv, 0); // before the TSV field
+    tsv.key(FcitxKey_Up);
+    check_eq(tsv.preedit(), "su3 amount",
+             "reinterpret does not rewrite TSV field");
+
+    Sim formula;
+    formula.b.pasteAtCaret("=su3+1");
+    move_caret_to(formula, 1); // before the formula identifier
+    formula.key(FcitxKey_Up);
+    check_eq(formula.preedit(), "=su3+1",
+             "reinterpret does not rewrite spreadsheet-like formula");
+
+    Sim latex;
+    latex.b.pasteAtCaret("\\su3{}");
+    move_caret_to(latex, 1); // before the LaTeX command name
+    latex.key(FcitxKey_Up);
+    check_eq(latex.preedit(), "\\su3{}",
+             "reinterpret does not rewrite LaTeX command");
+
+    Sim markdownAttr;
+    markdownAttr.b.pasteAtCaret("[label]{#su3}");
+    move_caret_to(markdownAttr, 9); // before the Markdown attribute id
+    markdownAttr.key(FcitxKey_Up);
+    check_eq(markdownAttr.preedit(), "[label]{#su3}",
+             "reinterpret does not rewrite Markdown attribute id");
 }
 
 void test_insert_while_selecting() {

@@ -215,7 +215,8 @@ bool isSingleAsciiLowerCell(const std::string &text) {
 }
 
 bool isTechnicalLiteralSuffix(const std::string &text) {
-    return text == "." || text == "/" || text == ":" || text == "=" ||
+    return text == "." || text == "/" || text == ":" || text == "," ||
+           text == "=" ||
            text == "+" || text == "*" || text == "?" || text == "{" ||
            text == "}" || text == "[" || text == "]" || text == "|";
 }
@@ -1213,12 +1214,25 @@ KeyResult Buffer::reinterpretFromCell() {
     if (consumeTo < 0) {
         return {true, false, {}, true}; // nothing forms a syllable: no-op
     }
+    auto startsAsciiField = [this](int index) {
+        if (index < 0 || index >= static_cast<int>(cells_.size())) {
+            return false;
+        }
+        const std::string &text = cells_[index].text;
+        return text.size() == 1 &&
+               ((text[0] >= 'A' && text[0] <= 'Z') ||
+                (text[0] >= 'a' && text[0] <= 'z') ||
+                (text[0] >= '0' && text[0] <= '9'));
+    };
     int next = consumeTo + 1;
+    bool skippedSpace = false;
     while (next < static_cast<int>(cells_.size()) && cells_[next].text == " ") {
+        skippedSpace = true;
         ++next;
     }
     if (next < static_cast<int>(cells_.size()) &&
-        isTechnicalLiteralSuffix(cells_[next].text)) {
+        (isTechnicalLiteralSuffix(cells_[next].text) ||
+         (skippedSpace && startsAsciiField(next)))) {
         return {true, false, {}, true};
     }
     // Replace the consumed cells with a single Chinese cell, then open its
