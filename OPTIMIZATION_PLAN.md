@@ -60,6 +60,7 @@
 - PKGBUILD 使用 tagged source tarball，`check()` 會跑 CTest。
 - `.SRCINFO` 與 PKGBUILD 同步。
 - 本地 release/package checks 會驗證 CMake project version、PKGBUILD `pkgver`、`.SRCINFO` `pkgver` 一致，避免 release 漏改版本。
+- package simulation 不再硬編碼 source tree 版本目錄，升版後會跟著 PKGBUILD `pkgver` 建立模擬 tarball 內容。
 
 ## 後續優先順序
 
