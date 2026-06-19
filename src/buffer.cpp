@@ -213,8 +213,9 @@ bool isSingleAsciiLowerCell(const std::string &text) {
 }
 
 bool isTechnicalLiteralSuffix(const std::string &text) {
-    return text == ":" || text == "=" || text == "+" || text == "*" ||
-           text == "?" || text == "{" || text == "[" || text == "|";
+    return text == "." || text == "/" || text == ":" || text == "=" ||
+           text == "+" || text == "*" || text == "?" || text == "{" ||
+           text == "[" || text == "|";
 }
 
 bool canPeelEnglishBody(const std::string &prefix, const std::string &body) {

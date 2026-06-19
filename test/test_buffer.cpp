@@ -792,6 +792,20 @@ void test_reinterpret() {
     regex.key(FcitxKey_Up);
     check_eq(regex.preedit(), "su3+",
              "reinterpret does not rewrite regex token");
+
+    Sim gitref;
+    gitref.b.pasteAtCaret("su3/main");
+    move_caret_to(gitref, 0); // before the Git ref prefix
+    gitref.key(FcitxKey_Up);
+    check_eq(gitref.preedit(), "su3/main",
+             "reinterpret does not rewrite Git ref prefix");
+
+    Sim hostport;
+    hostport.b.pasteAtCaret("su3.example:443");
+    move_caret_to(hostport, 0); // before the hostname
+    hostport.key(FcitxKey_Up);
+    check_eq(hostport.preedit(), "su3.example:443",
+             "reinterpret does not rewrite hostname or host:port");
 }
 
 void test_insert_while_selecting() {
