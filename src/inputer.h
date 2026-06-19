@@ -30,7 +30,7 @@ FCITX_CONFIGURATION(
         this, "KeyboardLayout", _("Keyboard layout"), inputer::KeyboardLayout::Default};
     fcitx::Option<bool> fullWidthPunctuation{
         this, "FullWidthPunctuation",
-        _("Output full-width Chinese punctuation (，。？) for punctuation keys"),
+        _("Use full-width Chinese punctuation for punctuation keys (for example < -> ，, > -> 。, ? -> ？, _ -> ＿). Off by default; no global shortcut is reserved."),
         false};);
 
 // Per-input-context state, owned by fcitx and created on demand.

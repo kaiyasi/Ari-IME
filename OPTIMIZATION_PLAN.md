@@ -33,6 +33,7 @@
 
 - pre-edit auxiliary line 顯示中/英模式、鍵盤配置、半形/全形標點狀態。
 - 全形/半形標點設定變更時顯示短暫提示，和鍵盤配置切換提示一致。
+- 全形標點設定項補上更完整的 configtool 說明，列出常見映射、預設關閉，並明確標示不保留全域快捷鍵。
 - 已評估快速切換全形標點快捷鍵：目前不加入固定預設鍵，避免攔截
   `Ctrl+.` 等應用程式常用快捷鍵；後續若要加入，應先做成可配置快捷鍵並明確定義 per-context / global 設定語意。
 - 候選詞多頁時顯示目前頁數與總頁數。
@@ -78,7 +79,7 @@
 
 ### P1: 輸入法完整度
 
-- 補上標點設定的 UI 說明，並持續擴充更多符號測試。
+- 持續擴充更多標點符號測試。
 - 若要加入快速切換全形標點，先設計可配置快捷鍵，不提供固定預設鍵；
   實作時需更新持久化 config 或明確標示為 per-context override，避免 buffer runtime 狀態被下一次 config 套用覆蓋。
 - 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 CSV/TSV data、spreadsheet-like formulas、LaTeX/Markdown extended syntax。
