@@ -2,7 +2,7 @@
 Name=知字 (Ari IME)
 Comment=Smart mixed Bopomofo/English input method (no mode switching)
 Category=InputMethod
-Version=0.2.0
+Version=@PROJECT_VERSION@
 Type=SharedLibrary
 Library=inputer
 Configurable=True

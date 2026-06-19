@@ -6,24 +6,25 @@ pkgdesc="知字 (Ari IME): Fcitx5 mixed Bopomofo/English input without mode swit
 arch=('x86_64')
 url="https://github.com/kaiyasi/Ari-IME"
 license=('GPL-3.0-or-later')
-depends=('fcitx5' 'libchewing')
+depends=('fcitx5' 'hicolor-icon-theme' 'libchewing')
 makedepends=('cmake' 'extra-cmake-modules' 'gcc')
-# For a release, point source at a tagged tarball and set the checksum:
-#   source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-#   sha256sums=('SKIP')
-source=()
-sha256sums=()
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+_srcdir="Ari-IME-$pkgver"
 
 build() {
-    cd "$srcdir/.."
-    cmake -B build -S . \
+    cmake -B "$srcdir/build" -S "$srcdir/$_srcdir" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DBUILD_TESTING=OFF
-    cmake --build build
+        -DBUILD_TESTING=ON
+    cmake --build "$srcdir/build"
+}
+
+check() {
+    ctest --test-dir "$srcdir/build" --output-on-failure
 }
 
 package() {
-    cd "$srcdir/.."
-    DESTDIR="$pkgdir" cmake --install build
+    DESTDIR="$pkgdir" cmake --install "$srcdir/build"
 }

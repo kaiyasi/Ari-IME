@@ -8,6 +8,7 @@
 
 #include <fcitx-utils/key.h>
 
+#include "layout.h"
 #include "zhuyin.h"
 
 // Result of feeding one key into the state machine, applied by the engine.
@@ -46,11 +47,13 @@ struct KeyResult {
 // works on ANY character in the string regardless of surrounding English: Down
 // enters a selection mode whose cursor moves over the whole pre-edit.
 //
-// Ctrl+Space additionally toggles a forced pure-English mode (no 注音), still
-// held in the pre-edit until Enter.
+// Ctrl+Space additionally toggles a forced pure-English mode (no 注音) that
+// persists until toggled again; text is still held in the pre-edit until Enter.
 class Buffer {
 public:
     KeyResult handleKey(const fcitx::Key &key);
+    // Clear composition/candidates/caret state. User mode toggles such as
+    // forced English persist until the user toggles them explicitly.
     void reset();
 
     // Insert clipboard / external text at the caret (Ctrl+V): drops in as literal
@@ -59,6 +62,11 @@ public:
 
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
+    // Select a candidate on the currently visible page. Used by UI candidate
+    // activation (mouse/touch) so it shares the same path as number-key picking.
+    KeyResult selectCandidate(int pageIndex);
+    int candidatePage() const;
+    int candidatePageCount() const;
     // Index (within the current candidate page) of the highlighted candidate,
     // or -1 when no candidate window is open.
     int highlight() const;
@@ -73,11 +81,20 @@ public:
     // --- Configuration (driven by the fcitx5 addon config) ---
     // When on, non-注音 punctuation keys produce chewing's full-width Chinese
     // punctuation (e.g. '<' -> ，, '?' -> ？); off (default) keeps them literal.
-    void setFullWidthPunct(bool on) { fullWidthPunct_ = on; }
+    bool setFullWidthPunct(bool on) {
+        if (fullWidthPunct_ == on) {
+            return false;
+        }
+        fullWidthPunct_ = on;
+        return true;
+    }
+    bool setKeyboardLayout(inputer::KeyboardLayout layout);
 
     // Forced pure-English mode (toggled by Ctrl+Space); lets the engine show the
     // current 中/英 mode hint.
     bool isForcedEnglish() const { return forcedEnglish_; }
+    bool isFullWidthPunct() const { return fullWidthPunct_; }
+    inputer::KeyboardLayout keyboardLayout() const { return layout_; }
 
 private:
     enum class Token { Chinese, English };
@@ -120,6 +137,7 @@ private:
     KeyResult handleSpace();
     KeyResult handleEnter();
     KeyResult handleBackspace();
+    KeyResult handleDelete();
     // On commit, replay each Chinese run into chewing with the user's chosen
     // characters selected and commit it, so chewing's autoLearn records the
     // phrase/homophone frequencies (personal adaptation over time).
@@ -137,6 +155,7 @@ private:
     // longest phrase interval), then choose global index `idx` within it.
     struct SelCand {
         std::string text;
+        std::string display;
         int down = 0;
         int idx = 0;
     };
@@ -144,7 +163,8 @@ private:
     // --- Editing mode: a caret over cells_ with two sub-states ---
     // Caret mode (candOpen_ == false): the caret sits BETWEEN characters; arrows
     // move it, printable keys (digits included) insert as ordinary input, ↓/↑
-    // open the candidate window to re-pick the character left of the caret.
+    // open the candidate window to re-pick the character right of the caret
+    // (or the last character when the caret is at the end).
     // Picking mode (candOpen_ == true): the classic candidate window over one
     // cell; ↑↓ navigate, number keys pick, Esc returns to caret mode.
     KeyResult enterSelection(const fcitx::Key &key); // freeze + enter caret mode
@@ -173,6 +193,7 @@ private:
     // Collect chewing's candidates at the cursor — longest phrase interval first,
     // down to single characters — into selCands_.
     void buildSelCands();
+    int visibleCandidateCount() const;
     // Write chewing's current buffer back over the run's cell texts.
     void applyRunToCells();
     KeyResult moveSelCursor(int delta);     // step to the adjacent cell
@@ -201,6 +222,7 @@ private:
 
     bool forcedEnglish_ = false;
     bool fullWidthPunct_ = false;
+    inputer::KeyboardLayout layout_ = inputer::KeyboardLayout::Default;
     Token token_ = Token::Chinese;
     std::vector<Cell> cells_;             // finalized pre-edit, before the live tail
     std::vector<Cell> tail_;              // cells parked AFTER the live tail while

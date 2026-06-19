@@ -18,43 +18,83 @@ phrasing and per-user learning.
   brand names stay intact (`aceru/6` → `acer螢`).
 - **Candidate re-selection anywhere** — press ↓/←/→ to open a cursor that walks
   the whole pre-edit and re-pick any character or phrase; earlier picks stay
-  pinned.
+  pinned. Candidates can be picked by number key or direct click/touch, and
+  multi-page lists show their current page in the auxiliary line. The labeled
+  `原始鍵 ...` candidate restores a converted character back to its raw keys.
 - **Consistent phrasing** — the character shown while typing matches the top
   candidate the selection window offers ("以選字候選為準").
 - **Full-width punctuation (optional)** — toggle in config; `<` → ，, `>` → 。,
-  `?` → ？, etc. Off by default (half-width).
-- **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops up.
+  `?` → ？, `\` → 、, `^` → ……, `(` → （, `{` → 『, etc. It applies
+  in mixed Chinese/English pre-edit text, including common symbols such as
+  `@` → ＠ and `%` → ％. Off by default (half-width), with a transient hint when
+  the setting changes. Ari IME deliberately does not reserve a fixed punctuation
+  toggle shortcut, so common application shortcuts such as `Ctrl+.` remain available.
+- **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
+  up, and the mode persists until toggled again.
+- **Visible composition status** — the auxiliary line shows current 中/英 mode,
+  keyboard layout and punctuation mode while composing.
 - **Per-user learning** — chewing records your homophone/phrase choices.
 
 ## Keys
 
 | Key | Action |
 |-----|--------|
-| letters / digits | 注音 keys (大千 layout) or literal English |
-| tone `3 4 6 7`, space (一聲) | complete the pending syllable |
+| letters / digits | 注音 keys in the selected keyboard layout, or literal English |
+| layout tone keys, space (一聲) | complete the pending syllable |
 | ↓ / ← / → | open candidate re-selection over the pre-edit |
-| ↑ | reinterpret an English run as 注音 / revert a 注音 cell to raw keys |
+| ↑ | open/reinterpret the current pre-edit cell |
+| Tab / Shift+Tab (in candidates) | move candidate highlight forward / backward |
+| Home / End | jump to the beginning / end of the pre-edit |
+| Delete | delete the character right of the caret, or the focused candidate cell |
+| PageUp / PageDown | move between candidate pages |
 | number `1`–`9` | pick a candidate |
 | Backspace (in selection) | delete the focused character and leave selection |
+| Esc | clear pre-edit, or close selection/candidates first |
 | Enter | commit the whole pre-edit to the application |
+| Ctrl+V / Shift+Insert | paste clipboard text at the current pre-edit caret, with control/newline-like separators folded into visible spaces |
 | Ctrl+Space | toggle forced English mode |
+
+Numeric-keypad navigation keys are treated like their main-keyboard equivalents
+when NumLock is off. Numeric-keypad digits remain literal digits when NumLock is
+on, so they do not accidentally become tone keys. `Shift+KP_Insert` also pastes.
 
 ## Keyboard layout
 
-Currently **大千 (KB_DEFAULT) only** — the syllable classification is layout-specific.
-Other layouts (倚天 / 許氏 / …) are a planned addition.
+Currently supported layouts:
+
+- **大千** (`KB_DEFAULT`) — `su3` → 你, `su3cl3` → 你好
+- **倚天** (`KB_ET`) — `ne3` → 你, `ne3hz3` → 你好
+- **許氏** (`KB_HSU`) — `nef` → 你, `nefhwf` → 你好
+- **IBM** (`KB_IBM`) — `7a,` → 你, `7a,-;,` → 你好
+- **精業** (`KB_GIN_YIEH`) — `d-a` → 你, `d-avla` → 你好
+- **Dvorak** (`KB_DVORAK`) — `og3` → 你, `og3jn3` → 你好
+- **Carpalx** (`KB_CARPALX`) — `su3` → 你, `su3cl3` → 你好
+- **Colemak-DH ANSI** (`KB_COLEMAK_DH_ANSI`) — `rl3` → 你, `rl3di3` → 你好
+- **Colemak-DH Ortholinear** (`KB_COLEMAK_DH_ORTH`) — `rl3` → 你, `rl3ci3` → 你好
+- **Workman** (`KB_WORKMAN`) — `sf3` → 你, `sf3mo3` → 你好
+- **Colemak** (`KB_COLEMAK`) — `rl3` → 你, `rl3ci3` → 你好
+
+The addon's config exposes the keyboard layout setting with these display names,
+and the key classification plus libchewing keyboard type share one layout layer,
+so other layouts can be added without changing the input state machine.
+Changing the layout clears the current uncommitted pre-edit and shows a transient
+keyboard-layout hint.
+Pinyin keyboard modes are intentionally not exposed here because this engine's
+state machine is built around one-key-per-Bopomofo-symbol layouts.
 
 ## Dependencies
 
-- fcitx5 (and `Fcitx5Core` / `Fcitx5Utils` development files)
+- fcitx5 (and `Fcitx5Core` / `Fcitx5Config` / `Fcitx5Utils` /
+  `Fcitx5ModuleClipboard` development files)
 - libchewing (`chewing`)
+- hicolor-icon-theme (for the installed `inputer` icon)
 - extra-cmake-modules (ECM)
 - a C++20 compiler, CMake ≥ 3.16
 
 On Arch Linux:
 
 ```sh
-sudo pacman -S fcitx5 libchewing extra-cmake-modules cmake gcc
+sudo pacman -S fcitx5 hicolor-icon-theme libchewing extra-cmake-modules cmake gcc
 ```
 
 ## Build & install
@@ -66,8 +106,8 @@ sudo cmake --install build
 ```
 
 Then restart fcitx5 and add **知字 (Ari IME)** in `fcitx5-configtool` (or your IME
-configuration). Per-addon options (e.g. full-width punctuation) appear under the
-addon's config page.
+configuration). Per-addon options (keyboard layout, full-width punctuation)
+appear under the addon's config page.
 
 ## Tests
 
@@ -77,6 +117,37 @@ ctest --test-dir build
 
 The tests isolate chewing's learned dictionary in a temp directory, so they are
 deterministic and do not touch your real `~/.config` data.
+
+For the full local verification pass:
+
+```sh
+scripts/check.sh
+```
+
+This checks version consistency across CMake/PKGBUILD/.SRCINFO, then runs the
+release build, CTest, install smoke check, PKGBUILD syntax check, and the
+sanitizer test profile. Add `INPUTER_CHECK_PACKAGE=1` to also run an offline
+Arch package `build/check/package` simulation.
+
+Set `INPUTER_CHECK_MODE=release`, `sanitize`, or `package` to run just one part
+of the check. GitHub Actions uses these modes as separate jobs in an Arch Linux
+container on pushes and pull requests.
+
+For memory/undefined-behavior checks:
+
+```sh
+cmake -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DINPUTER_ENABLE_SANITIZERS=ON
+cmake --build build-sanitize
+ctest --test-dir build-sanitize --output-on-failure
+```
+
+Leak detection is disabled in this profile so the tests still run in ptrace-based
+sandboxes. To include LeakSanitizer on a normal local/CI runner, add
+`-DINPUTER_SANITIZER_DETECT_LEAKS=ON`.
+
+Real application behavior still needs manual validation because preedit,
+candidate windows, clipboard, and theme rendering depend on the desktop session.
+Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 ## License
 

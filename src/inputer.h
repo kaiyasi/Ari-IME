@@ -15,14 +15,19 @@
 #include <fcitx/instance.h>
 
 #include "buffer.h"
+#include "layout.h"
 
 class InputerEngine;
 
-// User-facing configuration, surfaced in fcitx5-configtool. Note: the keyboard
-// layout is currently 大千-only because the syllable classification in buffer.cpp
-// (slotOf/canonical) is layout-specific; multi-layout support is a future task.
+// User-facing configuration, surfaced in fcitx5-configtool. Keyboard layout
+// choices are backed by layout.cpp so key classification and chewing's KB type
+// stay in sync.
 FCITX_CONFIGURATION(
     InputerConfig,
+    fcitx::OptionWithAnnotation<inputer::KeyboardLayout,
+                                inputer::KeyboardLayoutI18NAnnotation>
+        keyboardLayout{
+        this, "KeyboardLayout", _("Keyboard layout"), inputer::KeyboardLayout::Default};
     fcitx::Option<bool> fullWidthPunctuation{
         this, "FullWidthPunctuation",
         _("Output full-width Chinese punctuation (，。？) for punctuation keys"),
@@ -48,14 +53,19 @@ public:
     const fcitx::Configuration *getConfig() const override { return &config_; }
     void setConfig(const fcitx::RawConfig &config) override {
         config_.load(config, true);
+        applyConfig();
         fcitx::safeSaveAsIni(config_, "conf/inputer.conf");
     }
     void reloadConfig() override {
         fcitx::readAsIni(config_, "conf/inputer.conf");
+        applyConfig();
     }
 
 private:
+    inputer::KeyboardLayout applyConfig();
     void updateUI(fcitx::InputContext *ic, Buffer &buffer);
+    void applyResult(fcitx::InputContext *ic, Buffer &buffer,
+                     const KeyResult &result);
     // Current clipboard contents (Ctrl+V), or empty if the clipboard module is
     // unavailable. Loads the clipboard addon on demand.
     std::string clipboardText(fcitx::InputContext *ic);

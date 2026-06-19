@@ -1,7 +1,4 @@
-# Build output
-/build/
-
-# Editor / OS noise
-*.swp
-*~
-.DS_Store
+build/
+build-*/
+pkg/
+*.pkg.tar.*

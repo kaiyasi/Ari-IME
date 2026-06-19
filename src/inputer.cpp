@@ -3,7 +3,10 @@
 #include "inputer.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
+#include <string>
+#include <utility>
 
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/textformatflags.h>
@@ -23,12 +26,22 @@ namespace {
 // highlight tracks our own ↑/↓ navigation.
 class InputerCandidate : public fcitx::CandidateWord {
 public:
-    explicit InputerCandidate(const std::string &text, bool highlighted) {
+    explicit InputerCandidate(
+        const std::string &text, bool highlighted,
+        std::function<void(fcitx::InputContext *)> onSelect)
+        : onSelect_(std::move(onSelect)) {
         setText(fcitx::Text(text, highlighted
                                       ? fcitx::TextFormatFlag::HighLight
                                       : fcitx::TextFormatFlag::NoFlag));
     }
-    void select(fcitx::InputContext *) const override {}
+    void select(fcitx::InputContext *ic) const override {
+        if (onSelect_) {
+            onSelect_(ic);
+        }
+    }
+
+private:
+    std::function<void(fcitx::InputContext *)> onSelect_;
 };
 
 // Byte length of the UTF-8 character starting at `s[i]`.
@@ -76,6 +89,24 @@ fcitx::Text buildPreedit(const std::string &text, int caret) {
     return preedit;
 }
 
+std::string statusText(const Buffer &buffer) {
+    std::string out = buffer.isForcedEnglish() ? "英" : "中";
+    out += " · ";
+    out += inputer::keyboardLayoutName(buffer.keyboardLayout());
+    out += " · ";
+    out += buffer.isFullWidthPunct() ? "全形標點" : "半形標點";
+    return out;
+}
+
+bool isPasteShortcut(const fcitx::Key &key) {
+    if (key.check(FcitxKey_v, fcitx::KeyState::Ctrl) ||
+        key.check(FcitxKey_Insert, fcitx::KeyState::Shift)) {
+        return true;
+    }
+    return key.sym() == FcitxKey_KP_Insert &&
+           key.states().test(fcitx::KeyState::Shift);
+}
+
 void setPreedit(fcitx::InputContext *ic, fcitx::Text preedit) {
     if (ic->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {
         ic->inputPanel().setClientPreedit(preedit);
@@ -91,6 +122,15 @@ InputerEngine::InputerEngine(fcitx::Instance *instance)
       factory_([](fcitx::InputContext &) { return new InputerState(); }) {
     instance_->inputContextManager().registerProperty("inputerState", &factory_);
     reloadConfig();
+}
+
+inputer::KeyboardLayout InputerEngine::applyConfig() {
+    inputer::KeyboardLayout layout = *config_.keyboardLayout;
+    if (!inputer::keyboardLayoutAvailable(layout)) {
+        layout = inputer::KeyboardLayout::Default;
+    }
+    inputer::setCurrentKeyboardLayout(layout);
+    return layout;
 }
 
 void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
@@ -134,13 +174,29 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
         list->setSelectionKey(selectionKeys);
         int hl = buffer.highlight();
         for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
-            list->append(
-                std::make_unique<InputerCandidate>(candidates[i], i == hl));
+            list->append(std::make_unique<InputerCandidate>(
+                candidates[i], i == hl, [this, i](fcitx::InputContext *ic) {
+                    auto *state = ic->propertyFor(&factory_);
+                    KeyResult result = state->buffer.selectCandidate(i);
+                    applyResult(ic, state->buffer, result);
+                }));
         }
         if (hl >= 0 && hl < static_cast<int>(candidates.size())) {
             list->setGlobalCursorIndex(hl);
         }
         panel.setCandidateList(std::move(list));
+
+        int page = buffer.candidatePage();
+        int pages = buffer.candidatePageCount();
+        std::string auxDown;
+        if (pages > 1) {
+            auxDown = "候選 " + std::to_string(page) + "/" +
+                      std::to_string(pages) + " · ";
+        }
+        auxDown += statusText(buffer);
+        panel.setAuxDown(fcitx::Text(auxDown));
+    } else if (!preeditStr.empty()) {
+        panel.setAuxDown(fcitx::Text(statusText(buffer)));
     }
 
     ic->updatePreedit();
@@ -155,6 +211,20 @@ std::string InputerEngine::clipboardText(fcitx::InputContext *ic) {
     return clipboard->call<fcitx::IClipboard::clipboard>(ic);
 }
 
+void InputerEngine::applyResult(fcitx::InputContext *ic, Buffer &buffer,
+                                const KeyResult &result) {
+    if (result.hasCommit && !result.commitText.empty()) {
+        ic->commitString(result.commitText);
+    }
+    if (result.notifyMode) {
+        instance_->showCustomInputMethodInformation(
+            ic, buffer.isForcedEnglish() ? "英 English" : "中 中文");
+    }
+    if (result.updateUI) {
+        updateUI(ic, buffer);
+    }
+}
+
 void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
                              fcitx::KeyEvent &keyEvent) {
     if (keyEvent.isRelease()) {
@@ -166,14 +236,30 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
 
     // Apply current config (cheap + idempotent) so toggling it in configtool
     // takes effect on every context without per-state bookkeeping.
-    state->buffer.setFullWidthPunct(*config_.fullWidthPunctuation);
+    inputer::KeyboardLayout layout = applyConfig();
+    bool layoutChanged = state->buffer.setKeyboardLayout(layout);
+    bool punctChanged =
+        state->buffer.setFullWidthPunct(*config_.fullWidthPunctuation);
+    if (layoutChanged) {
+        std::string message =
+            std::string("鍵盤 ") + inputer::keyboardLayoutName(layout);
+        if (layout != *config_.keyboardLayout) {
+            message += " (設定不可用，已退回)";
+        }
+        instance_->showCustomInputMethodInformation(ic, message);
+        updateUI(ic, state->buffer);
+    }
+    if (punctChanged) {
+        instance_->showCustomInputMethodInformation(
+            ic, state->buffer.isFullWidthPunct() ? "標點 全形" : "標點 半形");
+        updateUI(ic, state->buffer);
+    }
 
-    // Ctrl+V / Shift+Insert while a pre-edit is active pastes the clipboard at the
-    // caret (everything is caret-relative). With no pre-edit, let the app paste.
+    // Ctrl+V / Shift+Insert paste clipboard text into our editable pre-edit
+    // buffer. If the clipboard is empty/unavailable, let the application handle
+    // the shortcut normally.
     const fcitx::Key &k = keyEvent.key();
-    if ((k.check(FcitxKey_v, fcitx::KeyState::Ctrl) ||
-         k.check(FcitxKey_Insert, fcitx::KeyState::Shift)) &&
-        !state->buffer.preeditText().empty()) {
+    if (isPasteShortcut(k)) {
         std::string pasted = clipboardText(ic);
         if (!pasted.empty()) {
             state->buffer.pasteAtCaret(pasted);
@@ -185,16 +271,7 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
 
     KeyResult result = state->buffer.handleKey(keyEvent.key());
 
-    if (result.hasCommit && !result.commitText.empty()) {
-        ic->commitString(result.commitText);
-    }
-    if (result.notifyMode) {
-        instance_->showCustomInputMethodInformation(
-            ic, state->buffer.isForcedEnglish() ? "英 English" : "中 中文");
-    }
-    if (result.updateUI) {
-        updateUI(ic, state->buffer);
-    }
+    applyResult(ic, state->buffer, result);
     if (result.handled) {
         keyEvent.filterAndAccept();
     }

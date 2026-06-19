@@ -1,0 +1,85 @@
+name: Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  release:
+    name: Release Build
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            cmake \
+            extra-cmake-modules \
+            fcitx5 \
+            gcc \
+            git \
+            hicolor-icon-theme \
+            libchewing \
+            pkgconf
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run release checks
+        run: INPUTER_CHECK_MODE=release scripts/check.sh
+
+  sanitize:
+    name: Sanitizers
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            cmake \
+            extra-cmake-modules \
+            fcitx5 \
+            gcc \
+            git \
+            hicolor-icon-theme \
+            libchewing \
+            pkgconf
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run sanitizer checks
+        run: INPUTER_CHECK_MODE=sanitize scripts/check.sh
+
+  package:
+    name: Package Simulation
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            cmake \
+            extra-cmake-modules \
+            fcitx5 \
+            gcc \
+            git \
+            hicolor-icon-theme \
+            libchewing \
+            pkgconf
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run package simulation
+        run: INPUTER_CHECK_MODE=package scripts/check.sh

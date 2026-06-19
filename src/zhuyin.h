@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "layout.h"
+
 struct ChewingContext;
 
-// Thin RAII wrapper around a libchewing context, configured for the Taiwan
-// (大千 / KB_DEFAULT) layout. The engine feeds raw QWERTY keys; chewing maps
-// them to bopomofo via the keyboard layout and performs candidate lookup,
-// intelligent phrasing and automatic per-user learning.
+// Thin RAII wrapper around a libchewing context, configured from the current
+// keyboard layout. The engine feeds raw QWERTY keys; chewing maps them to
+// bopomofo via that layout and performs candidate lookup, intelligent phrasing
+// and automatic per-user learning.
 class Zhuyin {
 public:
     Zhuyin();
@@ -22,6 +24,7 @@ public:
 
     // Clear all internal buffers but keep settings + learned user dictionary.
     void resetAll();
+    void setKeyboardLayout(inputer::KeyboardLayout layout);
 
     // Feed a single raw key (a printable ASCII character, e.g. 's', 'u', '3').
     void feedKey(char c);

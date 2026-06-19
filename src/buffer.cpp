@@ -3,14 +3,13 @@
 #include "buffer.h"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <string>
-#include <string_view>
 
 #include <fcitx-utils/keysym.h>
 
 #include "constants.h"
+#include "layout.h"
 
 namespace {
 
@@ -46,6 +45,19 @@ std::vector<std::string> splitUtf8(const std::string &s) {
     return out;
 }
 
+bool isAsciiControl(const std::string &ch) {
+    if (ch.size() != 1) {
+        return false;
+    }
+    unsigned char c = static_cast<unsigned char>(ch[0]);
+    return c < 0x20 || c == 0x7F;
+}
+
+bool isPasteSeparator(const std::string &ch) {
+    return isAsciiControl(ch) || ch == "\xc2\xa0" || ch == "\xe2\x80\xa8" ||
+           ch == "\xe2\x80\xa9";
+}
+
 int keypadAscii(fcitx::KeySym sym) {
     switch (sym) {
     case FcitxKey_KP_0: return '0';
@@ -68,88 +80,49 @@ int keypadAscii(fcitx::KeySym sym) {
     }
 }
 
+fcitx::KeySym normalizeKeySym(fcitx::KeySym sym) {
+    switch (sym) {
+    case FcitxKey_KP_Space: return FcitxKey_space;
+    case FcitxKey_KP_Home: return FcitxKey_Home;
+    case FcitxKey_KP_Left: return FcitxKey_Left;
+    case FcitxKey_KP_Up: return FcitxKey_Up;
+    case FcitxKey_KP_Right: return FcitxKey_Right;
+    case FcitxKey_KP_Down: return FcitxKey_Down;
+    case FcitxKey_KP_Prior: return FcitxKey_Page_Up;
+    case FcitxKey_KP_Next: return FcitxKey_Page_Down;
+    case FcitxKey_KP_End: return FcitxKey_End;
+    case FcitxKey_KP_Begin: return FcitxKey_Begin;
+    case FcitxKey_KP_Insert: return FcitxKey_Insert;
+    case FcitxKey_KP_Delete: return FcitxKey_Delete;
+    default: return sym;
+    }
+}
+
 bool hasWordModifier(const fcitx::Key &key) {
     return key.states().testAny(fcitx::KeyStates{
         fcitx::KeyState::Ctrl, fcitx::KeyState::Alt, fcitx::KeyState::Super});
 }
 
-// 大千 / KB_DEFAULT key classes. A 注音 syllable is at most one key from each
-// class, in the canonical order 聲母 < 介音 < 韻母 < 聲調. We use the class as a
-// "slot" so a raw key string can be re-sorted into that order before feeding
-// chewing, which makes detection tolerant of out-of-order typing (su3 vs s3u).
-//   聲母 = 0, 介音 = 1, 韻母 = 2, 聲調 = 3.  Non-注音 keys return -1.
-int slotOf(char c) {
-    // O(1) lookup: ASCII key -> 注音 slot (聲母 0, 介音 1, 韻母 2, 聲調 3), -1 otherwise.
-    static const std::array<int8_t, 128> kSlot = [] {
-        std::array<int8_t, 128> t{};
-        t.fill(-1);
-        auto mark = [&](std::string_view keys, int8_t slot) {
-            for (char k : keys) {
-                t[static_cast<unsigned char>(k)] = slot;
-            }
-        };
-        mark("1qaz2wsxedcrfv5tgbyhn", 0); // 聲母
-        mark("ujm", 1);                    // 介音 ㄧㄨㄩ
-        mark("8ik,9ol.0p;/-", 2);          // 韻母 ㄚ..ㄦ
-        mark("3467", 3);                   // 聲調 ˇˋˊ˙
-        return t;
-    }();
-    // Bopomofo has no case: a 注音 key is the same key whether Shift / Caps Lock
-    // is on or not, so fold uppercase letters to lowercase before the lookup.
-    unsigned char uc = static_cast<unsigned char>(c);
-    if (uc >= 'A' && uc <= 'Z') {
-        uc += 'a' - 'A';
+Zhuyin *probeForCurrentLayout(Zhuyin *&probe,
+                              inputer::KeyboardLayout &probeLayout) {
+    inputer::KeyboardLayout layout = inputer::currentKeyboardLayout();
+    if (!probe || probeLayout != layout) {
+        delete probe;
+        probe = new Zhuyin();
+        probeLayout = layout;
     }
-    return uc < kSlot.size() ? kSlot[uc] : -1;
-}
-
-bool isToneChar(char c) { return slotOf(c) == 3; }
-
-// Sort raw keys into canonical 注音 order. Each class appears at most once, so a
-// stable sort by slot yields the order chewing expects.
-std::string canonical(const std::string &keys) {
-    std::string out = keys;
-    // Fold to lowercase: these keys feed chewing (and become cell readings),
-    // which only understands the lowercase 大千 layout. Case is preserved
-    // separately on the English fallback path (syl_ / englishBuf_ keep the
-    // original characters), so uppercase still types English when it must.
-    for (char &c : out) {
-        if (c >= 'A' && c <= 'Z') {
-            c += 'a' - 'A';
-        }
-    }
-    std::stable_sort(out.begin(), out.end(),
-                     [](char a, char b) { return slotOf(a) < slotOf(b); });
-    return out;
-}
-
-// True when `keys` are all 注音 keys with no class used twice. When `allowTone`
-// is false a 聲調 key disqualifies the string (used to find the bopomofo body of
-// a trailing syllable, before the tone is appended).
-bool validSyllable(const std::string &keys, bool allowTone) {
-    std::array<bool, 4> seen{false, false, false, false};
-    for (char c : keys) {
-        int s = slotOf(c);
-        if (s < 0) {
-            return false;
-        }
-        if (s == 3 && !allowTone) {
-            return false;
-        }
-        if (seen[s]) {
-            return false;
-        }
-        seen[s] = true;
-    }
-    return true;
+    return probe;
 }
 
 // Whether a complete (toned) canonical syllable converts to a Chinese character
 // with nothing left dangling.
 bool syllableConverts(const std::string &canonicalKeys) {
-    // Intentionally leaked: a chewing context must outlive the process rather
-    // than be torn down during static destruction.
-    static Zhuyin *probe = new Zhuyin();
+    // Intentionally leaked at process exit: a chewing context must not be torn
+    // down during static destruction. It is rebuilt only on explicit layout
+    // changes while the process is alive.
+    static Zhuyin *probe = nullptr;
+    static inputer::KeyboardLayout probeLayout = inputer::KeyboardLayout::Default;
+    probe = probeForCurrentLayout(probe, probeLayout);
     probe->feedSequence(canonicalKeys);
     return probe->hasConverted() && !probe->hasBopomofo();
 }
@@ -157,7 +130,9 @@ bool syllableConverts(const std::string &canonicalKeys) {
 // Whether a bopomofo body (no tone) yields a character under 一聲 (the tone the
 // space key applies). Used to decide if space should convert a pending syllable.
 bool syllableConvertsTone1(const std::string &canonicalBody) {
-    static Zhuyin *probe = new Zhuyin();
+    static Zhuyin *probe = nullptr;
+    static inputer::KeyboardLayout probeLayout = inputer::KeyboardLayout::Default;
+    probe = probeForCurrentLayout(probe, probeLayout);
     probe->feedSequence(canonicalBody);
     probe->handleSpace(); // 一聲
     return probe->hasConverted() && !probe->hasBopomofo();
@@ -172,8 +147,29 @@ std::string chinesePunct(char c) {
     if (std::isalnum(static_cast<unsigned char>(c))) {
         return {};
     }
+    if (c == '\\') {
+        return "、";
+    }
+    if (c == '^') {
+        return "……";
+    }
+    switch (c) {
+    case '@': return "＠";
+    case '#': return "＃";
+    case '$': return "＄";
+    case '%': return "％";
+    case '&': return "＆";
+    case '*': return "＊";
+    case '+': return "＋";
+    case '=': return "＝";
+    case '|': return "｜";
+    case '~': return "～";
+    default: break;
+    }
     // Intentionally leaked, like the syllable probes above.
-    static Zhuyin *probe = new Zhuyin();
+    static Zhuyin *probe = nullptr;
+    static inputer::KeyboardLayout probeLayout = inputer::KeyboardLayout::Default;
+    probe = probeForCurrentLayout(probe, probeLayout);
     probe->resetAll();
     probe->handleDefault(static_cast<int>(c));
     std::string out;
@@ -202,10 +198,60 @@ std::pair<std::string, bool> readingBody(const std::string &reading) {
     return {reading, false};
 }
 
+bool isAsciiLower(char c) {
+    return c >= 'a' && c <= 'z';
+}
+
+bool hasAsciiLetter(const std::string &s) {
+    return std::any_of(s.begin(), s.end(), [](char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    });
+}
+
+bool isSingleAsciiLowerCell(const std::string &text) {
+    return text.size() == 1 && isAsciiLower(text[0]);
+}
+
+bool canPeelEnglishBody(const std::string &prefix, const std::string &body) {
+    int nonToneSlots = 0;
+    bool hasInitial = false;
+    bool hasMedial = false;
+    for (char c : body) {
+        int slot = inputer::zhuyinSlot(c);
+        if (slot < 0 || slot == inputer::kToneSlot) {
+            continue;
+        }
+        ++nonToneSlots;
+        if (slot == 0) {
+            hasInitial = true;
+        } else if (slot == 1) {
+            hasMedial = true;
+        }
+    }
+    // English text contains plenty of punctuation/digit patterns that overlap
+    // with final-only bopomofo keys, such as ".3" in version numbers. Do not
+    // peel digit/punctuation-only bodies from English.
+    if (!hasAsciiLetter(body)) {
+        return false;
+    }
+    if (!hasInitial && nonToneSlots < 2) {
+        // A single medial can be a legitimate English-word-friendly peel
+        // ("catsu3" -> "cats以"), but avoid acronym+zhuyin cases where the
+        // lowercase consonant before it belongs to the syllable ("HTTPsu3").
+        return hasMedial && body.size() == 1 && prefix.size() >= 2 &&
+               isAsciiLower(prefix.back()) &&
+               isAsciiLower(prefix[prefix.size() - 2]);
+    }
+    if (!prefix.empty() && !body.empty() && isAsciiLower(prefix.back()) &&
+        isAsciiLower(body.front()) && inputer::zhuyinSlot(body.front()) == 0) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 void Buffer::reset() {
-    forcedEnglish_ = false;
     token_ = Token::Chinese;
     cells_.clear();
     tail_.clear();
@@ -221,6 +267,20 @@ void Buffer::reset() {
     selPage_ = 0;
     runLoaded_ = false;
     zhuyin_.resetAll();
+}
+
+bool Buffer::setKeyboardLayout(inputer::KeyboardLayout layout) {
+    if (layout_ == layout) {
+        return false;
+    }
+    // Readings stored in existing cells are layout-specific raw keys. If the
+    // user changes layouts mid-preedit, keep the invariant simple and avoid
+    // re-feeding old readings through a different layout.
+    reset();
+    layout_ = layout;
+    inputer::setCurrentKeyboardLayout(layout_);
+    zhuyin_.setKeyboardLayout(layout_);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -301,21 +361,42 @@ std::vector<std::string> Buffer::candidates() const {
     // The current page (9) of the merged phrase+single candidate list. Empty on
     // an English cell (cursor still visible, just nothing to pick).
     std::vector<std::string> out;
-    if (!selecting_ || !candOpen_) {
+    int count = visibleCandidateCount();
+    if (count <= 0) {
         return out; // caret mode shows no candidate window
     }
+    out.reserve(count);
     int start = selPage_ * inputer::kCandPerPage;
-    for (int i = start;
-         i < start + inputer::kCandPerPage &&
-         i < static_cast<int>(selCands_.size());
-         ++i) {
-        out.push_back(selCands_[i].text);
+    for (int i = start; i < start + count; ++i) {
+        out.push_back(selCands_[i].display);
     }
     return out;
 }
 
+KeyResult Buffer::selectCandidate(int pageIndex) {
+    if (!selecting_ || !candOpen_) {
+        return {false, false, {}, false};
+    }
+    if (pageIndex < 0 || pageIndex >= visibleCandidateCount()) {
+        return {true, false, {}, false};
+    }
+    return pickCandidate(pageIndex);
+}
+
+int Buffer::candidatePage() const {
+    return (!selecting_ || !candOpen_ || selCands_.empty()) ? 0 : selPage_ + 1;
+}
+
+int Buffer::candidatePageCount() const {
+    if (!selecting_ || !candOpen_ || selCands_.empty()) {
+        return 0;
+    }
+    return (static_cast<int>(selCands_.size()) + inputer::kCandPerPage - 1) /
+           inputer::kCandPerPage;
+}
+
 int Buffer::highlight() const {
-    return candidates().empty() ? -1 : highlight_;
+    return visibleCandidateCount() <= 0 ? -1 : highlight_;
 }
 
 int Buffer::selectionChar() const {
@@ -358,7 +439,8 @@ KeyResult Buffer::handleKey(const fcitx::Key &key) {
     // Ctrl+Space toggles forced pure-English mode (no 注音 interpretation). Like
     // every other transition it folds the live tail into cells_ but never
     // commits; the pre-edit is still only flushed on Enter.
-    if (key.check(FcitxKey_space, fcitx::KeyState::Ctrl)) {
+    if (normalizeKeySym(key.sym()) == FcitxKey_space &&
+        key.states().test(fcitx::KeyState::Ctrl)) {
         if (selecting_) {
             exitSelection();
         }
@@ -379,7 +461,7 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
         return handleSelecting(key);
     }
 
-    auto sym = key.sym();
+    auto sym = normalizeKeySym(key.sym());
 
     if (sym == FcitxKey_space) {
         return handleSpace();
@@ -390,6 +472,9 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
     if (sym == FcitxKey_BackSpace) {
         return handleBackspace();
     }
+    if (sym == FcitxKey_Delete) {
+        return handleDelete();
+    }
     if (sym == FcitxKey_Escape) {
         if (!preeditText().empty()) {
             reset();
@@ -398,11 +483,13 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
         return {false, false, {}, false};
     }
 
-    // Down / Left / Right enter caret-editing over the whole pre-edit (the caret
-    // lands at the end, then this very key moves it / opens candidates). If there
-    // is nothing pending the arrow falls through to the application.
+    // Navigation keys enter caret-editing over the whole pre-edit (the caret
+    // lands at the end, then this very key moves it / opens candidates). If
+    // there is nothing pending the key falls through to the application.
     if ((sym == FcitxKey_Down || sym == FcitxKey_Left ||
-         sym == FcitxKey_Right) &&
+         sym == FcitxKey_Right || sym == FcitxKey_Up ||
+         sym == FcitxKey_Home || sym == FcitxKey_Begin ||
+         sym == FcitxKey_End) &&
         !forcedEnglish_) {
         return enterSelection(key);
     }
@@ -440,9 +527,22 @@ KeyResult Buffer::handleChar(char c, bool literal) {
     }
 
     if (token_ == Token::English) {
+        // In an English token, some punctuation-looking keys are still valid
+        // bopomofo pieces for tail peeling (e.g. "/" in "aceru/6" -> 螢). Only
+        // convert keys that are not part of the active keyboard layout.
+        if (fullWidthPunct_ && inputer::zhuyinSlot(c) < 0) {
+            std::string punct = chinesePunct(c);
+            if (!punct.empty()) {
+                freezeRun();
+                freezeEnglish();
+                cells_.push_back({false, punct, {}});
+                token_ = Token::Chinese;
+                return {true, false, {}, true};
+            }
+        }
         // English→Chinese transition without a delimiter: only a tone key, by
         // completing a trailing 注音 syllable, peels Chinese off the tail.
-        if (isToneChar(c)) {
+        if (inputer::isToneKey(c)) {
             KeyResult peeled;
             if (tryPeelEnglish(c, peeled)) {
                 return peeled;
@@ -452,7 +552,7 @@ KeyResult Buffer::handleChar(char c, bool literal) {
         return {true, false, {}, true};
     }
 
-    int s = slotOf(c);
+    int s = inputer::zhuyinSlot(c);
 
     // Non-注音 printable (punctuation, uppercase, ...): break to English.
     if (s < 0) {
@@ -477,18 +577,11 @@ KeyResult Buffer::handleChar(char c, bool literal) {
         return {true, false, {}, true}; // raw until a tone completes it
     }
 
-    // Does this key's class collide with one already in the in-progress
-    // syllable? The syllable is unsealed (no completed character yet), so a
-    // collision is ambiguous — it could continue this syllable or start a new
-    // one — and we fall back to English (matches 大千 mixed-input behaviour).
-    std::array<bool, 4> seen{false, false, false, false};
-    for (char k : syl_) {
-        int ks = slotOf(k);
-        if (ks >= 0) {
-            seen[ks] = true;
-        }
-    }
-    if (seen[s]) {
+    // If the extended raw keys cannot be assigned to a valid syllable, the
+    // unsealed hypothesis was wrong and we fall back to English. This goes
+    // through the layout layer because some layouts have dual-role keys (Hsu
+    // 'f' is ㄈ at syllable start but ˇ after a body).
+    if (!inputer::isValidSyllable(syl_ + c, /*allowTone=*/true)) {
         return flipToEnglish(c);
     }
 
@@ -496,8 +589,11 @@ KeyResult Buffer::handleChar(char c, bool literal) {
     // Only turn raw keys into Chinese once they form a complete, toned syllable.
     // A toned-but-incomplete state like "s3" (ㄋˇ) stays raw so an out-of-order
     // vowel can still complete it ("s3" + u -> 你).
-    const std::string body = canonical(syl_);
-    if (syllableConverts(body)) {
+    const std::string body = inputer::canonicalKeys(syl_);
+    const bool needsBody =
+        inputer::needsBodyBeforeToneCompletion(inputer::currentKeyboardLayout());
+    if ((!needsBody || inputer::hasMedialOrFinal(body)) &&
+        syllableConverts(body)) {
         integrateSyllable(body);
         syl_.clear();
     }
@@ -578,11 +674,14 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
     // relying on a dictionary, which would miss non-words.
     for (std::size_t k = buf.size(); k-- > 0;) {
         std::string body = buf.substr(k);
-        if (!validSyllable(body, /*allowTone=*/false)) {
+        if (!inputer::isValidSyllable(body, /*allowTone=*/false)) {
             continue;
         }
         std::string prefix = buf.substr(0, k);
-        std::string syllable = canonical(body);
+        if (!canPeelEnglishBody(prefix, body)) {
+            continue;
+        }
+        std::string syllable = inputer::canonicalKeys(body);
         syllable.push_back(tone);
         if (!syllableConverts(syllable)) {
             continue;
@@ -610,8 +709,8 @@ KeyResult Buffer::handleSpace() {
     // A pending bopomofo syllable: space is its 一聲. Convert it if that yields a
     // character (a lone 聲母 like "t" does not — fall through to a literal space).
     if (!forcedEnglish_ && token_ == Token::Chinese && !syl_.empty()) {
-        const std::string body = canonical(syl_);
-        if (validSyllable(body, /*allowTone=*/false) &&
+        const std::string body = inputer::canonicalKeys(syl_);
+        if (inputer::isValidSyllable(body, /*allowTone=*/false) &&
             syllableConvertsTone1(body)) {
             if (!englishBuf_.empty()) {
                 freezeRun();
@@ -702,6 +801,26 @@ KeyResult Buffer::handleBackspace() {
     if (!cells_.empty()) {
         cells_.pop_back();
         return {true, false, {}, true};
+    }
+    if (!tail_.empty()) {
+        // The caret is at the front of a parked tail during mid-string
+        // insertion. Backspace at that boundary is a no-op, but must still be
+        // absorbed so the application does not delete text outside the pre-edit.
+        return {true, false, {}, true};
+    }
+    return {false, false, {}, false};
+}
+
+KeyResult Buffer::handleDelete() {
+    // Delete is caret-relative. During normal end-of-string composition there is
+    // nothing to the right, but while inserting mid-string the parked tail_ is
+    // exactly the text to the right of the caret.
+    if (!tail_.empty()) {
+        tail_.erase(tail_.begin());
+        return {true, false, {}, true};
+    }
+    if (!preeditText().empty()) {
+        return {true, false, {}, false}; // absorb Delete at the end of pre-edit
     }
     return {false, false, {}, false};
 }
@@ -808,7 +927,8 @@ void Buffer::buildSelCands() {
         }
         int charLen = utf8Count(zhuyin_.candidate(0));
         for (int i = 0; i < total; ++i) {
-            selCands_.push_back({zhuyin_.candidate(i), down, i});
+            std::string text = zhuyin_.candidate(i);
+            selCands_.push_back({text, text, down, i});
         }
         if (charLen <= 1) {
             break; // reached the single-character interval
@@ -819,8 +939,20 @@ void Buffer::buildSelCands() {
     // marks it; picking it explodes the cell instead of choosing a homophone.
     std::string raw = readingBody(cells_[selCursor_].reading).first;
     if (!raw.empty()) {
-        selCands_.push_back({raw, -1, -1});
+        selCands_.push_back({raw, "原始鍵 " + raw, -1, -1});
     }
+}
+
+int Buffer::visibleCandidateCount() const {
+    if (!selecting_ || !candOpen_ || selCands_.empty()) {
+        return 0;
+    }
+    int start = selPage_ * inputer::kCandPerPage;
+    if (start < 0 || start >= static_cast<int>(selCands_.size())) {
+        return 0;
+    }
+    return std::min(inputer::kCandPerPage,
+                    static_cast<int>(selCands_.size()) - start);
 }
 
 void Buffer::applyRunToCells() {
@@ -984,11 +1116,15 @@ void Buffer::pasteAtCaret(const std::string &text) {
         pos = static_cast<int>(cells_.size());
     }
     // Pasted text drops in as literal cells (no 注音 reading): it is finished
-    // text, not something to re-pick. Each codepoint becomes one cell.
+    // text, not something to re-pick. Keep the pre-edit single-line and safe for
+    // clients by folding control/newline-like separators into one visible space.
     std::vector<Cell> pasted;
     for (const std::string &ch : splitUtf8(text)) {
-        if (ch == "\n" || ch == "\r" || ch == "\t") {
-            continue; // keep the pre-edit a single line
+        if (isPasteSeparator(ch)) {
+            if (pasted.empty() || pasted.back().text != " ") {
+                pasted.push_back({false, " ", {}});
+            }
+            continue;
         }
         pasted.push_back({false, ch, {}});
     }
@@ -1044,6 +1180,9 @@ KeyResult Buffer::reinterpretFromCell() {
     // Accumulate raw keys from the cursor cell forward (English cells contribute
     // their letter; a Chinese cell contributes its reading) until they form a
     // complete, convertible syllable. Look only a few cells ahead.
+    if (selCursor_ > 0 && !isSingleAsciiLowerCell(cells_[selCursor_ - 1].text)) {
+        return {true, false, {}, true};
+    }
     std::string raw;
     int consumeTo = -1;
     std::string found;
@@ -1052,12 +1191,12 @@ KeyResult Buffer::reinterpretFromCell() {
         std::string keys = cells_[j].chinese
                                ? readingBody(cells_[j].reading).first
                                : cells_[j].text;
-        std::string trial = canonical(raw + keys);
-        if (!validSyllable(trial, /*allowTone=*/true)) {
+        std::string trial = inputer::canonicalKeys(raw + keys);
+        if (!inputer::isValidSyllable(trial, /*allowTone=*/true)) {
             break; // this cell can't be part of the syllable; stop
         }
         raw += keys;
-        if (syllableConverts(trial)) {
+        if (hasAsciiLetter(raw) && syllableConverts(trial)) {
             consumeTo = j;
             found = trial;
             break;
@@ -1089,7 +1228,7 @@ KeyResult Buffer::handleSelecting(const fcitx::Key &key) {
 }
 
 KeyResult Buffer::handleCaret(const fcitx::Key &key) {
-    auto sym = key.sym();
+    auto sym = normalizeKeySym(key.sym());
     const int N = static_cast<int>(cells_.size());
 
     // Arrows move the caret between characters.
@@ -1105,6 +1244,14 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
         }
         return {true, false, {}, true};
     }
+    if (sym == FcitxKey_Home || sym == FcitxKey_Begin) {
+        caretPos_ = 0;
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_End) {
+        caretPos_ = N;
+        return {true, false, {}, true};
+    }
     // ↓ / ↑ open the candidate window for the character the caret points AT — the
     // one to its RIGHT (at the end, the last character); ↑ additionally
     // reinterprets an English cell as 注音.
@@ -1117,6 +1264,16 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
         if (caretPos_ > 0) {
             cells_.erase(cells_.begin() + caretPos_ - 1);
             --caretPos_;
+        }
+        if (cells_.empty()) {
+            exitSelection();
+        }
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_Delete) {
+        // Delete the character right of the caret.
+        if (caretPos_ < N) {
+            cells_.erase(cells_.begin() + caretPos_);
         }
         if (cells_.empty()) {
             exitSelection();
@@ -1163,7 +1320,7 @@ KeyResult Buffer::openCandidatesAt(int cell, bool reinterpret) {
 }
 
 KeyResult Buffer::handlePicking(const fcitx::Key &key) {
-    auto sym = key.sym();
+    auto sym = normalizeKeySym(key.sym());
 
     // ←/→ step to the adjacent character's candidates (fix several in a row).
     if (sym == FcitxKey_Left) {
@@ -1171,6 +1328,34 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
     }
     if (sym == FcitxKey_Right) {
         return moveSelCursor(+1);
+    }
+    if (sym == FcitxKey_Home || sym == FcitxKey_Begin) {
+        selCursor_ = 0;
+        runLoaded_ = false;
+        loadCellCandidates();
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_End) {
+        selCursor_ = static_cast<int>(cells_.size()) - 1;
+        runLoaded_ = false;
+        loadCellCandidates();
+        return {true, false, {}, true};
+    }
+    if (sym == FcitxKey_BackSpace || sym == FcitxKey_Delete) {
+        // In picking mode the focused cell is the user's editing target, so
+        // remove that cell and leave the caret at its former position.
+        if (selCursor_ >= 0 && selCursor_ < static_cast<int>(cells_.size())) {
+            cells_.erase(cells_.begin() + selCursor_);
+        }
+        if (cells_.empty()) {
+            exitSelection();
+            return {true, false, {}, true};
+        }
+        candOpen_ = false;
+        runLoaded_ = false;
+        caretPos_ = std::min(selCursor_, static_cast<int>(cells_.size()));
+        selCursor_ = std::min(caretPos_, static_cast<int>(cells_.size()) - 1);
+        return {true, false, {}, true};
     }
     if (sym == FcitxKey_Escape) {
         candOpen_ = false; // close the window, back to caret mode on this cell
@@ -1187,9 +1372,12 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
     int pageCount = std::min(inputer::kCandPerPage,
                              total - selPage_ * inputer::kCandPerPage);
 
-    // ↓ (and space) move the highlight through the merged phrase→single list,
-    // wrapping across pages at the end.
-    if (sym == FcitxKey_Down || sym == FcitxKey_space) {
+    const bool shift = key.states().test(fcitx::KeyState::Shift);
+
+    // ↓ / Space / Tab move the highlight through the merged phrase→single list,
+    // wrapping across pages at the end. Shift+Tab walks backward.
+    if (sym == FcitxKey_Down || sym == FcitxKey_space ||
+        (sym == FcitxKey_Tab && !shift)) {
         if (highlight_ + 1 < pageCount) {
             ++highlight_;
         } else if (selPage_ + 1 < totalPages) {
@@ -1201,9 +1389,11 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
         }
         return {true, false, {}, true};
     }
-    // ↑ moves the highlight back through the merged list (does NOT revert here —
-    // reverting is the last candidate entry, "raw keys"). Wraps at the top.
-    if (sym == FcitxKey_Up) {
+    // ↑ / Shift+Tab move the highlight back through the merged list (does NOT
+    // revert here — reverting is the last candidate entry, "raw keys"). Wraps
+    // at the top. ISO_Left_Tab is what some toolkits send for Shift+Tab.
+    if (sym == FcitxKey_Up || (sym == FcitxKey_Tab && shift) ||
+        sym == FcitxKey_ISO_Left_Tab) {
         if (highlight_ > 0) {
             --highlight_;
         } else if (selPage_ > 0) {

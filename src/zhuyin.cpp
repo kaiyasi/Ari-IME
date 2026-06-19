@@ -10,6 +10,7 @@
 #include <chewing.h>
 
 #include "constants.h"
+#include "layout.h"
 
 namespace {
 
@@ -45,8 +46,14 @@ Zhuyin::Zhuyin() {
     if (!ctx_) {
         return;
     }
-    chewing_set_KBType(ctx_, KB_DEFAULT);     // 大千 (Taiwan standard) layout.
-    chewing_set_autoLearn(ctx_, AUTOLEARN_ENABLED); // Learn homophone choices.
+    chewing_set_KBType(
+        ctx_, inputer::chewingKeyboardType(inputer::currentKeyboardLayout()));
+    // Tests run with a throwaway dictionary and should not try to persist learned
+    // data; production keeps auto-learning enabled by default.
+    const bool disableLearn =
+        std::getenv("INPUTER_DISABLE_AUTOLEARN") != nullptr;
+    chewing_set_autoLearn(ctx_,
+                          disableLearn ? AUTOLEARN_DISABLED : AUTOLEARN_ENABLED);
     chewing_set_spaceAsSelection(ctx_, 0);    // We drive selection ourselves.
     chewing_set_escCleanAllBuf(ctx_, 1);
     chewing_set_candPerPage(ctx_, inputer::kCandPerPage);
@@ -63,6 +70,12 @@ Zhuyin::~Zhuyin() {
 void Zhuyin::resetAll() {
     if (ctx_) {
         chewing_Reset(ctx_);
+    }
+}
+
+void Zhuyin::setKeyboardLayout(inputer::KeyboardLayout layout) {
+    if (ctx_) {
+        chewing_set_KBType(ctx_, inputer::chewingKeyboardType(layout));
     }
 }
 
