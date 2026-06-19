@@ -806,6 +806,27 @@ void test_reinterpret() {
     hostport.key(FcitxKey_Up);
     check_eq(hostport.preedit(), "su3.example:443",
              "reinterpret does not rewrite hostname or host:port");
+
+    Sim makefile;
+    makefile.b.pasteAtCaret("su3: build");
+    move_caret_to(makefile, 0); // before the Makefile target
+    makefile.key(FcitxKey_Up);
+    check_eq(makefile.preedit(), "su3: build",
+             "reinterpret does not rewrite Makefile target");
+
+    Sim ipv6;
+    ipv6.b.pasteAtCaret("su3::1");
+    move_caret_to(ipv6, 0); // before the IPv6-like literal
+    ipv6.key(FcitxKey_Up);
+    check_eq(ipv6.preedit(), "su3::1",
+             "reinterpret does not rewrite IPv6-like literal");
+
+    Sim templateVar;
+    templateVar.b.pasteAtCaret("su3}}");
+    move_caret_to(templateVar, 0); // before the template variable name
+    templateVar.key(FcitxKey_Up);
+    check_eq(templateVar.preedit(), "su3}}",
+             "reinterpret does not rewrite template variable");
 }
 
 void test_insert_while_selecting() {

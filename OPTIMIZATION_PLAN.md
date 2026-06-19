@@ -25,6 +25,7 @@
 - 擴充英文 cell 重新解讀注音測試到路徑、命令列參數、程式碼片段，避免 ↑ 把 literal `su3` 片段誤轉成中文。
 - 持續擴充英文 cell 重新解讀注音測試到 shell 管線、URL query string、程式語言泛型語法、Markdown inline code、JSON key/value、含底線識別字、log key-value、SQL identifier、CSS selector，避免真實技術文字被 ↑ 誤轉中文。
 - 英文 cell 重新解讀注音再補 YAML/TOML key、Docker image tag、regex token、Git ref、hostname/host:port，行首 technical literal 不會因 ↑ 被誤轉中文。
+- 英文 cell 重新解讀注音再補 Makefile target、IPv6-like literal、templating variable closing delimiter，避免行首 `su3` 類變數/target 被 ↑ 誤轉中文。
 
 ### UX
 
@@ -76,7 +77,7 @@
 - 補上標點設定的 UI 說明，並持續擴充更多符號測試。
 - 若要加入快速切換全形標點，先設計可配置快捷鍵，不提供固定預設鍵；
   實作時需更新持久化 config 或明確標示為 per-context override，避免 buffer runtime 狀態被下一次 config 套用覆蓋。
-- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 Makefile target、IPv6 literal、templating syntax。
+- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 shell variable、environment assignment、template filter、framework route pattern。
 
 ### P2: UX 細節
 
