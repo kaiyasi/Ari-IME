@@ -172,6 +172,10 @@ std::string pastePayload(const uint8_t *data, std::size_t size,
 void applyByte(FuzzState &state, const uint8_t *data, std::size_t size,
                std::size_t &offset) {
     const uint8_t op = data[offset++];
+    if (op >= 0x20 && op <= 0x7e) {
+        state.press(fcitx::Key(static_cast<fcitx::KeySym>(op)));
+        return;
+    }
     switch (op % 8) {
     case 0:
     case 1:
