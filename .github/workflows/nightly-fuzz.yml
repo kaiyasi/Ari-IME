@@ -1,0 +1,66 @@
+name: Nightly Fuzz
+
+on:
+  schedule:
+    - cron: "37 18 * * *"
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "libFuzzer run count"
+        required: false
+        default: "5000"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: Long Fuzz
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    timeout-minutes: 30
+
+    steps:
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-arch-pacman-${{ hashFiles('.github/workflows/nightly-fuzz.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arch-pacman-
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/ccache
+          key: ${{ runner.os }}-ccache-nightly-fuzz-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-nightly-fuzz-
+            ${{ runner.os }}-ccache-
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm \
+            ccache \
+            clang \
+            cmake \
+            extra-cmake-modules \
+            fcitx5 \
+            gcc \
+            git \
+            hicolor-icon-theme \
+            libchewing \
+            pkgconf
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run long fuzz checks
+        run: >
+          INPUTER_CHECK_MODE=fuzz
+          INPUTER_CXX_COMPILER_LAUNCHER=ccache
+          INPUTER_FUZZ_RUNS=${{ github.event.inputs.runs || '5000' }}
+          scripts/check.sh

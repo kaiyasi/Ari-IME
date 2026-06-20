@@ -174,6 +174,11 @@ printable ASCII bytes in those seeds are interpreted as direct key presses. Set
 `INPUTER_FUZZ_RUNS` to adjust the run count, or `INPUTER_FUZZ_CORPUS_DIR` to
 point at another corpus directory.
 
+GitHub also runs a separate scheduled/manual **Nightly Fuzz** workflow with a
+larger default run count. Trigger it manually from Actions and set the `runs`
+input when you want a longer one-off fuzz pass without slowing down normal
+push/PR checks.
+
 Real application behavior still needs manual validation because preedit,
 candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
