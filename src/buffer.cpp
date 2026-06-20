@@ -172,6 +172,8 @@ std::string chinesePunct(char c) {
     case '~': return "～";
     case '_': return "＿";
     case '`': return "｀";
+    case '"': return "＂";
+    case '\'': return "＇";
     default: break;
     }
     // Intentionally leaked, like the syllable probes above.

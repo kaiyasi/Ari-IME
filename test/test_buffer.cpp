@@ -1165,7 +1165,9 @@ void test_fullwidth_punct() {
     symbols.key('~');
     symbols.key('_');
     symbols.key('`');
-    check_eq(symbols.preedit(), "＠＃＄％＆＊＋＝｜～＿｀",
+    symbols.key('"');
+    symbols.key('\'');
+    check_eq(symbols.preedit(), "＠＃＄％＆＊＋＝｜～＿｀＂＇",
              "fullwidth common ASCII symbols");
 
     Sim e;
