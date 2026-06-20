@@ -9,6 +9,8 @@ option(INPUTER_ENABLE_SANITIZERS
     "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(INPUTER_SANITIZER_DETECT_LEAKS
     "Enable LeakSanitizer leak checks when sanitizers are enabled" OFF)
+option(INPUTER_ENABLE_FUZZING
+    "Build libFuzzer targets for Buffer state-machine fuzzing" OFF)
 
 find_package(ECM REQUIRED)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
@@ -41,6 +43,24 @@ function(inputer_enable_sanitizers target)
     target_link_options(${target}
         PRIVATE
             $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-fsanitize=address,undefined>
+    )
+endfunction()
+
+function(inputer_enable_fuzzer target)
+    if(NOT INPUTER_ENABLE_FUZZING)
+        return()
+    endif()
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+        message(FATAL_ERROR "INPUTER_ENABLE_FUZZING requires Clang or AppleClang")
+    endif()
+    target_compile_options(${target}
+        PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+    )
+    target_link_options(${target}
+        PRIVATE
+            -fsanitize=fuzzer,address,undefined
     )
 endfunction()
 
@@ -134,4 +154,21 @@ if(BUILD_TESTING)
     inputer_enable_sanitizers(test_layout)
     add_test(NAME layout COMMAND test_layout)
     inputer_configure_test(layout)
+endif()
+
+if(INPUTER_ENABLE_FUZZING)
+    add_executable(fuzz_buffer
+        test/fuzz_buffer.cpp
+        src/layout.cpp
+        src/buffer.cpp
+        src/zhuyin.cpp
+    )
+    target_include_directories(fuzz_buffer PRIVATE src test)
+    target_link_libraries(fuzz_buffer
+        PRIVATE
+            Fcitx5::Utils
+            PkgConfig::Chewing
+    )
+    inputer_enable_warnings(fuzz_buffer)
+    inputer_enable_fuzzer(fuzz_buffer)
 endif()

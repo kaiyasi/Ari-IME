@@ -146,6 +146,18 @@ Leak detection is disabled in this profile so the tests still run in ptrace-base
 sandboxes. To include LeakSanitizer on a normal local/CI runner, add
 `-DINPUTER_SANITIZER_DETECT_LEAKS=ON`.
 
+For bounded state-machine fuzzing with libFuzzer:
+
+```sh
+cmake -B build-fuzz -DCMAKE_CXX_COMPILER=clang++ -DINPUTER_ENABLE_FUZZING=ON
+cmake --build build-fuzz --target fuzz_buffer
+./build-fuzz/fuzz_buffer -runs=1000
+```
+
+The fuzz target is opt-in and is not part of the normal release/package build.
+It feeds mixed key, paste, candidate-selection, layout-switch, and punctuation
+events into `Buffer` while checking UTF-8 and public caret/candidate invariants.
+
 Real application behavior still needs manual validation because preedit,
 candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.

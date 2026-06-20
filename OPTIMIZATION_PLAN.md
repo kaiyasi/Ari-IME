@@ -73,6 +73,7 @@
 - GitHub Actions package simulation job 也啟用 ccache；PKGBUILD 支援可選 `CMAKE_CXX_COMPILER_LAUNCHER`，一般打包不受影響。
 - GitHub Actions 加入 workflow concurrency / cancel-in-progress，同一分支或 PR 只保留最新一次 CI matrix，避免連續推送浪費 runner。
 - 加入 deterministic key-sequence stress test，固定 seed 跑大量按鍵序列並檢查 preedit UTF-8、caret、selection、candidate page/highlight 等公開 invariant。
+- 加入 opt-in libFuzzer `fuzz_buffer` target，探索 `Buffer::handleKey`、貼上、候選點選、layout 切換與全形標點路徑，並檢查公開 caret/candidate/UTF-8 invariant。
 
 ### 發佈與包裝
 
@@ -107,4 +108,4 @@
 
 - 可再替 GitHub Actions 拆分更細的 dependency cache key，或視 runner 實測調整 ccache save/restore 策略。
 - 若未來 layout 探測成本變高，可把 slot table cache 持久化在 process lifetime 中並加測初始化次數。
-- 若要再提高狀態機韌性，可加入 libFuzzer/AFL harness 與 coverage 報表，專門探索 `Buffer::handleKey` 的長序列邊界。
+- 若要再提高狀態機韌性，可為 `fuzz_buffer` 累積 seed corpus、加入 coverage 報表，並評估是否在夜間 CI 跑 bounded fuzz。
