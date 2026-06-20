@@ -52,6 +52,7 @@
 - 全形標點補上常見 ASCII 符號全形化：`@ # $ % & * + = | ~`。
 - 全形標點補上 `_` 與反引號 fallback，避免 libchewing 將底線映射成破折號或讓反引號原樣通過。
 - 全形標點補上 ASCII 雙引號與單引號 fallback，避免 libchewing 映射成語意不相關的 `；` / `、`。
+- 全形標點補強跨鍵盤配置 regression，確保許氏 dual-role tone key 與精業 `-` 這類符號外觀注音鍵不會被誤轉成標點。
 - 新增 `docs/manual-qa.md`，把 GTK/Qt/Electron、Wayland/X11、候選點選、剪貼簿、數字鍵盤、設定切換等實機驗證流程整理成 checklist。
 
 ### 效能與穩定性
@@ -90,7 +91,7 @@
 
 ### P1: 輸入法完整度
 
-- 持續擴充更多標點符號測試，特別是不同鍵盤 layout 下有雙重語意的符號鍵。
+- 持續擴充更多標點符號測試，特別是不同鍵盤 layout 下仍缺少真實範例覆蓋的符號外觀鍵。
 - 若要加入快速切換全形標點，先設計可配置快捷鍵，不提供固定預設鍵；
   實作時需更新持久化 config 或明確標示為 per-context override，避免 buffer runtime 狀態被下一次 config 套用覆蓋。
 - 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，優先找開發、資料分析與文件編輯中容易把 `su3` 類 literal 誤解成注音的語境。

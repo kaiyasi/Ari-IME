@@ -1309,6 +1309,26 @@ void test_fullwidth_punct() {
     g.type("xu,4");           // a syllable using ',' = ㄝ
     check(g.preedit() != "x，4" && !g.preedit().empty(),
           "',' stays bopomofo in full-width mode");
+
+    Sim hsu;
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Hsu);
+    hsu.b.setKeyboardLayout(inputer::KeyboardLayout::Hsu);
+    hsu.b.setFullWidthPunct(true);
+    hsu.type("nefhwf"); // 許氏: f is both ㄈ and contextual ˇ.
+    hsu.key('?');
+    check_eq(hsu.preedit(), "你好？",
+             "fullwidth mode keeps Hsu dual-role tone keys as bopomofo");
+
+    Sim ginYieh;
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    ginYieh.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    ginYieh.b.setFullWidthPunct(true);
+    ginYieh.type("d-a"); // 精業: '-' is part of the ㄋㄧˇ key sequence.
+    ginYieh.key('?');
+    check_eq(ginYieh.preedit(), "你？",
+             "fullwidth mode keeps symbol-looking layout keys as bopomofo");
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 
 void test_deterministic_key_stress() {
