@@ -1491,5 +1491,5 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
     }
     candOpen_ = false;
     caretPos_ = selCursor_;
-    return handleAuto(key);
+    return {false, false, {}, true};
 }

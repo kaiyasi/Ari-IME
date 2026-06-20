@@ -679,6 +679,22 @@ void test_candidate_paging() {
     s.key(FcitxKey_Page_Up);
     check(s.cand() == first, "PageUp returns to previous candidate page");
     check(s.b.candidatePage() == 1, "PageUp rewinds page counter");
+
+    Sim pick;
+    pick.type("su3cl3");       // 你好
+    pick.key(FcitxKey_Left);   // caret between 你 and 好
+    pick.key(FcitxKey_Left);   // caret before 你
+    pick.key(FcitxKey_Down);   // open candidates for 你
+    pick.key(FcitxKey_Page_Down);
+    check(pick.b.candidatePage() == 2,
+          "candidate pick setup reaches second page");
+    pick.key('1');
+    check(!pick.preedit().empty() && pick.preedit() != "你好",
+          "cross-page pick rewrites focused cell");
+    pick.key(FcitxKey_Escape);
+    pick.type("1j4");
+    check(pick.preedit().find("不") != std::string::npos,
+          "typing after cross-page pick Escape continues at preserved caret");
 }
 
 void test_candidate_tab_navigation() {
@@ -1212,6 +1228,21 @@ void test_escape_behavior() {
              "typing after caret Escape resumes at end");
 }
 
+void test_candidate_control_closes_to_caret() {
+    Sim s;
+    s.type("su3cl3");         // 你好
+    s.key(FcitxKey_Left);     // caret between 你 and 好
+    s.key(FcitxKey_Left);     // caret before 你
+    s.key(FcitxKey_Down);     // candidate window focused on 你
+    KeyResult r = s.press(FcitxKey_F1);
+    check(!r.handled, "non-printable control passes through after closing");
+    check(s.b.selectionChar() == -1, "control key closes candidate highlight");
+    check_eq(s.preedit(), "你好", "control key keeps pre-edit text");
+    s.type("1j4");
+    check_eq(s.preedit(), "不你好",
+             "typing after control-close resumes at focused caret");
+}
+
 void test_picking_delete_focused_cell() {
     Sim s;
     s.type("su3cl3");          // 你好
@@ -1455,6 +1486,7 @@ int main() {
     test_caret_delete_home_end();
     test_direct_navigation_enters_editing();
     test_escape_behavior();
+    test_candidate_control_closes_to_caret();
     test_picking_delete_focused_cell();
     test_fullwidth_punct();
     test_deterministic_key_stress();
