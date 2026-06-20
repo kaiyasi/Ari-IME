@@ -1484,8 +1484,8 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
     }
 
     // Any other printable key: close the window and start inserting before this
-    // character, composed as normal input. Non-printable control keys leave
-    // editing and re-process.
+    // character, composed as normal input. Non-printable control keys close the
+    // window but keep caret mode, then pass through to the application.
     if (keypadAscii(sym) || (sym >= 33 && sym <= 126)) {
         return beginInsert(selCursor_, key);
     }

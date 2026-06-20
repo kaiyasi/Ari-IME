@@ -30,6 +30,27 @@ int utf8_count(const std::string &s) {
     return n;
 }
 
+std::string utf8_char_at(const std::string &s, int charIndex) {
+    int current = 0;
+    for (std::size_t i = 0; i < s.size();) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        std::size_t len = 1;
+        if ((c & 0xE0) == 0xC0) {
+            len = 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            len = 3;
+        } else if ((c & 0xF8) == 0xF0) {
+            len = 4;
+        }
+        if (current == charIndex && i + len <= s.size()) {
+            return s.substr(i, len);
+        }
+        i += len;
+        ++current;
+    }
+    return {};
+}
+
 bool valid_utf8(const std::string &s) {
     for (std::size_t i = 0; i < s.size();) {
         unsigned char c = static_cast<unsigned char>(s[i]);
@@ -691,10 +712,15 @@ void test_candidate_paging() {
     pick.key('1');
     check(!pick.preedit().empty() && pick.preedit() != "你好",
           "cross-page pick rewrites focused cell");
+    std::string pickedFirst = utf8_char_at(pick.preedit(), 0);
+    check(pick.b.selectionChar() == 1,
+          "cross-page pick advances candidate window to next cell");
     pick.key(FcitxKey_Escape);
+    check(pick.b.caretChar() == 1,
+          "cross-page pick Escape preserves next-cell caret");
     pick.type("1j4");
-    check(pick.preedit().find("不") != std::string::npos,
-          "typing after cross-page pick Escape continues at preserved caret");
+    check_eq(pick.preedit(), pickedFirst + "不好",
+             "typing after cross-page pick Escape inserts before next cell");
 }
 
 void test_candidate_tab_navigation() {
