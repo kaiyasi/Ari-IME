@@ -34,6 +34,7 @@
 - 英文 cell 重新解讀注音再補 bracketed log tag、comma-delimited log value、notebook cell marker、dataframe column、templated SQL relation regression。
 - 英文 cell 重新解讀注音再補 Kubernetes/YAML env ref、GraphQL fragment/variable、Terraform/HCL identifier regression。
 - 英文 cell 重新解讀注音再補 protobuf/schema syntax、PromQL metrics/labels、CI expression regression。
+- 英文 cell 重新解讀注音再補 HTML attribute/data attribute、reStructuredText anchor/role、systemd unit、CI step output、Docker Compose service reference、npm scope regression。
 
 ### UX
 

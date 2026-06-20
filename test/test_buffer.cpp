@@ -1131,6 +1131,62 @@ void test_reinterpret() {
     ciExpression.key(FcitxKey_Up);
     check_eq(ciExpression.preedit(), "${{ env.su3 }}",
              "reinterpret does not rewrite CI expression property");
+
+    Sim htmlAttr;
+    htmlAttr.b.pasteAtCaret("<div id=\"su3\">");
+    move_caret_to(htmlAttr, 9); // before the HTML attribute value
+    htmlAttr.key(FcitxKey_Up);
+    check_eq(htmlAttr.preedit(), "<div id=\"su3\">",
+             "reinterpret does not rewrite HTML attribute value");
+
+    Sim htmlDataAttr;
+    htmlDataAttr.b.pasteAtCaret("data-su3=\"x\"");
+    move_caret_to(htmlDataAttr, 5); // before the HTML data attribute stem
+    htmlDataAttr.key(FcitxKey_Up);
+    check_eq(htmlDataAttr.preedit(), "data-su3=\"x\"",
+             "reinterpret does not rewrite HTML data attribute name");
+
+    Sim rstAnchor;
+    rstAnchor.b.pasteAtCaret(".. _su3:");
+    move_caret_to(rstAnchor, 4); // before the reStructuredText anchor name
+    rstAnchor.key(FcitxKey_Up);
+    check_eq(rstAnchor.preedit(), ".. _su3:",
+             "reinterpret does not rewrite reStructuredText anchor");
+
+    Sim rstRole;
+    rstRole.b.pasteAtCaret(":ref:`su3`");
+    move_caret_to(rstRole, 6); // before the reStructuredText role target
+    rstRole.key(FcitxKey_Up);
+    check_eq(rstRole.preedit(), ":ref:`su3`",
+             "reinterpret does not rewrite reStructuredText role target");
+
+    Sim systemdUnit;
+    systemdUnit.b.pasteAtCaret("su3.service");
+    move_caret_to(systemdUnit, 0); // before the systemd unit name
+    systemdUnit.key(FcitxKey_Up);
+    check_eq(systemdUnit.preedit(), "su3.service",
+             "reinterpret does not rewrite systemd unit name");
+
+    Sim ciStepOutput;
+    ciStepOutput.b.pasteAtCaret("steps.su3.outputs.path");
+    move_caret_to(ciStepOutput, 6); // before the GitHub Actions step id
+    ciStepOutput.key(FcitxKey_Up);
+    check_eq(ciStepOutput.preedit(), "steps.su3.outputs.path",
+             "reinterpret does not rewrite CI step output property");
+
+    Sim dockerCompose;
+    dockerCompose.b.pasteAtCaret("depends_on: [su3]");
+    move_caret_to(dockerCompose, 13); // before the compose service name
+    dockerCompose.key(FcitxKey_Up);
+    check_eq(dockerCompose.preedit(), "depends_on: [su3]",
+             "reinterpret does not rewrite Docker Compose service reference");
+
+    Sim npmScope;
+    npmScope.b.pasteAtCaret("@su3/package");
+    move_caret_to(npmScope, 1); // before the npm scope name
+    npmScope.key(FcitxKey_Up);
+    check_eq(npmScope.preedit(), "@su3/package",
+             "reinterpret does not rewrite npm package scope");
 }
 
 void test_insert_while_selecting() {
