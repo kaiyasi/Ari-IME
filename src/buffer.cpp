@@ -1146,6 +1146,9 @@ void Buffer::pasteAtCaret(const std::string &text) {
         }
         pasted.push_back({false, ch, {}});
     }
+    if (pasted.empty()) {
+        return;
+    }
     cells_.insert(cells_.begin() + pos, pasted.begin(), pasted.end());
     // Land in caret mode with the caret right after the pasted text, so further
     // keys keep composing at that position.

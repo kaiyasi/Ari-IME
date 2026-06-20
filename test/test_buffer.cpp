@@ -566,6 +566,15 @@ void test_paste_at_caret() {
     check_eq(zeroWidth.preedit(), "alphabetagammadelta",
              "paste removes zero-width format characters");
 
+    Sim onlyZeroWidth;
+    onlyZeroWidth.b.pasteAtCaret(std::string("\xe2\x80\x8b") +
+                                 "\xe2\x81\xa0" + "\xef\xbb\xbf");
+    check_eq(onlyZeroWidth.preedit(), "",
+             "paste of only zero-width format characters is empty");
+    KeyResult ignoredPasteEsc = onlyZeroWidth.press(FcitxKey_Escape);
+    check(!ignoredPasteEsc.handled,
+          "paste of only zero-width format characters leaves no IM state");
+
     Sim onlyWs;
     onlyWs.b.pasteAtCaret("\n\t");
     check_eq(onlyWs.preedit(), " ", "paste of only separators becomes a space");
