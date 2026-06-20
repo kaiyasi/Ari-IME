@@ -983,6 +983,41 @@ void test_reinterpret() {
     templatedSql.key(FcitxKey_Up);
     check_eq(templatedSql.preedit(), "{{ ref('su3') }}",
              "reinterpret does not rewrite templated SQL relation name");
+
+    Sim kubeEnv;
+    kubeEnv.b.pasteAtCaret("value: $(su3)");
+    move_caret_to(kubeEnv, 9); // before the Kubernetes env var name
+    kubeEnv.key(FcitxKey_Up);
+    check_eq(kubeEnv.preedit(), "value: $(su3)",
+             "reinterpret does not rewrite Kubernetes env ref");
+
+    Sim graphqlFragment;
+    graphqlFragment.b.pasteAtCaret("...su3 on User");
+    move_caret_to(graphqlFragment, 3); // before the GraphQL fragment name
+    graphqlFragment.key(FcitxKey_Up);
+    check_eq(graphqlFragment.preedit(), "...su3 on User",
+             "reinterpret does not rewrite GraphQL fragment name");
+
+    Sim graphqlVariable;
+    graphqlVariable.b.pasteAtCaret("$su3: String!");
+    move_caret_to(graphqlVariable, 1); // before the GraphQL variable name
+    graphqlVariable.key(FcitxKey_Up);
+    check_eq(graphqlVariable.preedit(), "$su3: String!",
+             "reinterpret does not rewrite GraphQL variable");
+
+    Sim terraformResource;
+    terraformResource.b.pasteAtCaret("resource \"x\" \"su3\" {}");
+    move_caret_to(terraformResource, 14); // before the HCL resource name
+    terraformResource.key(FcitxKey_Up);
+    check_eq(terraformResource.preedit(), "resource \"x\" \"su3\" {}",
+             "reinterpret does not rewrite Terraform resource name");
+
+    Sim hclIdentifier;
+    hclIdentifier.b.pasteAtCaret("local.su3");
+    move_caret_to(hclIdentifier, 6); // before the HCL identifier
+    hclIdentifier.key(FcitxKey_Up);
+    check_eq(hclIdentifier.preedit(), "local.su3",
+             "reinterpret does not rewrite HCL dotted identifier");
 }
 
 void test_insert_while_selecting() {
