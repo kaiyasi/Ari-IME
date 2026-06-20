@@ -8,6 +8,7 @@ build_dir="${INPUTER_BUILD_DIR:-build}"
 sanitize_dir="${INPUTER_SANITIZE_BUILD_DIR:-build-sanitize}"
 fuzz_dir="${INPUTER_FUZZ_BUILD_DIR:-build-fuzz}"
 fuzz_corpus_dir="${INPUTER_FUZZ_CORPUS_DIR:-test/corpus/fuzz_buffer}"
+coverage_dir="${INPUTER_COVERAGE_BUILD_DIR:-build-coverage}"
 install_prefix="${INPUTER_INSTALL_PREFIX:-/tmp/inputer-install-check}"
 mode="${INPUTER_CHECK_MODE:-all}"
 build_type="${INPUTER_BUILD_TYPE:-Release}"
@@ -132,6 +133,35 @@ fuzz_checks() {
         "$fuzz_dir/fuzz_buffer" "${fuzz_args[@]}"
 }
 
+coverage_checks() {
+    if ! command -v gcov >/dev/null 2>&1; then
+        printf 'gcov is required for INPUTER_CHECK_MODE=coverage\n' >&2
+        exit 1
+    fi
+
+    local cmake_args=()
+    mapfile -t cmake_args < <(cmake_compiler_args)
+    run cmake -S . -B "$coverage_dir" \
+        "${cmake_args[@]}" \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DINPUTER_ENABLE_COVERAGE=ON \
+        -DBUILD_TESTING=ON
+    run cmake --build "$coverage_dir"
+    run ctest --test-dir "$coverage_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
+
+    local report_dir="$coverage_dir/gcov"
+    mkdir -p "$report_dir"
+    find "$report_dir" -maxdepth 1 -name '*.gcov' -delete
+    run gcov -b -c \
+        "$coverage_dir/CMakeFiles/test_buffer.dir/src/buffer.cpp.gcda" \
+        "$coverage_dir/CMakeFiles/test_buffer.dir/src/zhuyin.cpp.gcda"
+    mv ./*.gcov "$report_dir"/
+    run gcov -b -c \
+        "$coverage_dir/CMakeFiles/test_layout.dir/src/layout.cpp.gcda"
+    mv ./*.gcov "$report_dir"/
+    printf '\nCoverage reports written to %s\n' "$report_dir"
+}
+
 package_checks() {
     check_versions
     local pkgbuild_version
@@ -161,6 +191,9 @@ sanitize)
     ;;
 fuzz)
     fuzz_checks
+    ;;
+coverage)
+    coverage_checks
     ;;
 package)
     check_srcinfo

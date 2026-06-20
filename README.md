@@ -130,9 +130,10 @@ release build, CTest, install smoke check, PKGBUILD syntax check, and the
 sanitizer test profile. Add `INPUTER_CHECK_PACKAGE=1` to also run an offline
 Arch package `build/check/package` simulation.
 
-Set `INPUTER_CHECK_MODE=release`, `sanitize`, `fuzz`, or `package` to run just
-one part of the check. GitHub Actions uses these modes as separate jobs in an
-Arch Linux container on pushes and pull requests.
+Set `INPUTER_CHECK_MODE=release`, `sanitize`, `coverage`, `fuzz`, or `package`
+to run just one part of the check. GitHub Actions uses the release, sanitizer,
+bounded-fuzz, and package modes as separate jobs in an Arch Linux container on
+pushes and pull requests.
 
 For memory/undefined-behavior checks:
 
@@ -145,6 +146,16 @@ ctest --test-dir build-sanitize --output-on-failure
 Leak detection is disabled in this profile so the tests still run in ptrace-based
 sandboxes. To include LeakSanitizer on a normal local/CI runner, add
 `-DINPUTER_SANITIZER_DETECT_LEAKS=ON`.
+
+For a local gcov coverage report:
+
+```sh
+INPUTER_CHECK_MODE=coverage scripts/check.sh
+```
+
+This builds the tests with `-DINPUTER_ENABLE_COVERAGE=ON`, runs CTest, and writes
+`.gcov` reports for the main `src/` state-machine files to
+`build-coverage/gcov/`.
 
 For bounded state-machine fuzzing with libFuzzer:
 

@@ -11,6 +11,8 @@ option(INPUTER_SANITIZER_DETECT_LEAKS
     "Enable LeakSanitizer leak checks when sanitizers are enabled" OFF)
 option(INPUTER_ENABLE_FUZZING
     "Build libFuzzer targets for Buffer state-machine fuzzing" OFF)
+option(INPUTER_ENABLE_COVERAGE
+    "Build tests with compiler coverage instrumentation" OFF)
 
 find_package(ECM REQUIRED)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
@@ -61,6 +63,25 @@ function(inputer_enable_fuzzer target)
     target_link_options(${target}
         PRIVATE
             -fsanitize=fuzzer,address,undefined
+    )
+endfunction()
+
+function(inputer_enable_coverage target)
+    if(NOT INPUTER_ENABLE_COVERAGE)
+        return()
+    endif()
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        message(FATAL_ERROR "INPUTER_ENABLE_COVERAGE requires GCC or Clang")
+    endif()
+    target_compile_options(${target}
+        PRIVATE
+            --coverage
+            -O0
+            -g
+    )
+    target_link_options(${target}
+        PRIVATE
+            --coverage
     )
 endfunction()
 
@@ -137,6 +158,7 @@ if(BUILD_TESTING)
     )
     inputer_enable_warnings(test_buffer)
     inputer_enable_sanitizers(test_buffer)
+    inputer_enable_coverage(test_buffer)
     add_test(NAME buffer COMMAND test_buffer)
     inputer_configure_test(buffer)
 
@@ -152,6 +174,7 @@ if(BUILD_TESTING)
     )
     inputer_enable_warnings(test_layout)
     inputer_enable_sanitizers(test_layout)
+    inputer_enable_coverage(test_layout)
     add_test(NAME layout COMMAND test_layout)
     inputer_configure_test(layout)
 endif()

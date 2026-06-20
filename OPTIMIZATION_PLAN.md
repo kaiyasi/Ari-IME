@@ -80,6 +80,7 @@
 - 加入 opt-in libFuzzer `fuzz_buffer` target，探索 `Buffer::handleKey`、貼上、候選點選、layout 切換與全形標點路徑，並檢查公開 caret/candidate/UTF-8 invariant。
 - GitHub Actions 加入 bounded fuzz job，透過 `INPUTER_CHECK_MODE=fuzz` 建置 `fuzz_buffer` 並短跑 libFuzzer smoke test。
 - 為 `fuzz_buffer` 加入初始 seed corpus，且 printable ASCII seed 會直接作為按鍵輸入，讓 bounded fuzz 從混輸、技術 literal、貼上/layout、標點等代表性路徑起跑。
+- 加入本地 `INPUTER_CHECK_MODE=coverage`，用 gcov 對主要 `src/` 狀態機檔案產生文字 coverage 報表。
 
 ### 發佈與包裝
 
@@ -114,4 +115,4 @@
 
 - 可再替 GitHub Actions 拆分更細的 dependency cache key，或視 runner 實測調整 ccache save/restore 策略。
 - 若未來 layout 探測成本變高，可把 slot table cache 持久化在 process lifetime 中並加測初始化次數。
-- 若要再提高狀態機韌性，可為 `fuzz_buffer` 加入 coverage 報表，並評估是否另外安排長時間夜間 fuzz。
+- 若要再提高狀態機韌性，可評估是否另外安排長時間夜間 fuzz。
