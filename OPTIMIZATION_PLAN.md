@@ -65,6 +65,7 @@
 - GitHub Actions 加入 pacman package cache，並使用 `pacman -S --needed` 降低 Arch container matrix job 重複下載與重裝成本。
 - GitHub Actions release/sanitizer jobs 啟用 ccache，`scripts/check.sh` 支援 `INPUTER_CXX_COMPILER_LAUNCHER` 傳入 CMake compiler launcher。
 - GitHub Actions package simulation job 也啟用 ccache；PKGBUILD 支援可選 `CMAKE_CXX_COMPILER_LAUNCHER`，一般打包不受影響。
+- GitHub Actions 加入 workflow concurrency / cancel-in-progress，同一分支或 PR 只保留最新一次 CI matrix，避免連續推送浪費 runner。
 - 加入 deterministic key-sequence stress test，固定 seed 跑大量按鍵序列並檢查 preedit UTF-8、caret、selection、candidate page/highlight 等公開 invariant。
 
 ### 發佈與包裝
@@ -98,6 +99,6 @@
 
 ### P3: 效能與維護
 
-- 可再替 GitHub Actions 加入更細的 workflow concurrency/cancel-in-progress。
+- 可再替 GitHub Actions 拆分更細的 dependency cache key，或視 runner 實測調整 ccache save/restore 策略。
 - 若未來 layout 探測成本變高，可把 slot table cache 持久化在 process lifetime 中並加測初始化次數。
 - 若要再提高狀態機韌性，可加入 libFuzzer/AFL harness 與 coverage 報表，專門探索 `Buffer::handleKey` 的長序列邊界。
