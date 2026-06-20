@@ -456,6 +456,22 @@ void test_candidate_direct_selection() {
     check_eq(s.preedit(), "妳好",
              "direct candidate selection rewrites phrase like number key");
 
+    Sim single;
+    single.type("su3cl3");
+    single.key(FcitxKey_Left); // caret between 你 and 好
+    single.key(FcitxKey_Left); // caret before 你
+    single.key(FcitxKey_Down); // open candidates for 你
+    r = single.b.selectCandidate(3); // 妳 single, matching keyboard navigation
+    check(r.handled, "direct candidate selection handles single candidate");
+    check_eq(single.preedit(), "妳好",
+             "direct single candidate rewrites focused cell");
+    check(single.b.selectionChar() == 1,
+          "direct single candidate advances to next cell");
+    single.key(FcitxKey_Escape);
+    single.type("1j4");
+    check_eq(single.preedit(), "妳不好",
+             "typing after direct pick Escape resumes before next cell");
+
     Sim stale;
     stale.type("su3");
     stale.key(FcitxKey_Down);
@@ -1189,6 +1205,9 @@ void test_picking_delete_focused_cell() {
     s.key(FcitxKey_BackSpace); // delete focused 你, not char left of caret
     check_eq(s.preedit(), "好", "picking backspace deletes focused cell");
     check(s.b.selectionChar() == -1, "candidate window closes after focused delete");
+    s.type("1j4");
+    check_eq(s.preedit(), "不好",
+             "typing after focused delete resumes at deleted position");
 
     Sim d;
     d.type("su3cl3");          // 你好
