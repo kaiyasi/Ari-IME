@@ -130,9 +130,9 @@ release build, CTest, install smoke check, PKGBUILD syntax check, and the
 sanitizer test profile. Add `INPUTER_CHECK_PACKAGE=1` to also run an offline
 Arch package `build/check/package` simulation.
 
-Set `INPUTER_CHECK_MODE=release`, `sanitize`, or `package` to run just one part
-of the check. GitHub Actions uses these modes as separate jobs in an Arch Linux
-container on pushes and pull requests.
+Set `INPUTER_CHECK_MODE=release`, `sanitize`, `fuzz`, or `package` to run just
+one part of the check. GitHub Actions uses these modes as separate jobs in an
+Arch Linux container on pushes and pull requests.
 
 For memory/undefined-behavior checks:
 
@@ -157,6 +157,8 @@ cmake --build build-fuzz --target fuzz_buffer
 The fuzz target is opt-in and is not part of the normal release/package build.
 It feeds mixed key, paste, candidate-selection, layout-switch, and punctuation
 events into `Buffer` while checking UTF-8 and public caret/candidate invariants.
+Use `INPUTER_CHECK_MODE=fuzz scripts/check.sh` for the same bounded smoke run
+that CI uses. Set `INPUTER_FUZZ_RUNS` to adjust the run count.
 
 Real application behavior still needs manual validation because preedit,
 candidate windows, clipboard, and theme rendering depend on the desktop session.

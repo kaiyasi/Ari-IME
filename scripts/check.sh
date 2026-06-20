@@ -6,6 +6,7 @@ cd "$repo_root"
 
 build_dir="${INPUTER_BUILD_DIR:-build}"
 sanitize_dir="${INPUTER_SANITIZE_BUILD_DIR:-build-sanitize}"
+fuzz_dir="${INPUTER_FUZZ_BUILD_DIR:-build-fuzz}"
 install_prefix="${INPUTER_INSTALL_PREFIX:-/tmp/inputer-install-check}"
 mode="${INPUTER_CHECK_MODE:-all}"
 build_type="${INPUTER_BUILD_TYPE:-Release}"
@@ -103,6 +104,29 @@ sanitize_checks() {
     run ctest --test-dir "$sanitize_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
 }
 
+fuzz_checks() {
+    if ! command -v clang++ >/dev/null 2>&1; then
+        if [[ "${INPUTER_FUZZ_ALLOW_SKIP:-0}" == "1" ]]; then
+            printf 'Skipping fuzz checks: clang++ not found\n'
+            return
+        fi
+        printf 'clang++ is required for INPUTER_CHECK_MODE=fuzz\n' >&2
+        exit 1
+    fi
+
+    local cmake_args=()
+    mapfile -t cmake_args < <(cmake_compiler_args)
+    run cmake -S . -B "$fuzz_dir" \
+        "${cmake_args[@]}" \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DINPUTER_ENABLE_FUZZING=ON \
+        -DBUILD_TESTING=OFF
+    run cmake --build "$fuzz_dir" --target fuzz_buffer
+    run env ASAN_OPTIONS=detect_leaks=0 LSAN_OPTIONS=detect_leaks=0 \
+        "$fuzz_dir/fuzz_buffer" "-runs=${INPUTER_FUZZ_RUNS:-256}"
+}
+
 package_checks() {
     check_versions
     local pkgbuild_version
@@ -129,6 +153,9 @@ release)
     ;;
 sanitize)
     sanitize_checks
+    ;;
+fuzz)
+    fuzz_checks
     ;;
 package)
     check_srcinfo

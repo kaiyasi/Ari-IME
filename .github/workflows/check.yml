@@ -118,6 +118,55 @@ jobs:
       - name: Run sanitizer checks
         run: INPUTER_CHECK_MODE=sanitize INPUTER_CXX_COMPILER_LAUNCHER=ccache scripts/check.sh
 
+  fuzz:
+    name: Bounded Fuzz
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-arch-pacman-${{ hashFiles('.github/workflows/check.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arch-pacman-
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/ccache
+          key: ${{ runner.os }}-ccache-fuzz-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-fuzz-
+            ${{ runner.os }}-ccache-
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm \
+            ccache \
+            clang \
+            cmake \
+            extra-cmake-modules \
+            fcitx5 \
+            gcc \
+            git \
+            hicolor-icon-theme \
+            libchewing \
+            pkgconf
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run bounded fuzz checks
+        run: >
+          INPUTER_CHECK_MODE=fuzz
+          INPUTER_CXX_COMPILER_LAUNCHER=ccache
+          INPUTER_FUZZ_RUNS=256
+          scripts/check.sh
+
   package:
     name: Package Simulation
     runs-on: ubuntu-latest
