@@ -24,10 +24,18 @@ jobs:
             cxx: clang++
 
     steps:
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-arch-pacman-${{ hashFiles('.github/workflows/check.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arch-pacman-
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm \
+          pacman -S --needed --noconfirm \
             clang \
             cmake \
             extra-cmake-modules \
@@ -57,10 +65,18 @@ jobs:
       image: archlinux:base-devel
 
     steps:
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-arch-pacman-${{ hashFiles('.github/workflows/check.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arch-pacman-
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm \
+          pacman -S --needed --noconfirm \
             cmake \
             extra-cmake-modules \
             fcitx5 \
@@ -83,10 +99,18 @@ jobs:
       image: archlinux:base-devel
 
     steps:
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-arch-pacman-${{ hashFiles('.github/workflows/check.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-arch-pacman-
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm \
+          pacman -S --needed --noconfirm \
             cmake \
             extra-cmake-modules \
             fcitx5 \

@@ -59,6 +59,7 @@
 - 加入 GitHub Actions workflow，在 Arch Linux container 中重用本地檢查腳本並跑 package simulation。
 - GitHub Actions 拆成 release、sanitizer、package simulation 三個 jobs，各自回報失敗位置，同時共用 `scripts/check.sh` 的 mode 入口。
 - GitHub Actions release job 加入 GCC/Clang compiler matrix 與 Release/Debug build type matrix，`scripts/check.sh` 支援 `INPUTER_CC` / `INPUTER_CXX` / `INPUTER_BUILD_TYPE` 覆寫 CMake 設定。
+- GitHub Actions 加入 pacman package cache，並使用 `pacman -S --needed` 降低 Arch container matrix job 重複下載與重裝成本。
 - 加入 deterministic key-sequence stress test，固定 seed 跑大量按鍵序列並檢查 preedit UTF-8、caret、selection、candidate page/highlight 等公開 invariant。
 
 ### 發佈與包裝
@@ -92,6 +93,6 @@
 
 ### P3: 效能與維護
 
-- 可再替 GitHub Actions 加上 cache，降低 Arch container 重複安裝與編譯成本。
+- 可再替 GitHub Actions 加上 ccache/sccache，降低 matrix job C++ 編譯成本。
 - 若未來 layout 探測成本變高，可把 slot table cache 持久化在 process lifetime 中並加測初始化次數。
 - 若要再提高狀態機韌性，可加入 libFuzzer/AFL harness 與 coverage 報表，專門探索 `Buffer::handleKey` 的長序列邊界。
