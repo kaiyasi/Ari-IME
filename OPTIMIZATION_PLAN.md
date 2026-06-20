@@ -33,6 +33,7 @@
 - 英文 cell 重新解讀注音再補 CSV/TSV data、spreadsheet-like formula、LaTeX command、Markdown attribute id regression。
 - 英文 cell 重新解讀注音再補 bracketed log tag、comma-delimited log value、notebook cell marker、dataframe column、templated SQL relation regression。
 - 英文 cell 重新解讀注音再補 Kubernetes/YAML env ref、GraphQL fragment/variable、Terraform/HCL identifier regression。
+- 英文 cell 重新解讀注音再補 protobuf/schema syntax、PromQL metrics/labels、CI expression regression。
 
 ### UX
 
@@ -92,7 +93,7 @@
 - 持續擴充更多標點符號測試，特別是不同鍵盤 layout 下有雙重語意的符號鍵。
 - 若要加入快速切換全形標點，先設計可配置快捷鍵，不提供固定預設鍵；
   實作時需更新持久化 config 或明確標示為 per-context override，避免 buffer runtime 狀態被下一次 config 套用覆蓋。
-- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，例如 protobuf/schema syntax、PromQL/metrics labels、CI expression syntax。
+- 針對更多真實文字樣本持續擴充英文 cell 重新解讀注音測試，優先找開發、資料分析與文件編輯中容易把 `su3` 類 literal 誤解成注音的語境。
 
 ### P2: UX 細節
 

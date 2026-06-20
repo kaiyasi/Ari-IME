@@ -1018,6 +1018,41 @@ void test_reinterpret() {
     hclIdentifier.key(FcitxKey_Up);
     check_eq(hclIdentifier.preedit(), "local.su3",
              "reinterpret does not rewrite HCL dotted identifier");
+
+    Sim protobufField;
+    protobufField.b.pasteAtCaret("optional string su3 = 1;");
+    move_caret_to(protobufField, 16); // before the protobuf field name
+    protobufField.key(FcitxKey_Up);
+    check_eq(protobufField.preedit(), "optional string su3 = 1;",
+             "reinterpret does not rewrite protobuf field name");
+
+    Sim schemaType;
+    schemaType.b.pasteAtCaret("type Su3 { id: ID! }");
+    move_caret_to(schemaType, 5); // before the schema type name
+    schemaType.key(FcitxKey_Up);
+    check_eq(schemaType.preedit(), "type Su3 { id: ID! }",
+             "reinterpret does not rewrite schema type name");
+
+    Sim promMetric;
+    promMetric.b.pasteAtCaret("rate(su3_total{job=\"api\"}[5m])");
+    move_caret_to(promMetric, 5); // before the PromQL metric name
+    promMetric.key(FcitxKey_Up);
+    check_eq(promMetric.preedit(), "rate(su3_total{job=\"api\"}[5m])",
+             "reinterpret does not rewrite PromQL metric name");
+
+    Sim promLabel;
+    promLabel.b.pasteAtCaret("up{su3=\"api\"}");
+    move_caret_to(promLabel, 3); // before the PromQL label name
+    promLabel.key(FcitxKey_Up);
+    check_eq(promLabel.preedit(), "up{su3=\"api\"}",
+             "reinterpret does not rewrite PromQL label name");
+
+    Sim ciExpression;
+    ciExpression.b.pasteAtCaret("${{ env.su3 }}");
+    move_caret_to(ciExpression, 8); // before the GitHub Actions property name
+    ciExpression.key(FcitxKey_Up);
+    check_eq(ciExpression.preedit(), "${{ env.su3 }}",
+             "reinterpret does not rewrite CI expression property");
 }
 
 void test_insert_while_selecting() {
