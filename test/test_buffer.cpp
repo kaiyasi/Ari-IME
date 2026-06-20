@@ -641,6 +641,22 @@ void test_revert_entry() {
           "raw-keys candidate is labeled");
     s.key(FcitxKey_Return);
     check_eq(s.preedit(), "su3", "revert entry explodes 你 -> su3");
+    s.type("cl3");
+    check_eq(s.preedit(), "su3好",
+             "typing after tail raw-key revert resumes after exploded keys");
+
+    Sim mid;
+    mid.type("su3cl3");       // 你好
+    mid.key(FcitxKey_Left);   // caret between 你 and 好
+    mid.key(FcitxKey_Left);   // caret before 你
+    mid.key(FcitxKey_Down);   // candidate window for 你
+    mid.key(FcitxKey_Up);     // raw-keys revert candidate
+    mid.key(FcitxKey_Return);
+    check_eq(mid.preedit(), "su3好",
+             "mid-string raw-key revert preserves following cells");
+    mid.type("1j4");
+    check_eq(mid.preedit(), "su3不好",
+             "typing after mid-string raw-key revert resumes before next cell");
 }
 
 void test_candidate_paging() {
