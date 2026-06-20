@@ -58,6 +58,7 @@ check_versions() {
             "$cmake_version" "$pkgbuild_version" "$srcinfo_version" >&2
         exit 1
     fi
+    printf 'Ari IME version: v%s\n' "$cmake_version"
 }
 
 check_srcinfo() {

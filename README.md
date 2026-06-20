@@ -127,8 +127,10 @@ scripts/check.sh
 
 This checks version consistency across CMake/PKGBUILD/.SRCINFO, then runs the
 release build, CTest, install smoke check, PKGBUILD syntax check, and the
-sanitizer test profile. Add `INPUTER_CHECK_PACKAGE=1` to also run an offline
-Arch package `build/check/package` simulation.
+sanitizer test profile. The version check prints the validated Ari IME version
+so release/upload checkpoints can cite it directly. Add
+`INPUTER_CHECK_PACKAGE=1` to also run an offline Arch package
+`build/check/package` simulation.
 
 Set `INPUTER_CHECK_MODE=release`, `sanitize`, `coverage`, `fuzz`, or `package`
 to run just one part of the check. GitHub Actions uses the release, sanitizer,
