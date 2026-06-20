@@ -1424,6 +1424,15 @@ void test_fullwidth_punct() {
     check_eq(ginYieh.preedit(), "你？",
              "fullwidth mode keeps symbol-looking layout keys as bopomofo");
 
+    Sim ibm;
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Ibm);
+    ibm.b.setKeyboardLayout(inputer::KeyboardLayout::Ibm);
+    ibm.b.setFullWidthPunct(true);
+    ibm.type("7a,-;,"); // IBM uses ',', '-' and ';' as layout keys.
+    ibm.key('?');
+    check_eq(ibm.preedit(), "你好？",
+             "fullwidth mode keeps IBM punctuation-looking keys as bopomofo");
+
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 

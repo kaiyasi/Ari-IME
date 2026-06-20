@@ -58,7 +58,7 @@
 - 全形標點補上常見 ASCII 符號全形化：`@ # $ % & * + = | ~`。
 - 全形標點補上 `_` 與反引號 fallback，避免 libchewing 將底線映射成破折號或讓反引號原樣通過。
 - 全形標點補上 ASCII 雙引號與單引號 fallback，避免 libchewing 映射成語意不相關的 `；` / `、`。
-- 全形標點補強跨鍵盤配置 regression，確保許氏 dual-role tone key 與精業 `-` 這類符號外觀注音鍵不會被誤轉成標點。
+- 全形標點補強跨鍵盤配置 regression，確保許氏 dual-role tone key、精業 `-`、IBM `, - ;` 這類符號外觀注音鍵不會被誤轉成標點。
 - 新增 `docs/manual-qa.md`，把 GTK/Qt/Electron、Wayland/X11、候選點選、剪貼簿、數字鍵盤、設定切換等實機驗證流程整理成 checklist。
 
 ### 效能與穩定性
