@@ -7,6 +7,7 @@ cd "$repo_root"
 build_dir="${INPUTER_BUILD_DIR:-build}"
 sanitize_dir="${INPUTER_SANITIZE_BUILD_DIR:-build-sanitize}"
 fuzz_dir="${INPUTER_FUZZ_BUILD_DIR:-build-fuzz}"
+fuzz_corpus_dir="${INPUTER_FUZZ_CORPUS_DIR:-test/corpus/fuzz_buffer}"
 install_prefix="${INPUTER_INSTALL_PREFIX:-/tmp/inputer-install-check}"
 mode="${INPUTER_CHECK_MODE:-all}"
 build_type="${INPUTER_BUILD_TYPE:-Release}"
@@ -123,8 +124,12 @@ fuzz_checks() {
         -DINPUTER_ENABLE_FUZZING=ON \
         -DBUILD_TESTING=OFF
     run cmake --build "$fuzz_dir" --target fuzz_buffer
+    local fuzz_args=("-runs=${INPUTER_FUZZ_RUNS:-256}")
+    if [[ -d "$fuzz_corpus_dir" ]]; then
+        fuzz_args+=("$fuzz_corpus_dir")
+    fi
     run env ASAN_OPTIONS=detect_leaks=0 LSAN_OPTIONS=detect_leaks=0 \
-        "$fuzz_dir/fuzz_buffer" "-runs=${INPUTER_FUZZ_RUNS:-256}"
+        "$fuzz_dir/fuzz_buffer" "${fuzz_args[@]}"
 }
 
 package_checks() {

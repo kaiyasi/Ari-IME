@@ -158,7 +158,9 @@ The fuzz target is opt-in and is not part of the normal release/package build.
 It feeds mixed key, paste, candidate-selection, layout-switch, and punctuation
 events into `Buffer` while checking UTF-8 and public caret/candidate invariants.
 Use `INPUTER_CHECK_MODE=fuzz scripts/check.sh` for the same bounded smoke run
-that CI uses. Set `INPUTER_FUZZ_RUNS` to adjust the run count.
+that CI uses. It loads the seed corpus in `test/corpus/fuzz_buffer` when present.
+Set `INPUTER_FUZZ_RUNS` to adjust the run count, or
+`INPUTER_FUZZ_CORPUS_DIR` to point at another corpus directory.
 
 Real application behavior still needs manual validation because preedit,
 candidate windows, clipboard, and theme rendering depend on the desktop session.
