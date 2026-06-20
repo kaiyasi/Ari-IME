@@ -520,6 +520,10 @@ void test_pin_earlier_pick() {
     s.key(FcitxKey_Down);  // 郝
     s.key(FcitxKey_Return);
     check_eq(s.preedit(), "妳郝", "earlier 妳 stays locked after picking 郝");
+    check(s.b.selectionChar() == -1,
+          "consecutive picks close candidate window at tail");
+    check(s.b.caretChar() == utf8_count(s.preedit()),
+          "consecutive picks leave caret at end of pre-edit");
     s.type("1j4");
     check_eq(s.preedit(), "妳郝不",
              "typing after consecutive picks appends after fixed text");
