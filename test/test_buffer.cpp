@@ -552,6 +552,20 @@ void test_paste_at_caret() {
     check_eq(unicodeSeparators.preedit(), "alpha beta gamma delta",
              "paste normalizes common Unicode separators to spaces");
 
+    Sim extraUnicodeSeparators;
+    extraUnicodeSeparators.b.pasteAtCaret(
+        std::string("alpha") + "\xe3\x80\x80" + "beta" + "\xe2\x80\xaf" +
+        "gamma");
+    check_eq(extraUnicodeSeparators.preedit(), "alpha beta gamma",
+             "paste normalizes ideographic and narrow no-break spaces");
+
+    Sim zeroWidth;
+    zeroWidth.b.pasteAtCaret(std::string("alpha") + "\xe2\x80\x8b" +
+                             "beta" + "\xe2\x81\xa0" + "gamma" +
+                             "\xef\xbb\xbf" + "delta");
+    check_eq(zeroWidth.preedit(), "alphabetagammadelta",
+             "paste removes zero-width format characters");
+
     Sim onlyWs;
     onlyWs.b.pasteAtCaret("\n\t");
     check_eq(onlyWs.preedit(), " ", "paste of only separators becomes a space");

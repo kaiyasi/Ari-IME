@@ -52,7 +52,7 @@ phrasing and per-user learning.
 | Backspace (in selection) | delete the focused character and leave selection |
 | Esc | clear pre-edit, or close selection/candidates first |
 | Enter | commit the whole pre-edit to the application |
-| Ctrl+V / Shift+Insert | paste clipboard text at the current pre-edit caret, with control/newline-like separators folded into visible spaces |
+| Ctrl+V / Shift+Insert | paste clipboard text at the current pre-edit caret, with control/newline-like separators folded into visible spaces and zero-width artifacts removed |
 | Ctrl+Space | toggle forced English mode |
 
 Numeric-keypad navigation keys are treated like their main-keyboard equivalents

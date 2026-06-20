@@ -16,6 +16,7 @@
 - 候選窗會以 `原始鍵 ...` 標示 raw-key 還原項，降低最後一個候選用途不明的 UX 問題。
 - 支援貼上到目前 caret，並把 ASCII 控制字元折成可見空白，避免多行或控制字元破壞 pre-edit。
 - 貼上正規化補強 Unicode NBSP、line separator、paragraph separator，避免從網頁/PDF/聊天工具貼入時出現不可見分隔或多行 pre-edit。
+- 貼上正規化再補 ideographic space、narrow NBSP，並移除 zero-width space、word joiner、BOM，避免不可見格式字元污染 pre-edit。
 - 支援 Ctrl+Space 強制英文模式，且模式跨 reset、Esc、commit 保持。
 - 支援可選全形標點，並保留注音韻母鍵與 numeric keypad 的原本語意。
 - 修正 numeric keypad：NumLock on 時輸入 literal 數字/符號，NumLock off 時作為導覽鍵。

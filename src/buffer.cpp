@@ -55,7 +55,13 @@ bool isAsciiControl(const std::string &ch) {
 
 bool isPasteSeparator(const std::string &ch) {
     return isAsciiControl(ch) || ch == "\xc2\xa0" || ch == "\xe2\x80\xa8" ||
-           ch == "\xe2\x80\xa9";
+           ch == "\xe2\x80\xa9" || ch == "\xe2\x80\xaf" ||
+           ch == "\xe3\x80\x80";
+}
+
+bool isIgnoredPasteFormat(const std::string &ch) {
+    return ch == "\xe2\x80\x8b" || ch == "\xe2\x81\xa0" ||
+           ch == "\xef\xbb\xbf";
 }
 
 int keypadAscii(fcitx::KeySym sym) {
@@ -1129,6 +1135,9 @@ void Buffer::pasteAtCaret(const std::string &text) {
     // clients by folding control/newline-like separators into one visible space.
     std::vector<Cell> pasted;
     for (const std::string &ch : splitUtf8(text)) {
+        if (isIgnoredPasteFormat(ch)) {
+            continue;
+        }
         if (isPasteSeparator(ch)) {
             if (pasted.empty() || pasted.back().text != " ") {
                 pasted.push_back({false, " ", {}});
