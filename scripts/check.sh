@@ -22,6 +22,9 @@ cmake_compiler_args() {
     if [[ -n "${INPUTER_CXX:-}" ]]; then
         printf '%s\n' "-DCMAKE_CXX_COMPILER=$INPUTER_CXX"
     fi
+    if [[ -n "${INPUTER_CXX_COMPILER_LAUNCHER:-}" ]]; then
+        printf '%s\n' "-DCMAKE_CXX_COMPILER_LAUNCHER=$INPUTER_CXX_COMPILER_LAUNCHER"
+    fi
 }
 
 extract_cmake_version() {

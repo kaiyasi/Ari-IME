@@ -32,10 +32,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-arch-pacman-
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.compiler.name }}-${{ matrix.build_type }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.compiler.name }}-${{ matrix.build_type }}-
+            ${{ runner.os }}-ccache-${{ matrix.compiler.name }}-
+            ${{ runner.os }}-ccache-
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --needed --noconfirm \
+            ccache \
             clang \
             cmake \
             extra-cmake-modules \
@@ -56,6 +67,7 @@ jobs:
           INPUTER_BUILD_DIR=build-${{ matrix.compiler.name }}-${{ matrix.build_type }}
           INPUTER_CC=${{ matrix.compiler.cc }}
           INPUTER_CXX=${{ matrix.compiler.cxx }}
+          INPUTER_CXX_COMPILER_LAUNCHER=ccache
           scripts/check.sh
 
   sanitize:
@@ -73,10 +85,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-arch-pacman-
 
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: /github/home/.cache/ccache
+          key: ${{ runner.os }}-ccache-sanitize-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-sanitize-
+            ${{ runner.os }}-ccache-
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --needed --noconfirm \
+            ccache \
             cmake \
             extra-cmake-modules \
             fcitx5 \
@@ -90,7 +112,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run sanitizer checks
-        run: INPUTER_CHECK_MODE=sanitize scripts/check.sh
+        run: INPUTER_CHECK_MODE=sanitize INPUTER_CXX_COMPILER_LAUNCHER=ccache scripts/check.sh
 
   package:
     name: Package Simulation
