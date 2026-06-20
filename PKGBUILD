@@ -14,7 +14,13 @@ sha256sums=('SKIP')
 _srcdir="Ari-IME-$pkgver"
 
 build() {
+    local cmake_args=()
+    if [[ -n "${CMAKE_CXX_COMPILER_LAUNCHER:-}" ]]; then
+        cmake_args+=("-DCMAKE_CXX_COMPILER_LAUNCHER=$CMAKE_CXX_COMPILER_LAUNCHER")
+    fi
+
     cmake -B "$srcdir/build" -S "$srcdir/$_srcdir" \
+        "${cmake_args[@]}" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DBUILD_TESTING=ON
