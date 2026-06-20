@@ -948,6 +948,41 @@ void test_reinterpret() {
     markdownAttr.key(FcitxKey_Up);
     check_eq(markdownAttr.preedit(), "[label]{#su3}",
              "reinterpret does not rewrite Markdown attribute id");
+
+    Sim logBracket;
+    logBracket.b.pasteAtCaret("[su3] request started");
+    move_caret_to(logBracket, 1); // before the log tag
+    logBracket.key(FcitxKey_Up);
+    check_eq(logBracket.preedit(), "[su3] request started",
+             "reinterpret does not rewrite bracketed log tag");
+
+    Sim logJsonish;
+    logJsonish.b.pasteAtCaret("event=su3, status=ok");
+    move_caret_to(logJsonish, 6); // before the log field value
+    logJsonish.key(FcitxKey_Up);
+    check_eq(logJsonish.preedit(), "event=su3, status=ok",
+             "reinterpret does not rewrite comma-delimited log value");
+
+    Sim notebookCell;
+    notebookCell.b.pasteAtCaret("# %% su3");
+    move_caret_to(notebookCell, 5); // before the notebook cell tag
+    notebookCell.key(FcitxKey_Up);
+    check_eq(notebookCell.preedit(), "# %% su3",
+             "reinterpret does not rewrite notebook cell marker text");
+
+    Sim pandasColumn;
+    pandasColumn.b.pasteAtCaret("df['su3']");
+    move_caret_to(pandasColumn, 4); // before the dataframe column name
+    pandasColumn.key(FcitxKey_Up);
+    check_eq(pandasColumn.preedit(), "df['su3']",
+             "reinterpret does not rewrite quoted dataframe column");
+
+    Sim templatedSql;
+    templatedSql.b.pasteAtCaret("{{ ref('su3') }}");
+    move_caret_to(templatedSql, 8); // before the dbt/Jinja relation name
+    templatedSql.key(FcitxKey_Up);
+    check_eq(templatedSql.preedit(), "{{ ref('su3') }}",
+             "reinterpret does not rewrite templated SQL relation name");
 }
 
 void test_insert_while_selecting() {
