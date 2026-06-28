@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 0.2.0 LANGUAGES CXX)
+project(inputer VERSION 0.2.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -190,6 +190,7 @@ if(INPUTER_ENABLE_FUZZING)
     target_link_libraries(fuzz_buffer
         PRIVATE
             Fcitx5::Utils
+            Fcitx5::Config
             PkgConfig::Chewing
     )
     inputer_enable_warnings(fuzz_buffer)

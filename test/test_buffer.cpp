@@ -108,6 +108,16 @@ struct Sim {
     std::vector<std::string> cand() { return b.candidates(); }
 };
 
+std::string bu4_default() {
+    Sim s;
+    s.type("1j4");
+    std::string out = s.preedit();
+    check(valid_utf8(out), "1j4 default candidate is valid UTF-8");
+    check(utf8_count(out) == 1, "1j4 converts to one Chinese character");
+    check(out != "1j4", "1j4 does not remain raw keys");
+    return out;
+}
+
 void check_invariants(Sim &s, const char *label) {
     std::string preedit = s.preedit();
     check(valid_utf8(preedit), label);
@@ -306,25 +316,27 @@ void test_keypad_literal() {
 }
 
 void test_keypad_navigation() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");       // 你好
     s.key(FcitxKey_KP_Home); // NumLock off keypad Home
-    s.type("1j4");          // 不
-    check_eq(s.preedit(), "不你好", "keypad Home moves caret to front");
+    s.type("1j4");          // ㄅㄨˋ, default homophone depends on libchewing
+    check_eq(s.preedit(), bu + "你好", "keypad Home moves caret to front");
 
     Sim begin;
     begin.type("su3cl3");       // 你好
     begin.key(FcitxKey_KP_Begin); // NumLock off keypad 5 / Begin
-    begin.type("1j4");          // 不
-    check_eq(begin.preedit(), "不你好",
+    begin.type("1j4");          // ㄅㄨˋ
+    check_eq(begin.preedit(), bu + "你好",
              "keypad Begin moves caret to front");
 
     Sim e;
     e.type("su3cl3");       // 你好
     e.key(FcitxKey_KP_Home);
     e.key(FcitxKey_KP_End);
-    e.type("1j4");          // 不
-    check_eq(e.preedit(), "你好不", "keypad End moves caret to end");
+    e.type("1j4");          // ㄅㄨˋ
+    check_eq(e.preedit(), "你好" + bu, "keypad End moves caret to end");
 
     Sim d;
     d.type("su3cl3");       // 你好
@@ -450,6 +462,8 @@ void test_live_matches_top_candidate() {
 }
 
 void test_phrase_pick() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left); // caret between 你 and 好
@@ -458,11 +472,13 @@ void test_phrase_pick() {
     s.key('2');           // pick #2 = 妳好 (phrase)
     check_eq(s.preedit(), "妳好", "phrase pick rewrites both cells");
     s.type("1j4");
-    check_eq(s.preedit(), "妳好不",
+    check_eq(s.preedit(), "妳好" + bu,
              "typing after end-of-line phrase pick appends at tail");
 }
 
 void test_candidate_direct_selection() {
+    const std::string bu = bu4_default();
+
     Sim empty;
     KeyResult r = empty.b.selectCandidate(0);
     check(!r.handled, "direct candidate selection without window passes through");
@@ -490,7 +506,7 @@ void test_candidate_direct_selection() {
           "direct single candidate advances to next cell");
     single.key(FcitxKey_Escape);
     single.type("1j4");
-    check_eq(single.preedit(), "妳不好",
+    check_eq(single.preedit(), "妳" + bu + "好",
              "typing after direct pick Escape resumes before next cell");
 
     Sim stale;
@@ -505,6 +521,8 @@ void test_candidate_direct_selection() {
 }
 
 void test_pin_earlier_pick() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");
     s.key(FcitxKey_Left);  // caret between 你 and 好
@@ -525,39 +543,43 @@ void test_pin_earlier_pick() {
     check(s.b.caretChar() == utf8_count(s.preedit()),
           "consecutive picks leave caret at end of pre-edit");
     s.type("1j4");
-    check_eq(s.preedit(), "妳郝不",
+    check_eq(s.preedit(), "妳郝" + bu,
              "typing after consecutive picks appends after fixed text");
 }
 
 // The headline fix: a 注音 syllable whose FIRST key is a number-row key (不 =
 // ㄅㄨˋ = "1j4") must insert at the caret, not get eaten as a candidate pick.
 void test_insert_chinese_midstring() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");       // 你好
     s.key(FcitxKey_Left);   // caret between 你 and 好
     s.key(FcitxKey_Left);   // caret before 你 (front)
-    s.type("1j4");          // ㄅㄨˋ = 不, leading digit must NOT pick a candidate
-    check_eq(s.preedit(), "不你好", "insert digit-led 注音 不 at the front");
-    check(s.b.caretChar() == 1, "caret sits after the inserted 不, not at end");
+    s.type("1j4");          // leading digit must NOT pick a candidate
+    check_eq(s.preedit(), bu + "你好", "insert digit-led 注音 at the front");
+    check(s.b.caretChar() == 1, "caret sits after the inserted char, not at end");
     s.key(FcitxKey_Return);
-    check_eq(s.committed, "不你好", "commit includes inserted char + tail");
+    check_eq(s.committed, bu + "你好", "commit includes inserted char + tail");
 
     // Insert in the middle, not just the front.
     Sim m;
     m.type("su3cl3");       // 你好
     m.key(FcitxKey_Left);   // caret between 你 and 好
-    m.type("1j4");          // insert 不 before 好
-    check_eq(m.preedit(), "你不好", "insert 不 between 你 and 好");
-    check(m.b.caretChar() == 2, "caret sits between 不 and 好, not at end");
+    m.type("1j4");          // insert ㄅㄨˋ before 好
+    check_eq(m.preedit(), "你" + bu + "好", "insert 注音 between 你 and 好");
+    check(m.b.caretChar() == 2, "caret sits between inserted char and 好, not at end");
 }
 
 // Paste lands at the caret like any other action, and typing continues there.
 void test_paste_at_caret() {
+    const std::string bu = bu4_default();
+
     Sim fresh;
     fresh.b.pasteAtCaret("ABC");
     check_eq(fresh.preedit(), "ABC", "paste can start a fresh pre-edit");
     fresh.type("1j4");
-    check_eq(fresh.preedit(), "ABC不",
+    check_eq(fresh.preedit(), "ABC" + bu,
              "typing continues after paste-started pre-edit");
 
     Sim s;
@@ -566,8 +588,8 @@ void test_paste_at_caret() {
     s.b.pasteAtCaret("ABC");
     check_eq(s.preedit(), "你ABC好", "paste lands at the caret");
     check(s.b.caretChar() == 4, "caret sits right after the pasted text");
-    s.type("1j4");         // keep composing at the caret -> insert 不 after ABC
-    check_eq(s.preedit(), "你ABC不好", "typing continues at the caret after paste");
+    s.type("1j4");         // keep composing at the caret
+    check_eq(s.preedit(), "你ABC" + bu + "好", "typing continues at the caret after paste");
 
     // Pasting while typing at the end folds the live run in first.
     Sim e;
@@ -657,6 +679,8 @@ void test_up_navigates_not_revert() {
 }
 
 void test_revert_entry() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3");        // 你
     s.key(FcitxKey_Down); // enter + open candidates for 你
@@ -680,11 +704,13 @@ void test_revert_entry() {
     check_eq(mid.preedit(), "su3好",
              "mid-string raw-key revert preserves following cells");
     mid.type("1j4");
-    check_eq(mid.preedit(), "su3不好",
+    check_eq(mid.preedit(), "su3" + bu + "好",
              "typing after mid-string raw-key revert resumes before next cell");
 }
 
 void test_candidate_paging() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3");        // 你 has enough homophones to fill multiple pages
     s.key(FcitxKey_Down); // open candidates
@@ -723,7 +749,7 @@ void test_candidate_paging() {
     check(pick.b.caretChar() == 1,
           "cross-page pick Escape preserves next-cell caret");
     pick.type("1j4");
-    check_eq(pick.preedit(), pickedFirst + "不好",
+    check_eq(pick.preedit(), pickedFirst + bu + "好",
              "typing after cross-page pick Escape inserts before next cell");
 }
 
@@ -749,11 +775,13 @@ void test_candidate_tab_navigation() {
 
 void test_reinterpret() {
     Sim s;
-    s.type("catsu3");     // cats以 (auto peel)
-    check_eq(s.preedit(), "cats以", "catsu3 auto-guesses cats以");
-    s.key(FcitxKey_Left); // caret between s and 以
+    s.type("catsu3");     // cats + current ㄧˇ default (libchewing-dependent)
+    std::string peeled = s.preedit();
+    check(peeled.rfind("cats", 0) == 0 && utf8_count(peeled) == 5,
+          "catsu3 keeps cats and peels one Chinese syllable");
+    s.key(FcitxKey_Left); // caret between s and the peeled syllable
     s.key(FcitxKey_Left); // caret before s (so ↑ targets s)
-    s.key(FcitxKey_Up);   // reinterpret the s (+ 以) -> 你
+    s.key(FcitxKey_Up);   // reinterpret the s (+ peeled syllable) -> 你
     check_eq(s.preedit(), "cat你", "reinterpret recovers cat你");
 
     Sim filename;
@@ -1222,6 +1250,8 @@ void test_selection_backspace() {
 }
 
 void test_caret_delete_home_end() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");       // 你好
     s.key(FcitxKey_Left);   // caret between 你 and 好
@@ -1232,19 +1262,21 @@ void test_caret_delete_home_end() {
     h.type("su3cl3");       // 你好
     h.key(FcitxKey_Left);   // enter caret mode
     h.key(FcitxKey_Home);   // caret before 你
-    h.type("1j4");          // 不
-    check_eq(h.preedit(), "不你好", "Home moves insertion to the front");
+    h.type("1j4");          // ㄅㄨˋ
+    check_eq(h.preedit(), bu + "你好", "Home moves insertion to the front");
 
     Sim e;
     e.type("su3cl3");       // 你好
     e.key(FcitxKey_Left);   // caret between 你 and 好
     e.key(FcitxKey_Home);   // front
     e.key(FcitxKey_End);    // end
-    e.type("1j4");          // 不
-    check_eq(e.preedit(), "你好不", "End moves insertion to the end");
+    e.type("1j4");          // ㄅㄨˋ
+    check_eq(e.preedit(), "你好" + bu, "End moves insertion to the end");
 }
 
 void test_direct_navigation_enters_editing() {
+    const std::string bu = bu4_default();
+
     Sim empty;
     KeyResult r = empty.press(FcitxKey_Home);
     check(!r.handled, "Home with no pre-edit passes through");
@@ -1254,21 +1286,21 @@ void test_direct_navigation_enters_editing() {
     Sim h;
     h.type("su3cl3");      // 你好
     h.key(FcitxKey_Home);  // direct caret mode at front
-    h.type("1j4");         // 不
-    check_eq(h.preedit(), "不你好", "top-level Home enters editing at front");
+    h.type("1j4");         // ㄅㄨˋ
+    check_eq(h.preedit(), bu + "你好", "top-level Home enters editing at front");
 
     Sim b;
     b.type("su3cl3");       // 你好
     b.key(FcitxKey_Begin);  // direct Begin at front
-    b.type("1j4");          // 不
-    check_eq(b.preedit(), "不你好", "top-level Begin enters editing at front");
+    b.type("1j4");          // ㄅㄨˋ
+    check_eq(b.preedit(), bu + "你好", "top-level Begin enters editing at front");
 
     Sim e;
     e.type("su3cl3");      // 你好
     e.key(FcitxKey_Home);  // front
     e.key(FcitxKey_End);   // direct End to tail while editing
-    e.type("1j4");         // 不
-    check_eq(e.preedit(), "你好不", "top-level End moves editing caret to tail");
+    e.type("1j4");         // ㄅㄨˋ
+    check_eq(e.preedit(), "你好" + bu, "top-level End moves editing caret to tail");
 
     Sim d;
     d.type("su3");
@@ -1283,6 +1315,8 @@ void test_direct_navigation_enters_editing() {
 }
 
 void test_escape_behavior() {
+    const std::string bu = bu4_default();
+
     Sim empty;
     KeyResult r = empty.press(FcitxKey_Escape);
     check(!r.handled, "Escape with no pre-edit passes through");
@@ -1301,7 +1335,7 @@ void test_escape_behavior() {
     check(picking.b.selectionChar() == -1, "Escape closes candidate window");
     check_eq(picking.preedit(), "你", "Escape keeps text after closing candidates");
     picking.type("1j4");
-    check_eq(picking.preedit(), "不你",
+    check_eq(picking.preedit(), bu + "你",
              "typing after candidate Escape resumes at caret");
 
     Sim caret;
@@ -1310,11 +1344,13 @@ void test_escape_behavior() {
     caret.key(FcitxKey_Escape);
     check_eq(caret.preedit(), "你好", "Escape exits caret mode without clearing");
     caret.type("1j4");
-    check_eq(caret.preedit(), "你好不",
+    check_eq(caret.preedit(), "你好" + bu,
              "typing after caret Escape resumes at end");
 }
 
 void test_candidate_control_closes_to_caret() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");         // 你好
     s.key(FcitxKey_Left);     // caret between 你 and 好
@@ -1325,11 +1361,13 @@ void test_candidate_control_closes_to_caret() {
     check(s.b.selectionChar() == -1, "control key closes candidate highlight");
     check_eq(s.preedit(), "你好", "control key keeps pre-edit text");
     s.type("1j4");
-    check_eq(s.preedit(), "不你好",
+    check_eq(s.preedit(), bu + "你好",
              "typing after control-close resumes at focused caret");
 }
 
 void test_picking_delete_focused_cell() {
+    const std::string bu = bu4_default();
+
     Sim s;
     s.type("su3cl3");          // 你好
     s.key(FcitxKey_Left);      // caret between 你 and 好
@@ -1339,7 +1377,7 @@ void test_picking_delete_focused_cell() {
     check_eq(s.preedit(), "好", "picking backspace deletes focused cell");
     check(s.b.selectionChar() == -1, "candidate window closes after focused delete");
     s.type("1j4");
-    check_eq(s.preedit(), "不好",
+    check_eq(s.preedit(), bu + "好",
              "typing after focused delete resumes at deleted position");
 
     Sim d;

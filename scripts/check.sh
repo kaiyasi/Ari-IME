@@ -172,7 +172,7 @@ package_checks() {
     mkdir -p "$tmp/Ari-IME-$pkgbuild_version"
     cp -a CMakeLists.txt LICENSE README.md data src test \
         "$tmp/Ari-IME-$pkgbuild_version/"
-    run env srcdir="$tmp" pkgdir="$tmp/pkg" bash -lc \
+    run env srcdir="$tmp" pkgdir="$tmp/pkg" bash -e -o pipefail -lc \
         'source PKGBUILD; build; check; package; find "$pkgdir" -type f | sort'
 }
 
