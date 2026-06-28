@@ -1,6 +1,6 @@
 # Maintainer: Kaiyasi <zengcode0315@gmail.com>
 pkgname=fcitx5-ari-ime
-pkgver=0.2.2
+pkgver=0.2.3
 pkgrel=1
 pkgdesc="知字 (Ari IME): Fcitx5 mixed Bopomofo/English input without mode switching"
 arch=('x86_64')

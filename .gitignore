@@ -2,3 +2,4 @@ build/
 build-*/
 pkg/
 *.pkg.tar.*
+*.gcov

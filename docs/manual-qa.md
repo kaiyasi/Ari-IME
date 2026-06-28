@@ -21,6 +21,10 @@ and display server behavior.
   INPUTER_DISABLE_AUTOLEARN=1 fcitx5 -r
   ```
 
+- Candidate ordering comes from libchewing and may change across libchewing
+  versions. When a scenario inserts `1j4`, validate caret placement and commit
+  behavior using the current default ㄅㄨˋ candidate shown by your system.
+
 ## Environment Matrix
 
 Run the core scenarios in at least one app from each toolkit group:
@@ -64,8 +68,8 @@ available:
 
 | Scenario | Steps | Expected |
 |----------|-------|----------|
-| Insert before text | Type `su3cl3`, press Home, type `1j4` | Preedit becomes `不你好`; caret remains after inserted char |
-| Insert in middle | Type `su3cl3`, press Left, type `1j4` | Preedit becomes `你不好` |
+| Insert before text | Type `su3cl3`, press Home, type `1j4` | The current default ㄅㄨˋ candidate appears before `你好`; caret remains after inserted char |
+| Insert in middle | Type `su3cl3`, press Left, type `1j4` | The current default ㄅㄨˋ candidate appears between `你` and `好` |
 | Delete right of caret | Type `su3cl3`, press Left, Delete | Preedit becomes `你` |
 | Close candidates | Type `su3`, Down, Esc, type `1j4` | Candidate window closes; next input inserts at caret |
 
@@ -84,7 +88,7 @@ available:
 | Scenario | Steps | Expected |
 |----------|-------|----------|
 | NumLock digits | Press keypad `1`, `2`, `3` | Preedit is literal `123`; digits do not become tone keys |
-| Keypad navigation | Type `su3cl3`, press keypad Home, type `1j4` | Preedit becomes `不你好` |
+| Keypad navigation | Type `su3cl3`, press keypad Home, type `1j4` | The current default ㄅㄨˋ candidate appears before `你好` |
 | Keypad candidate paging | Type `su3`, keypad Down, keypad PageDown/PageUp | Candidate pages move like main keyboard keys |
 
 ## Configuration And Status

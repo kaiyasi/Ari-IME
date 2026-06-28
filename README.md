@@ -92,6 +92,10 @@ state machine is built around one-key-per-Bopomofo-symbol layouts.
 - extra-cmake-modules (ECM)
 - a C++20 compiler, CMake ≥ 3.16
 
+The automated tests are written to tolerate libchewing dictionary ranking
+changes where Ari IME does not own the exact candidate order. Current local and
+CI verification is exercised with libchewing 0.12.0 on Arch Linux.
+
 On Arch Linux:
 
 ```sh
