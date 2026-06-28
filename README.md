@@ -127,8 +127,9 @@ scripts/check.sh
 
 This checks version consistency across CMake/PKGBUILD/.SRCINFO, then runs the
 release build, CTest, install smoke check, PKGBUILD syntax check, and the
-sanitizer test profile. The version check prints the validated Ari IME version
-so release/upload checkpoints can cite it directly. Add
+sanitizer test profile. The version check prints the validated Ari IME version,
+libchewing version, CMake version, and active C++ compiler so CI failures can be
+correlated with dependency changes. Add
 `INPUTER_CHECK_PACKAGE=1` to also run an offline Arch package
 `build/check/package` simulation.
 
@@ -172,7 +173,9 @@ It feeds mixed key, paste, candidate-selection, layout-switch, and punctuation
 events into `Buffer` while checking UTF-8 and public caret/candidate invariants.
 Use `INPUTER_CHECK_MODE=fuzz scripts/check.sh` for the same bounded smoke run
 that CI uses. It loads the seed corpus in `test/corpus/fuzz_buffer` when present;
-printable ASCII bytes in those seeds are interpreted as direct key presses. Set
+the check script copies those seeds into a temporary corpus first so local fuzz
+runs do not dirty the tracked seed directory. Printable ASCII bytes in those
+seeds are interpreted as direct key presses. Set
 `INPUTER_FUZZ_RUNS` to adjust the run count, or `INPUTER_FUZZ_CORPUS_DIR` to
 point at another corpus directory.
 

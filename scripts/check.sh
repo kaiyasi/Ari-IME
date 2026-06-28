@@ -61,6 +61,19 @@ check_versions() {
     printf 'Ari IME version: v%s\n' "$cmake_version"
 }
 
+print_dependency_versions() {
+    if command -v pkg-config >/dev/null 2>&1 &&
+       pkg-config --exists chewing >/dev/null 2>&1; then
+        printf 'libchewing version: %s\n' "$(pkg-config --modversion chewing)"
+    fi
+    if command -v cmake >/dev/null 2>&1; then
+        printf 'CMake version: %s\n' "$(cmake --version | sed -n '1s/^cmake version //p')"
+    fi
+    if command -v "${INPUTER_CXX:-c++}" >/dev/null 2>&1; then
+        printf 'C++ compiler: %s\n' "$("${INPUTER_CXX:-c++}" --version | sed -n '1p')"
+    fi
+}
+
 check_srcinfo() {
     if ! command -v makepkg >/dev/null 2>&1; then
         return
@@ -84,6 +97,7 @@ check_srcinfo() {
 
 release_checks() {
     check_versions
+    print_dependency_versions
     local cmake_args=()
     mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$build_dir" "${cmake_args[@]}" \
@@ -96,6 +110,7 @@ release_checks() {
 }
 
 sanitize_checks() {
+    print_dependency_versions
     local cmake_args=()
     mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$sanitize_dir" \
@@ -108,6 +123,7 @@ sanitize_checks() {
 }
 
 fuzz_checks() {
+    print_dependency_versions
     if ! command -v clang++ >/dev/null 2>&1; then
         if [[ "${INPUTER_FUZZ_ALLOW_SKIP:-0}" == "1" ]]; then
             printf 'Skipping fuzz checks: clang++ not found\n'
@@ -127,14 +143,21 @@ fuzz_checks() {
         -DBUILD_TESTING=OFF
     run cmake --build "$fuzz_dir" --target fuzz_buffer
     local fuzz_args=("-runs=${INPUTER_FUZZ_RUNS:-256}")
+    local fuzz_work_dir=""
     if [[ -d "$fuzz_corpus_dir" ]]; then
-        fuzz_args+=("$fuzz_corpus_dir")
+        fuzz_work_dir="$(mktemp -d /tmp/inputer-fuzz-corpus-XXXXXX)"
+        cp -a "$fuzz_corpus_dir"/. "$fuzz_work_dir"/
+        fuzz_args+=("$fuzz_work_dir")
     fi
     run env ASAN_OPTIONS=detect_leaks=0 LSAN_OPTIONS=detect_leaks=0 \
         "$fuzz_dir/fuzz_buffer" "${fuzz_args[@]}"
+    if [[ -n "$fuzz_work_dir" ]]; then
+        rm -rf "$fuzz_work_dir"
+    fi
 }
 
 coverage_checks() {
+    print_dependency_versions
     if ! command -v gcov >/dev/null 2>&1; then
         printf 'gcov is required for INPUTER_CHECK_MODE=coverage\n' >&2
         exit 1
@@ -156,15 +179,18 @@ coverage_checks() {
     run gcov -b -c \
         "$coverage_dir/CMakeFiles/test_buffer.dir/src/buffer.cpp.gcda" \
         "$coverage_dir/CMakeFiles/test_buffer.dir/src/zhuyin.cpp.gcda"
-    mv ./*.gcov "$report_dir"/
+    mv buffer.cpp.gcov zhuyin.cpp.gcov "$report_dir"/
+    find . -maxdepth 1 -name '*.gcov' -delete
     run gcov -b -c \
         "$coverage_dir/CMakeFiles/test_layout.dir/src/layout.cpp.gcda"
-    mv ./*.gcov "$report_dir"/
+    mv layout.cpp.gcov "$report_dir"/
+    find . -maxdepth 1 -name '*.gcov' -delete
     printf '\nCoverage reports written to %s\n' "$report_dir"
 }
 
 package_checks() {
     check_versions
+    print_dependency_versions
     local pkgbuild_version
     pkgbuild_version="$(extract_pkgbuild_version)"
     tmp="$(mktemp -d /tmp/inputer-pkgcheck-XXXXXX)"

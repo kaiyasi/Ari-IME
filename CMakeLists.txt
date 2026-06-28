@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 0.2.1 LANGUAGES CXX)
+project(inputer VERSION 0.2.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +24,7 @@ find_package(Fcitx5ModuleClipboard REQUIRED) # clipboard_public.h for Ctrl+V pas
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Chewing REQUIRED IMPORTED_TARGET chewing)
+message(STATUS "Using chewing ${Chewing_VERSION}")
 
 include(GNUInstallDirs)
 
