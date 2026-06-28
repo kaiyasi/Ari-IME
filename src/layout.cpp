@@ -310,10 +310,15 @@ std::string canonicalKeys(const std::string &keys) {
     for (std::size_t i = 0; i < order.size(); ++i) {
         order[i] = i;
     }
-    std::stable_sort(order.begin(), order.end(), [&](std::size_t a,
-                                                     std::size_t b) {
-        return slots[a] < slots[b];
-    });
+    for (std::size_t i = 1; i < order.size(); ++i) {
+        std::size_t key = order[i];
+        std::size_t j = i;
+        while (j > 0 && slots[key] < slots[order[j - 1]]) {
+            order[j] = order[j - 1];
+            --j;
+        }
+        order[j] = key;
+    }
     std::string sorted;
     sorted.reserve(out.size());
     for (std::size_t i : order) {

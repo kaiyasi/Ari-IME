@@ -190,6 +190,7 @@ if(INPUTER_ENABLE_FUZZING)
     target_link_libraries(fuzz_buffer
         PRIVATE
             Fcitx5::Utils
+            Fcitx5::Config
             PkgConfig::Chewing
     )
     inputer_enable_warnings(fuzz_buffer)

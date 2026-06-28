@@ -154,8 +154,9 @@ std::string pastePayload(const uint8_t *data, std::size_t size,
     if (offset >= size) {
         return {};
     }
-    const std::size_t len = std::min<std::size_t>((data[offset++] % 12) + 1,
-                                                  size - offset);
+    const uint8_t lenByte = data[offset++];
+    const std::size_t len =
+        std::min<std::size_t>((lenByte % 12) + 1, size - offset);
     std::string text;
     text.reserve(len);
     for (std::size_t i = 0; i < len; ++i) {
