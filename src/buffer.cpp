@@ -64,6 +64,11 @@ bool isIgnoredPasteFormat(const std::string &ch) {
            ch == "\xef\xbb\xbf";
 }
 
+bool isAsciiWhitespace(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
+           c == '\v';
+}
+
 int keypadAscii(fcitx::KeySym sym) {
     switch (sym) {
     case FcitxKey_KP_0: return '0';
@@ -264,6 +269,21 @@ bool canPeelEnglishBody(const std::string &prefix, const std::string &body) {
         return false;
     }
     return true;
+}
+
+bool canPeelSymbolLedBody(const std::string &body) {
+    if (body.size() < 2 || !inputer::isSymbolLikeZhuyinKey(body.front())) {
+        return false;
+    }
+    return std::any_of(body.begin() + 1, body.end(), [](char c) {
+        return inputer::zhuyinSlot(c) >= 0;
+    });
+}
+
+bool hasAsciiDigit(const std::string &s) {
+    return std::any_of(s.begin(), s.end(), [](char c) {
+        return c >= '0' && c <= '9';
+    });
 }
 
 } // namespace
@@ -540,7 +560,7 @@ KeyResult Buffer::handleChar(char c, bool literal) {
             englishBuf_.push_back(c);
             return {true, false, {}, true};
         }
-        return flipToEnglish(c); // breaks a pending Chinese syllable, if any
+        return handleLiteralChar(c); // breaks a pending Chinese syllable, if any
     }
 
     if (token_ == Token::English) {
@@ -583,12 +603,15 @@ KeyResult Buffer::handleChar(char c, bool literal) {
                 return {true, false, {}, true};
             }
         }
-        return flipToEnglish(c);
+        return handleLiteralChar(c);
     }
 
     if (syl_.empty()) {
         if (s == 3) {
-            return flipToEnglish(c); // a tone cannot start a syllable
+            return handleLiteralChar(c); // a tone cannot start a syllable
+        }
+        if (shouldPreferLiteralAmbiguousStart(c)) {
+            return handleLiteralChar(c);
         }
         syl_.push_back(c);
         return {true, false, {}, true}; // raw until a tone completes it
@@ -599,7 +622,7 @@ KeyResult Buffer::handleChar(char c, bool literal) {
     // through the layout layer because some layouts have dual-role keys (Hsu
     // 'f' is ㄈ at syllable start but ˇ after a body).
     if (!inputer::isValidSyllable(syl_ + c, /*allowTone=*/true)) {
-        return flipToEnglish(c);
+        return handleLiteralChar(c);
     }
 
     syl_.push_back(c);
@@ -615,6 +638,22 @@ KeyResult Buffer::handleChar(char c, bool literal) {
         syl_.clear();
     }
     return {true, false, {}, true};
+}
+
+KeyResult Buffer::handleLiteralChar(char c) {
+    if (fullWidthPunct_) {
+        std::string punct = chinesePunct(c);
+        if (!punct.empty()) {
+            freezeAll();
+            cells_.push_back({false, punct, {}});
+            return {true, false, {}, true};
+        }
+    }
+    if (token_ == Token::English) {
+        englishBuf_.push_back(c);
+        return {true, false, {}, true};
+    }
+    return flipToEnglish(c);
 }
 
 void Buffer::integrateSyllable(const std::string &body) {
@@ -683,8 +722,201 @@ KeyResult Buffer::flipToEnglish(char trailing) {
     return {true, false, {}, true};
 }
 
+bool Buffer::shouldPreferLiteralAmbiguousStart(char c) const {
+    if (!inputer::isSymbolLikeZhuyinKey(c)) {
+        return false;
+    }
+    if (!syl_.empty()) {
+        return false;
+    }
+    if (cells_.empty() && zhuyin_.preedit().empty() && englishBuf_.empty()) {
+        return true;
+    }
+    if (cells_.empty()) {
+        if (!tail_.empty()) {
+            return cellLooksLiteralish(tail_.front());
+        }
+        return false;
+    }
+    const Cell &last = cells_.back();
+    if (cellLooksLiteralish(last)) {
+        return true;
+    }
+    return !tail_.empty() && cellLooksLiteralish(tail_.front());
+}
+
+bool Buffer::cellLooksLiteralish(const Cell &cell) const {
+    if (cell.chinese) {
+        return false;
+    }
+    if (cell.text == " ") {
+        return true;
+    }
+    if (cell.text.size() != 1) {
+        return true;
+    }
+    unsigned char c = static_cast<unsigned char>(cell.text[0]);
+    return isAsciiWhitespace(static_cast<char>(c)) || !std::isalnum(c);
+}
+
+int Buffer::literalContextBiasAt(int idx) const {
+    if (idx < 0 || idx >= static_cast<int>(cells_.size())) {
+        return 0;
+    }
+
+    int bias = 0;
+    const Cell &cell = cells_[idx];
+    auto reading = readingBody(cell.reading).first;
+    if (!reading.empty() && inputer::isSymbolLikeZhuyinKey(reading.front())) {
+        bias += 3;
+    }
+    if (cell.locked) {
+        bias += 1;
+    }
+
+    auto considerNeighbor = [this, &bias](const Cell *neighbor) {
+        if (!neighbor) {
+            ++bias;
+            return;
+        }
+        if (neighbor->chinese) {
+            --bias;
+            return;
+        }
+        if (cellLooksLiteralish(*neighbor)) {
+            bias += 2;
+        } else {
+            ++bias;
+        }
+    };
+
+    considerNeighbor(idx > 0 ? &cells_[idx - 1] : nullptr);
+    considerNeighbor(idx + 1 < static_cast<int>(cells_.size()) ? &cells_[idx + 1]
+                                                               : nullptr);
+
+    int literalNeighbors = 0;
+    for (int j = std::max(0, idx - 2);
+         j <= std::min(static_cast<int>(cells_.size()) - 1, idx + 2); ++j) {
+        if (j == idx || cells_[j].chinese) {
+            continue;
+        }
+        if (cellLooksLiteralish(cells_[j])) {
+            ++literalNeighbors;
+        }
+    }
+    if (literalNeighbors >= 2) {
+        bias += 2;
+    }
+
+    return bias;
+}
+
+int Buffer::candidateScore(const SelCand &cand) const {
+    const int literalBias = literalContextBiasAt(selCursor_);
+    if (cand.down < 0) {
+        int score = -48 + literalBias * 10;
+        if (literalBias >= 5) {
+            score += 18;
+        }
+        return score;
+    }
+
+    int len = utf8Count(cand.text);
+    int score = 0;
+    score += len * 16;
+    score -= std::max(cand.down, 0) * 7;
+
+    if (len == 1) {
+        score += literalBias * 5;
+    } else {
+        score -= literalBias * 4;
+    }
+
+    bool hasChineseLeft = selCursor_ > 0 && cells_[selCursor_ - 1].chinese;
+    bool hasChineseRight =
+        selCursor_ + len < static_cast<int>(cells_.size()) &&
+        cells_[selCursor_ + len].chinese;
+    if (len > 1 && (hasChineseLeft || hasChineseRight)) {
+        score += 8;
+    }
+    if (len == 1 && !hasChineseLeft && !hasChineseRight) {
+        score += 10;
+    }
+
+    if (hasAsciiLetter(cand.text) || hasAsciiDigit(cand.text)) {
+        score -= 20;
+    }
+
+    std::vector<std::string> chars = splitUtf8(cand.text);
+    bool exactSpanMatch = true;
+    int limit = std::min<int>(chars.size(),
+                              static_cast<int>(cells_.size()) - selCursor_);
+    for (int i = 0; i < limit; ++i) {
+        const Cell &cell = cells_[selCursor_ + i];
+        if (chars[i] != cell.text) {
+            exactSpanMatch = false;
+            if (cell.locked) {
+                score -= 24;
+            }
+            if (!cell.chinese) {
+                score -= 16;
+            }
+        }
+    }
+    if (exactSpanMatch && len == limit) {
+        score += 28;
+    }
+
+    return score;
+}
+
+void Buffer::rankSelCands() {
+    std::stable_sort(selCands_.begin(), selCands_.end(),
+                     [this](const SelCand &a, const SelCand &b) {
+                         int scoreA = candidateScore(a);
+                         int scoreB = candidateScore(b);
+                         if (scoreA != scoreB) {
+                             return scoreA > scoreB;
+                         }
+                         if (a.down != b.down) {
+                             return a.down < b.down;
+                         }
+                         return a.order < b.order;
+                     });
+}
+
 bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
     const std::string &buf = englishBuf_;
+    // A punctuation-looking key may have been kept literal at a boundary because
+    // it was ambiguous on its own. If the trailing literal tail later forms a
+    // clear symbol-led zhuyin body, recover that longer suffix first instead of
+    // peeling only the shortest alphabetic tail.
+    for (std::size_t k = 0; k < buf.size(); ++k) {
+        std::string body = buf.substr(k);
+        if (!inputer::isValidSyllable(body, /*allowTone=*/false) ||
+            !canPeelSymbolLedBody(body)) {
+            continue;
+        }
+        std::string syllable = inputer::canonicalKeys(body);
+        syllable.push_back(tone);
+        if (!syllableConverts(syllable)) {
+            continue;
+        }
+
+        freezeRun();
+        for (char c : buf.substr(0, k)) {
+            cells_.push_back({false, std::string(1, c), {}});
+        }
+        zhuyin_.feedSequence(syllable);
+        runReadings_ = {syllable};
+        moveAutoCommit();
+        token_ = Token::Chinese;
+        englishBuf_.clear();
+        syl_.clear();
+        out = {true, false, {}, true};
+        return true;
+    }
+
     // Prefer the shortest trailing syllable (largest k) that actually forms a
     // character: steal as few letters as possible from the English word. This
     // keeps brand names like "acer" intact ("aceru/6" -> acer + 螢) without
@@ -945,7 +1177,8 @@ void Buffer::buildSelCands() {
         int charLen = utf8Count(zhuyin_.candidate(0));
         for (int i = 0; i < total; ++i) {
             std::string text = zhuyin_.candidate(i);
-            selCands_.push_back({text, text, down, i});
+            selCands_.push_back({text, text, down, i,
+                                 static_cast<int>(selCands_.size())});
         }
         if (charLen <= 1) {
             break; // reached the single-character interval
@@ -956,8 +1189,10 @@ void Buffer::buildSelCands() {
     // marks it; picking it explodes the cell instead of choosing a homophone.
     std::string raw = readingBody(cells_[selCursor_].reading).first;
     if (!raw.empty()) {
-        selCands_.push_back({raw, "原始鍵 " + raw, -1, -1});
+        selCands_.push_back(
+            {raw, "原始鍵 " + raw, -1, -1, static_cast<int>(selCands_.size())});
     }
+    rankSelCands();
 }
 
 int Buffer::visibleCandidateCount() const {

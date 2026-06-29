@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 0.2.3 LANGUAGES CXX)
+project(inputer VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -103,6 +103,7 @@ configure_file(
 
 add_library(inputer MODULE
     src/layout.cpp
+    src/user_data.cpp
     src/zhuyin.cpp
     src/buffer.cpp
     src/inputer.cpp
@@ -147,6 +148,7 @@ if(BUILD_TESTING)
     add_executable(test_buffer
         test/test_buffer.cpp
         src/layout.cpp
+        src/user_data.cpp
         src/buffer.cpp
         src/zhuyin.cpp
     )
@@ -178,12 +180,33 @@ if(BUILD_TESTING)
     inputer_enable_coverage(test_layout)
     add_test(NAME layout COMMAND test_layout)
     inputer_configure_test(layout)
+
+    add_executable(test_user_data
+        test/test_user_data.cpp
+        src/layout.cpp
+        src/user_data.cpp
+        src/buffer.cpp
+        src/zhuyin.cpp
+    )
+    target_include_directories(test_user_data PRIVATE src)
+    target_link_libraries(test_user_data
+        PRIVATE
+            Fcitx5::Utils
+            Fcitx5::Config
+            PkgConfig::Chewing
+    )
+    inputer_enable_warnings(test_user_data)
+    inputer_enable_sanitizers(test_user_data)
+    inputer_enable_coverage(test_user_data)
+    add_test(NAME user_data COMMAND test_user_data)
+    inputer_configure_test(user_data)
 endif()
 
 if(INPUTER_ENABLE_FUZZING)
     add_executable(fuzz_buffer
         test/fuzz_buffer.cpp
         src/layout.cpp
+        src/user_data.cpp
         src/buffer.cpp
         src/zhuyin.cpp
     )

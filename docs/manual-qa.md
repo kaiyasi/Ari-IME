@@ -49,7 +49,7 @@ available:
 |----------|-------|----------|
 | Mixed Chinese/English | Type `aceru/6aj4`, press Enter | Preedit shows `acer螢幕`; app receives `acer螢幕` only after Enter |
 | Literal English | Type `README.md`, press Enter | Preedit and commit stay `README.md` |
-| URL/version literal | Type `https://ari-ime.test/v0.2.3`, press Enter | Version digits and dots stay literal |
+| URL/version literal | Type `https://ari-ime.test/v1.0.0`, press Enter | Version digits and dots stay literal |
 | Acronym + Chinese | Type `HTTPsu3`, press Enter | Preedit and commit are `HTTP你` |
 | Forced English | Press Ctrl+Space, type `su3`, press Enter | Mode hint shows English; commit is `su3`; mode remains English |
 

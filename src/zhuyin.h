@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "layout.h"
+#include "user_data.h"
 
 struct ChewingContext;
 

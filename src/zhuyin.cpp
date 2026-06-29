@@ -2,9 +2,6 @@
 // Copyright (C) 2026 Kaiyasi
 #include "zhuyin.h"
 
-#include <cctype>
-#include <cstdlib>
-#include <filesystem>
 #include <string>
 
 #include <chewing.h>
@@ -12,35 +9,11 @@
 #include "constants.h"
 #include "layout.h"
 
-namespace {
-
-// Resolve (and create) the per-user dictionary path so chewing can persist
-// learned phrase frequencies across sessions. Returns empty on failure, in
-// which case chewing falls back to its default user path.
-std::string userPath() {
-    namespace fs = std::filesystem;
-    fs::path base;
-    if (const char *xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg) {
-        base = fs::path(xdg);
-    } else if (const char *home = std::getenv("HOME"); home && *home) {
-        base = fs::path(home) / ".config";
-    } else {
-        return {};
-    }
-    fs::path dir = base / "inputer";
-    std::error_code ec;
-    fs::create_directories(dir, ec);
-    if (ec) {
-        return {};
-    }
-    // chewing_new2 expects a FILE path for the user dictionary, not a directory.
-    return (dir / "userdict.dat").string();
-}
-
-} // namespace
-
 Zhuyin::Zhuyin() {
-    const std::string path = userPath();
+    std::error_code ec;
+    const bool haveUserDataDir = inputer::ensureUserDataDir(ec);
+    const std::string path =
+        haveUserDataDir ? inputer::userDictionaryPath().string() : std::string{};
     ctx_ = chewing_new2(nullptr, path.empty() ? nullptr : path.c_str(), nullptr,
                         nullptr);
     if (!ctx_) {
@@ -50,10 +23,9 @@ Zhuyin::Zhuyin() {
         ctx_, inputer::chewingKeyboardType(inputer::currentKeyboardLayout()));
     // Tests run with a throwaway dictionary and should not try to persist learned
     // data; production keeps auto-learning enabled by default.
-    const bool disableLearn =
-        std::getenv("INPUTER_DISABLE_AUTOLEARN") != nullptr;
-    chewing_set_autoLearn(ctx_,
-                          disableLearn ? AUTOLEARN_DISABLED : AUTOLEARN_ENABLED);
+    chewing_set_autoLearn(
+        ctx_, inputer::autoLearnEnabled() ? AUTOLEARN_ENABLED
+                                          : AUTOLEARN_DISABLED);
     chewing_set_spaceAsSelection(ctx_, 0);    // We drive selection ourselves.
     chewing_set_escCleanAllBuf(ctx_, 1);
     chewing_set_candPerPage(ctx_, inputer::kCandPerPage);

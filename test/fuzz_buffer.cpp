@@ -213,7 +213,6 @@ void applyByte(FuzzState &state, const uint8_t *data, std::size_t size,
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, std::size_t size) {
     static test::TempConfigHome configHome("inputer-buffer-fuzz-config");
-    setenv("INPUTER_DISABLE_AUTOLEARN", "1", 1);
 
     FuzzState state;
     std::size_t offset = 0;

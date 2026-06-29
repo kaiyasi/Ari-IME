@@ -31,6 +31,10 @@ FCITX_CONFIGURATION(
     fcitx::Option<bool> fullWidthPunctuation{
         this, "FullWidthPunctuation",
         _("Use full-width Chinese punctuation for punctuation keys (for example < -> ，, > -> 。, ? -> ？, _ -> ＿). Off by default; no global shortcut is reserved."),
+        false};
+    fcitx::Option<bool> showStatusLine{
+        this, "ShowStatusLine",
+        _("Show composition status text in the auxiliary line (for example 中 · 大千 · 半形標點) while composing."),
         false};);
 
 // Per-input-context state, owned by fcitx and created on demand.

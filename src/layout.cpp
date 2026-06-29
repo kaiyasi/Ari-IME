@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -295,6 +296,11 @@ int zhuyinSlot(char c) {
 bool isToneKey(char c) {
     return zhuyinSlot(c) == kToneSlot ||
            isDualRoleToneKey(currentKeyboardLayout(), c);
+}
+
+bool isSymbolLikeZhuyinKey(char c) {
+    unsigned char uc = static_cast<unsigned char>(c);
+    return zhuyinSlot(c) >= 0 && !std::isalnum(uc);
 }
 
 std::string canonicalKeys(const std::string &keys) {

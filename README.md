@@ -1,4 +1,4 @@
-# 知字 · Ari IME
+# Ari IME
 
 A Fcitx5 input method for Traditional Chinese that lets you type **Bopomofo (注音)
 and English together without switching modes**. Every key first shows as itself;
@@ -33,7 +33,8 @@ phrasing and per-user learning.
 - **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
   up, and the mode persists until toggled again.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
-  keyboard layout and punctuation mode while composing.
+  keyboard layout and punctuation mode while composing. This status line is off
+  by default and can be re-enabled in the addon config.
 - **Per-user learning** — chewing records your homophone/phrase choices.
 
 ## Keys
@@ -110,7 +111,7 @@ cmake --build build
 sudo cmake --install build
 ```
 
-Then restart fcitx5 and add **知字 (Ari IME)** in `fcitx5-configtool` (or your IME
+Then restart fcitx5 and add **Ari IME** in `fcitx5-configtool` (or your IME
 configuration). Per-addon options (keyboard layout, full-width punctuation)
 appear under the addon's config page.
 
@@ -122,6 +123,17 @@ ctest --test-dir build
 
 The tests isolate chewing's learned dictionary in a temp directory, so they are
 deterministic and do not touch your real `~/.config` data.
+
+Development/test safeguards around personalization:
+
+- Automated tests set `INPUTER_USER_DATA_DIR` and `XDG_CONFIG_HOME` to a fresh
+  temp directory.
+- Automated tests also set `INPUTER_DISABLE_AUTOLEARN=1`, so no learned
+  personalization is intentionally recorded during ordinary
+  unit/integration/fuzz runs, and any libchewing-created artifacts stay inside
+  the disposable temp directory.
+- Production usage keeps auto-learning enabled by default and writes only to
+  Ari IME's own `userdict.dat`, not libchewing's built-in dictionary resources.
 
 For the full local verification pass:
 
@@ -191,6 +203,36 @@ push/PR checks.
 Real application behavior still needs manual validation because preedit,
 candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
+
+Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
+[docs/release-1.0.0.md](docs/release-1.0.0.md).
+
+## Resetting learned data
+
+Ari IME stores only its learned per-user dictionary in:
+
+- `${INPUTER_USER_DATA_DIR}/userdict.dat`, when `INPUTER_USER_DATA_DIR` is set
+- otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/inputer/userdict.dat`
+
+This file contains learned phrase/homophone preferences. It is safe to reset
+without affecting libchewing's built-in/base dictionary.
+
+To reset learned data safely for development or local troubleshooting:
+
+```sh
+scripts/reset-user-data.sh
+```
+
+The script backs up the current `userdict.dat` to a timestamped `.bak.*` file
+and removes the active learned dictionary so Ari IME starts relearning from a
+clean state. Use `--yes` for non-interactive use, or `--no-backup` if you
+explicitly want to discard the existing learned file.
+
+For test/dev isolation, point Ari IME at a disposable user-data directory:
+
+```sh
+export INPUTER_USER_DATA_DIR=/tmp/inputer-dev-userdata
+```
 
 ## License
 

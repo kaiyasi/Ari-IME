@@ -2,6 +2,7 @@
 // classification. Exits non-zero on any failure so it can gate changes.
 
 #include <string>
+#include <cctype>
 
 #include <fcitx-config/rawconfig.h>
 
@@ -62,6 +63,8 @@ void test_layout_classification() {
     check(inputer::zhuyinSlot('4') == inputer::kToneSlot,
           "layout classifies exact tone symbols");
     check(inputer::isToneKey('3'), "layout recognizes tone key");
+    check(!inputer::isSymbolLikeZhuyinKey('s'),
+          "letters are not treated as symbol-like zhuyin keys");
     check_eq(inputer::canonicalKeys("s3u"), "su3",
              "layout canonicalizes out-of-order syllable");
     check(inputer::isValidSyllable("su3", /*allowTone=*/true),
@@ -154,6 +157,18 @@ void test_additional_layouts() {
             std::string(c.name) + " canonicalizes syllable";
         check_eq(inputer::canonicalKeys(c.keys), c.canonical,
                  canonicalLabel.c_str());
+        if (!std::isalnum(static_cast<unsigned char>(c.medial))) {
+            std::string symbolLabel =
+                std::string(c.name) + " classifies punctuation-looking medial";
+            check(inputer::isSymbolLikeZhuyinKey(c.medial),
+                  symbolLabel.c_str());
+        }
+        if (!std::isalnum(static_cast<unsigned char>(c.tone))) {
+            std::string symbolLabel =
+                std::string(c.name) + " classifies punctuation-looking tone";
+            check(inputer::isSymbolLikeZhuyinKey(c.tone),
+                  symbolLabel.c_str());
+        }
         fcitx::RawConfig raw;
         marshallOption(raw, c.layout);
         inputer::KeyboardLayout parsed = inputer::KeyboardLayout::Default;

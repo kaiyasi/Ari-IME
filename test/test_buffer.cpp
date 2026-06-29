@@ -6,6 +6,7 @@
 //   ctest --test-dir build --output-on-failure
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <fcitx-utils/key.h>
@@ -118,6 +119,61 @@ std::string bu4_default() {
     return out;
 }
 
+struct SymbolLeadCase {
+    inputer::KeyboardLayout layout;
+    std::string keys;
+};
+
+int find_visible_candidate(const std::vector<std::string> &cands,
+                           const std::string &text) {
+    for (int i = 0; i < static_cast<int>(cands.size()); ++i) {
+        if (cands[i] == text) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+bool find_symbol_lead_case(char lead, SymbolLeadCase &out) {
+    const inputer::KeyboardLayout layouts[] = {
+        inputer::KeyboardLayout::Default,
+        inputer::KeyboardLayout::Eten,
+        inputer::KeyboardLayout::Hsu,
+        inputer::KeyboardLayout::Ibm,
+        inputer::KeyboardLayout::GinYieh,
+        inputer::KeyboardLayout::Dvorak,
+        inputer::KeyboardLayout::Carpalx,
+        inputer::KeyboardLayout::ColemakDhAnsi,
+        inputer::KeyboardLayout::ColemakDhOrth,
+        inputer::KeyboardLayout::Workman,
+        inputer::KeyboardLayout::Colemak,
+    };
+    for (inputer::KeyboardLayout layout : layouts) {
+        inputer::setCurrentKeyboardLayout(layout);
+        if (!inputer::isSymbolLikeZhuyinKey(lead)) {
+            continue;
+        }
+        for (int mid = 33; mid <= 126; ++mid) {
+            if (!inputer::isValidSyllable(std::string{lead, static_cast<char>(mid)},
+                                          /*allowTone=*/false)) {
+                continue;
+            }
+            for (int tone = 33; tone <= 126; ++tone) {
+                char toneChar = static_cast<char>(tone);
+                if (!inputer::isToneKey(toneChar)) {
+                    continue;
+                }
+                std::string keys{lead, static_cast<char>(mid), toneChar};
+                if (inputer::isValidSyllable(keys, /*allowTone=*/true)) {
+                    out = {layout, keys};
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void check_invariants(Sim &s, const char *label) {
     std::string preedit = s.preedit();
     check(valid_utf8(preedit), label);
@@ -191,10 +247,10 @@ void test_common_mixed_literals() {
 
     check_eq(pe("kai@example.com"), "kai@example.com",
              "email address stays literal");
-    check_eq(pe("https://ari-ime.test/v0.2.3"),
-             "https://ari-ime.test/v0.2.3",
+    check_eq(pe("https://ari-ime.test/v1.0.0"),
+             "https://ari-ime.test/v1.0.0",
              "URL with version path stays literal");
-    check_eq(pe("Ari-IME-0.2.3"), "Ari-IME-0.2.3",
+    check_eq(pe("Ari-IME-1.0.0"), "Ari-IME-1.0.0",
              "hyphenated version string stays literal");
     check_eq(pe("README.md"), "README.md", "filename stays literal");
     check_eq(pe("APIji3"), "API我", "acronym followed by zhuyin converts");
@@ -444,7 +500,8 @@ void test_phrase_priority() {
     s.key(FcitxKey_Down); // open candidates for 你 (the char to the right)
     auto c = s.cand();
     check(!c.empty() && c[0] == "你好", "phrase 你好 listed first");
-    check(c.size() > 2 && c[2] == "你", "single 你 after phrases");
+    int singleIndex = find_visible_candidate(c, "你");
+    check(singleIndex > 0, "single 你 remains available after phrase candidates");
 }
 
 // Live typing and the selection window must agree on the preferred phrase:
@@ -469,7 +526,10 @@ void test_phrase_pick() {
     s.key(FcitxKey_Left); // caret between 你 and 好
     s.key(FcitxKey_Left); // caret before 你
     s.key(FcitxKey_Down); // open candidates for 你
-    s.key('2');           // pick #2 = 妳好 (phrase)
+    int phraseIndex = find_visible_candidate(s.cand(), "妳好");
+    check(phraseIndex >= 0, "visible candidates include 妳好");
+    KeyResult picked = s.b.selectCandidate(phraseIndex);
+    check(picked.handled, "phrase pick selects visible phrase candidate");
     check_eq(s.preedit(), "妳好", "phrase pick rewrites both cells");
     s.type("1j4");
     check_eq(s.preedit(), "妳好" + bu,
@@ -488,7 +548,9 @@ void test_candidate_direct_selection() {
     s.key(FcitxKey_Left); // caret between 你 and 好
     s.key(FcitxKey_Left); // caret before 你
     s.key(FcitxKey_Down); // open candidates for 你
-    r = s.b.selectCandidate(1);
+    int phraseIndex = find_visible_candidate(s.cand(), "妳好");
+    check(phraseIndex >= 0, "visible candidates include 妳好");
+    r = s.b.selectCandidate(phraseIndex);
     check(r.handled, "direct candidate selection handles visible candidate");
     check_eq(s.preedit(), "妳好",
              "direct candidate selection rewrites phrase like number key");
@@ -498,7 +560,9 @@ void test_candidate_direct_selection() {
     single.key(FcitxKey_Left); // caret between 你 and 好
     single.key(FcitxKey_Left); // caret before 你
     single.key(FcitxKey_Down); // open candidates for 你
-    r = single.b.selectCandidate(3); // 妳 single, matching keyboard navigation
+    int niIndex = find_visible_candidate(single.cand(), "妳");
+    check(niIndex >= 0, "visible candidates include 妳");
+    r = single.b.selectCandidate(niIndex);
     check(r.handled, "direct candidate selection handles single candidate");
     check_eq(single.preedit(), "妳好",
              "direct single candidate rewrites focused cell");
@@ -528,10 +592,10 @@ void test_pin_earlier_pick() {
     s.key(FcitxKey_Left);  // caret between 你 and 好
     s.key(FcitxKey_Left);  // caret before 你
     s.key(FcitxKey_Down);  // open candidates for 你 (hl0 你好)
-    s.key(FcitxKey_Down);  // 妳好
-    s.key(FcitxKey_Down);  // 你 (single)
-    s.key(FcitxKey_Down);  // 妳 (single)
-    s.key(FcitxKey_Return); // pick 妳; window advances to the next cell (好)
+    int niPinnedIndex = find_visible_candidate(s.cand(), "妳");
+    check(niPinnedIndex >= 0, "visible candidates include 妳 for pinning test");
+    KeyResult pinned = s.b.selectCandidate(niPinnedIndex);
+    check(pinned.handled, "pinning test picks 妳 directly");
     check_eq(s.preedit(), "妳好", "picked 妳 single");
     check(s.b.selectionChar() == 1, "pick advances the window to the next cell");
     // Still picking, now on 好: fix it to 郝. The earlier 妳 pick must stay locked.
@@ -545,6 +609,48 @@ void test_pin_earlier_pick() {
     s.type("1j4");
     check_eq(s.preedit(), "妳郝" + bu,
              "typing after consecutive picks appends after fixed text");
+}
+
+void test_candidate_ranking_prefers_current_choice() {
+    Sim s;
+    s.type("su3");
+    s.key(FcitxKey_Down);
+    int niIndex = find_visible_candidate(s.cand(), "妳");
+    check(niIndex >= 0, "visible candidates include 妳");
+    KeyResult picked = s.b.selectCandidate(niIndex);
+    check(picked.handled, "direct pick selects 妳");
+    check_eq(s.preedit(), "妳", "explicit pick updates preedit");
+    s.key(FcitxKey_Escape);
+    s.key(FcitxKey_Home);
+    s.key(FcitxKey_Down);
+    auto reopened = s.cand();
+    check(!reopened.empty() && reopened[0] == "妳",
+          "reopened candidates prefer the current explicit choice");
+}
+
+void test_symbol_heavy_context_promotes_raw_keys() {
+    SymbolLeadCase openParen;
+    if (!find_symbol_lead_case('(', openParen)) {
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+        return;
+    }
+
+    inputer::setCurrentKeyboardLayout(openParen.layout);
+
+    Sim s;
+    s.b.setKeyboardLayout(openParen.layout);
+    s.key('?');
+    s.type(openParen.keys);
+    check(s.preedit().size() > openParen.keys.size(),
+          "symbol-led zhuyin converts after literal punctuation");
+    s.key(FcitxKey_Left); // caret between ? and the converted Chinese cell
+    s.key(FcitxKey_Down); // open candidates on the converted cell
+    auto cands = s.cand();
+    check(!cands.empty(), "symbol-led context opens candidates");
+    check(cands[0] == "原始鍵 " + openParen.keys,
+          "symbol-heavy context promotes raw-key fallback");
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 
 // The headline fix: a 注音 syllable whose FIRST key is a number-row key (不 =
@@ -794,13 +900,13 @@ void test_reinterpret() {
           "filename reinterpret no-op does not open candidates");
 
     Sim version;
-    version.type("Ari-IME-0.2.3");
+    version.type("Ari-IME-1.0.0");
     version.key(FcitxKey_Home);
     version.key(FcitxKey_End);
     version.key(FcitxKey_Left); // caret before final 3
     version.key(FcitxKey_Left); // caret before '.'
     version.key(FcitxKey_Up);
-    check_eq(version.preedit(), "Ari-IME-0.2.3",
+    check_eq(version.preedit(), "Ari-IME-1.0.0",
              "reinterpret does not rewrite version punctuation");
 
     Sim word;
@@ -1233,7 +1339,10 @@ void test_commit_after_pick() {
     s.key(FcitxKey_Left);     // caret between 你 and 好
     s.key(FcitxKey_Left);     // caret before 你
     s.key(FcitxKey_Down);     // open candidates for 你
-    s.key('2');               // pick the 2nd candidate (a phrase 妳好)
+    int phraseIndex = find_visible_candidate(s.cand(), "妳好");
+    check(phraseIndex >= 0, "visible candidates include 妳好");
+    KeyResult picked = s.b.selectCandidate(phraseIndex);
+    check(picked.handled, "direct phrase pick selects 妳好");
     std::string chosen = s.preedit();
     s.key(FcitxKey_Return);   // commit
     check_eq(s.committed, chosen, "commit reflects current pre-edit");
@@ -1530,6 +1639,59 @@ void test_fullwidth_punct() {
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 
+void test_ambiguous_symbol_boundary_literals() {
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+
+    Sim start;
+    start.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    start.key('-'); // 精業: '-' can map to a zhuyin slot, but at a boundary prefer punctuation.
+    check_eq(start.preedit(), "-", "boundary symbol-like zhuyin key stays literal at start");
+    start.key(FcitxKey_space);
+    check_eq(start.preedit(), "- ",
+             "boundary symbol-like zhuyin key stays literal before whitespace");
+
+    Sim afterSpace;
+    afterSpace.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    afterSpace.key(FcitxKey_space);
+    afterSpace.key('-');
+    check_eq(afterSpace.preedit(), " -",
+             "boundary symbol-like zhuyin key stays literal after whitespace");
+
+    Sim symbolHeavy;
+    symbolHeavy.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    symbolHeavy.key('-');
+    symbolHeavy.key('?');
+    check_eq(symbolHeavy.preedit(), "-?",
+             "symbol-heavy input keeps symbol-like zhuyin key literal");
+
+    Sim chinese;
+    chinese.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+    chinese.type("d-a"); // 你
+    chinese.type("vla"); // 好
+    check_eq(chinese.preedit(), "你好",
+             "normal zhuyin typing still works with punctuation-looking keys inside a syllable");
+
+    SymbolLeadCase paren{};
+    if (find_symbol_lead_case('(', paren)) {
+        Sim recovered;
+        recovered.b.setKeyboardLayout(paren.layout);
+        recovered.type(paren.keys);
+        check(recovered.preedit() != paren.keys,
+              "clear symbol-led zhuyin composition can still convert after boundary literal preference");
+    }
+
+    SymbolLeadCase closeParen{};
+    if (find_symbol_lead_case(')', closeParen)) {
+        Sim recovered;
+        recovered.b.setKeyboardLayout(closeParen.layout);
+        recovered.type(closeParen.keys);
+        check(recovered.preedit() != closeParen.keys,
+              "clear close-paren-led zhuyin composition can still convert after boundary literal preference");
+    }
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+}
+
 void test_deterministic_key_stress() {
     struct Event {
         fcitx::Key key;
@@ -1605,6 +1767,8 @@ int main() {
     test_phrase_pick();
     test_candidate_direct_selection();
     test_pin_earlier_pick();
+    test_candidate_ranking_prefers_current_choice();
+    test_symbol_heavy_context_promotes_raw_keys();
     test_insert_chinese_midstring();
     test_paste_at_caret();
     test_midstring_delete_boundaries();
@@ -1622,6 +1786,7 @@ int main() {
     test_candidate_control_closes_to_caret();
     test_picking_delete_focused_cell();
     test_fullwidth_punct();
+    test_ambiguous_symbol_boundary_literals();
     test_deterministic_key_stress();
 
     return test::finish();

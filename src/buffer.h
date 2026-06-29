@@ -117,6 +117,7 @@ private:
     // `literal` keys (e.g. numeric-keypad digits) are never interpreted as 注音;
     // they break any pending syllable and go straight into the English tail.
     KeyResult handleChar(char c, bool literal = false);
+    KeyResult handleLiteralChar(char c);
     // Feed a complete, canonicalised syllable body into the live chewing run,
     // extending it so chewing's phrasing spans contiguous Chinese. English in
     // front of it freezes the old run first, preserving order.
@@ -149,6 +150,9 @@ private:
     void freezeSyllable();   // raw syl_ -> English cells
     void freezeAll();        // all three, in order
     void moveAutoCommit();   // pull chewing's auto-committed front chars into cells_
+    bool shouldPreferLiteralAmbiguousStart(char c) const;
+    bool cellLooksLiteralish(const Cell &cell) const;
+    int literalContextBiasAt(int idx) const;
 
     // One re-selection candidate. `down` and `idx` say how to re-pick it from a
     // freshly-fed run: press Down `down` times to reach its interval (0 = the
@@ -158,7 +162,10 @@ private:
         std::string display;
         int down = 0;
         int idx = 0;
+        int order = 0;
     };
+    int candidateScore(const SelCand &cand) const;
+    void rankSelCands();
 
     // --- Editing mode: a caret over cells_ with two sub-states ---
     // Caret mode (candOpen_ == false): the caret sits BETWEEN characters; arrows

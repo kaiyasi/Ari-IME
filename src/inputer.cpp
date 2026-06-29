@@ -193,9 +193,15 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
             auxDown = "候選 " + std::to_string(page) + "/" +
                       std::to_string(pages) + " · ";
         }
-        auxDown += statusText(buffer);
-        panel.setAuxDown(fcitx::Text(auxDown));
-    } else if (!preeditStr.empty()) {
+        if (*config_.showStatusLine) {
+            auxDown += statusText(buffer);
+        } else if (pages > 1 && auxDown.size() >= 3) {
+            auxDown.erase(auxDown.size() - 3); // drop the trailing " · "
+        }
+        if (!auxDown.empty()) {
+            panel.setAuxDown(fcitx::Text(auxDown));
+        }
+    } else if (!preeditStr.empty() && *config_.showStatusLine) {
         panel.setAuxDown(fcitx::Text(statusText(buffer)));
     }
 

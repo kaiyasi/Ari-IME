@@ -60,6 +60,7 @@ int chewingKeyboardType(KeyboardLayout layout);
 bool keyboardLayoutAvailable(KeyboardLayout layout);
 int zhuyinSlot(char c);
 bool isToneKey(char c);
+bool isSymbolLikeZhuyinKey(char c);
 std::string canonicalKeys(const std::string &keys);
 bool isValidSyllable(const std::string &keys, bool allowTone);
 bool hasMedialOrFinal(const std::string &keys);
