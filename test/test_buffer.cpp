@@ -502,6 +502,9 @@ void test_phrase_priority() {
     check(!c.empty() && c[0] == "你好", "phrase 你好 listed first");
     int singleIndex = find_visible_candidate(c, "你");
     check(singleIndex > 0, "single 你 remains available after phrase candidates");
+    int rawIndex = find_visible_candidate(c, "原始鍵 su3");
+    check(rawIndex < 0 || rawIndex > singleIndex,
+          "raw-key fallback stays behind phrase choices in Chinese context");
 }
 
 // Live typing and the selection window must agree on the preferred phrase:
@@ -889,6 +892,31 @@ void test_reinterpret() {
     s.key(FcitxKey_Left); // caret before s (so ↑ targets s)
     s.key(FcitxKey_Up);   // reinterpret the s (+ peeled syllable) -> 你
     check_eq(s.preedit(), "cat你", "reinterpret recovers cat你");
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+    if (inputer::isValidSyllable(".3-3", /*allowTone=*/true)) {
+        Sim symbolLead;
+        symbolLead.type(".3-3");
+        symbolLead.key(FcitxKey_Home); // caret before '.'
+        symbolLead.key(FcitxKey_Up);
+        check(symbolLead.preedit() != ".3-3",
+              "reinterpret recovers symbol-led zhuyin from boundary literal");
+        check(symbolLead.b.selectionChar() == 0,
+              "symbol-led reinterpret opens candidates on recovered character");
+        check(!symbolLead.cand().empty(),
+              "symbol-led reinterpret exposes candidate list");
+
+        Sim afterChinese;
+        afterChinese.type("su3");
+        afterChinese.type(".3-3");
+        afterChinese.key(FcitxKey_Home);
+        afterChinese.key(FcitxKey_Right); // caret before '.'
+        afterChinese.key(FcitxKey_Up);
+        check(afterChinese.preedit() != "你.3-3",
+              "symbol-led reinterpret also works after Chinese text");
+        check(afterChinese.b.selectionChar() == 1,
+              "symbol-led reinterpret after Chinese focuses recovered character");
+    }
 
     Sim filename;
     filename.type("README.md");
@@ -1670,6 +1698,29 @@ void test_ambiguous_symbol_boundary_literals() {
     chinese.type("vla"); // 好
     check_eq(chinese.preedit(), "你好",
              "normal zhuyin typing still works with punctuation-looking keys inside a syllable");
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+
+    Sim literalDigits;
+    literalDigits.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
+    literalDigits.type("su3");
+    literalDigits.type(",3-3");
+    check_eq(literalDigits.preedit(), "你,3-3",
+             "symbol-digit-hyphen sequence stays literal after Chinese");
+
+    Sim literalAtStart;
+    literalAtStart.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
+    literalAtStart.type(",3-3");
+    check_eq(literalAtStart.preedit(), ",3-3",
+             "symbol-digit-hyphen sequence stays literal at start");
+
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Ibm);
+
+    Sim ibmRecovered;
+    ibmRecovered.b.setKeyboardLayout(inputer::KeyboardLayout::Ibm);
+    ibmRecovered.type("7a,-;,");
+    check_eq(ibmRecovered.preedit(), "你好",
+             "IBM symbol-led syllable still recovers after literal staging");
 
     SymbolLeadCase paren{};
     if (find_symbol_lead_case('(', paren)) {

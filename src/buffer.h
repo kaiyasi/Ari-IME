@@ -135,6 +135,7 @@ private:
     // syllable (e.g. "acer" + "u/6" -> acer螢). Peel it off when the remaining
     // prefix is empty or a real English word, so English typing isn't hijacked.
     bool tryPeelEnglish(char tone, KeyResult &out);
+    bool tryPeelEnglishTone1(KeyResult &out);
     KeyResult handleSpace();
     KeyResult handleEnter();
     KeyResult handleBackspace();

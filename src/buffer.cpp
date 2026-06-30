@@ -726,23 +726,10 @@ bool Buffer::shouldPreferLiteralAmbiguousStart(char c) const {
     if (!inputer::isSymbolLikeZhuyinKey(c)) {
         return false;
     }
-    if (!syl_.empty()) {
-        return false;
-    }
-    if (cells_.empty() && zhuyin_.preedit().empty() && englishBuf_.empty()) {
-        return true;
-    }
-    if (cells_.empty()) {
-        if (!tail_.empty()) {
-            return cellLooksLiteralish(tail_.front());
-        }
-        return false;
-    }
-    const Cell &last = cells_.back();
-    if (cellLooksLiteralish(last)) {
-        return true;
-    }
-    return !tail_.empty() && cellLooksLiteralish(tail_.front());
+    // Punctuation-looking zhuyin starts are too ambiguous to convert eagerly:
+    // stage them as literal text first, then recover them later only if the
+    // following keys prove a valid symbol-led syllable.
+    return syl_.empty();
 }
 
 bool Buffer::cellLooksLiteralish(const Cell &cell) const {
@@ -813,8 +800,18 @@ int Buffer::literalContextBiasAt(int idx) const {
 
 int Buffer::candidateScore(const SelCand &cand) const {
     const int literalBias = literalContextBiasAt(selCursor_);
+    const bool hasChineseLeft = selCursor_ > 0 && cells_[selCursor_ - 1].chinese;
+    bool hasChineseRight =
+        selCursor_ + 1 < static_cast<int>(cells_.size()) &&
+        cells_[selCursor_ + 1].chinese;
     if (cand.down < 0) {
         int score = -48 + literalBias * 10;
+        if (hasChineseLeft) {
+            score -= 12;
+        }
+        if (hasChineseRight) {
+            score -= 12;
+        }
         if (literalBias >= 5) {
             score += 18;
         }
@@ -832,15 +829,19 @@ int Buffer::candidateScore(const SelCand &cand) const {
         score -= literalBias * 4;
     }
 
-    bool hasChineseLeft = selCursor_ > 0 && cells_[selCursor_ - 1].chinese;
-    bool hasChineseRight =
-        selCursor_ + len < static_cast<int>(cells_.size()) &&
-        cells_[selCursor_ + len].chinese;
+    hasChineseRight = selCursor_ + len < static_cast<int>(cells_.size()) &&
+                      cells_[selCursor_ + len].chinese;
     if (len > 1 && (hasChineseLeft || hasChineseRight)) {
         score += 8;
     }
+    if (len > 1 && hasChineseLeft && hasChineseRight) {
+        score += 10;
+    }
     if (len == 1 && !hasChineseLeft && !hasChineseRight) {
         score += 10;
+    }
+    if (len == 1 && hasChineseLeft && hasChineseRight) {
+        score -= 8;
     }
 
     if (hasAsciiLetter(cand.text) || hasAsciiDigit(cand.text)) {
@@ -954,6 +955,37 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
     return false;
 }
 
+bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
+    const std::string &buf = englishBuf_;
+    for (std::size_t k = 0; k < buf.size(); ++k) {
+        std::string body = buf.substr(k);
+        if (!inputer::isValidSyllable(body, /*allowTone=*/false) ||
+            !canPeelSymbolLedBody(body)) {
+            continue;
+        }
+        std::string syllable = inputer::canonicalKeys(body);
+        if (!syllableConvertsTone1(syllable)) {
+            continue;
+        }
+
+        freezeRun();
+        for (char c : buf.substr(0, k)) {
+            cells_.push_back({false, std::string(1, c), {}});
+        }
+        zhuyin_.feedSequence(syllable);
+        zhuyin_.handleSpace();
+        runReadings_ = {syllable + " "};
+        normalizeRunToTop();
+        moveAutoCommit();
+        token_ = Token::Chinese;
+        englishBuf_.clear();
+        syl_.clear();
+        out = {true, false, {}, true};
+        return true;
+    }
+    return false;
+}
+
 KeyResult Buffer::handleSpace() {
     // A pending bopomofo syllable: space is its 一聲. Convert it if that yields a
     // character (a lone 聲母 like "t" does not — fall through to a literal space).
@@ -981,6 +1013,12 @@ KeyResult Buffer::handleSpace() {
             syl_.clear();
             token_ = Token::Chinese;
             return {true, false, {}, true};
+        }
+    }
+    if (!forcedEnglish_ && token_ == Token::English) {
+        KeyResult peeled;
+        if (tryPeelEnglishTone1(peeled)) {
+            return peeled;
         }
     }
     // Otherwise space is a literal separator: fold the current token into cells_
@@ -1438,31 +1476,20 @@ KeyResult Buffer::reinterpretFromCell() {
     // Accumulate raw keys from the cursor cell forward (English cells contribute
     // their letter; a Chinese cell contributes its reading) until they form a
     // complete, convertible syllable. Look only a few cells ahead.
-    if (selCursor_ > 0 && !isSingleAsciiLowerCell(cells_[selCursor_ - 1].text)) {
+    const std::string currentKeys = cells_[selCursor_].chinese
+                                        ? readingBody(cells_[selCursor_].reading).first
+                                        : cells_[selCursor_].text;
+    const bool symbolLed =
+        !currentKeys.empty() && inputer::isSymbolLikeZhuyinKey(currentKeys.front());
+    if (selCursor_ > 0 && !symbolLed &&
+        !isSingleAsciiLowerCell(cells_[selCursor_ - 1].text)) {
         return {true, false, {}, true};
     }
     std::string raw;
     int consumeTo = -1;
     std::string found;
+    int bestScore = -1000000;
     int limit = std::min(static_cast<int>(cells_.size()), selCursor_ + 4);
-    for (int j = selCursor_; j < limit; ++j) {
-        std::string keys = cells_[j].chinese
-                               ? readingBody(cells_[j].reading).first
-                               : cells_[j].text;
-        std::string trial = inputer::canonicalKeys(raw + keys);
-        if (!inputer::isValidSyllable(trial, /*allowTone=*/true)) {
-            break; // this cell can't be part of the syllable; stop
-        }
-        raw += keys;
-        if (hasAsciiLetter(raw) && syllableConverts(trial)) {
-            consumeTo = j;
-            found = trial;
-            break;
-        }
-    }
-    if (consumeTo < 0) {
-        return {true, false, {}, true}; // nothing forms a syllable: no-op
-    }
     auto startsAsciiField = [this](int index) {
         if (index < 0 || index >= static_cast<int>(cells_.size())) {
             return false;
@@ -1473,6 +1500,61 @@ KeyResult Buffer::reinterpretFromCell() {
                 (text[0] >= 'a' && text[0] <= 'z') ||
                 (text[0] >= '0' && text[0] <= '9'));
     };
+    auto rawUsesSymbolKey = [](const std::string &keys) {
+        return std::any_of(keys.begin(), keys.end(), [](char c) {
+            return inputer::isSymbolLikeZhuyinKey(c);
+        });
+    };
+    for (int j = selCursor_; j < limit; ++j) {
+        std::string keys = cells_[j].chinese
+                               ? readingBody(cells_[j].reading).first
+                               : cells_[j].text;
+        std::string trial = inputer::canonicalKeys(raw + keys);
+        if (!inputer::isValidSyllable(trial, /*allowTone=*/true)) {
+            break; // this cell can't be part of the syllable; stop
+        }
+        raw += keys;
+        if ((hasAsciiLetter(raw) || canPeelSymbolLedBody(raw)) &&
+            syllableConverts(trial)) {
+            int next = j + 1;
+            bool skippedSpace = false;
+            while (next < static_cast<int>(cells_.size()) &&
+                   cells_[next].text == " ") {
+                skippedSpace = true;
+                ++next;
+            }
+            const bool consumesSymbolKey = rawUsesSymbolKey(raw);
+            if (!symbolLed && consumesSymbolKey && startsAsciiField(next)) {
+                continue;
+            }
+
+            int score = 0;
+            const int consumed = j - selCursor_ + 1;
+            score += symbolLed ? consumed * 12 : -consumed * 4;
+            if (selCursor_ > 0 && cells_[selCursor_ - 1].chinese) {
+                score += 10;
+            }
+            if (next < static_cast<int>(cells_.size()) && cells_[next].chinese) {
+                score += 10;
+            }
+            if (next < static_cast<int>(cells_.size()) &&
+                (isTechnicalLiteralSuffix(cells_[next].text) ||
+                 (skippedSpace && startsAsciiField(next)))) {
+                score -= 48;
+            }
+            if (startsAsciiField(selCursor_ - 1) && !symbolLed) {
+                score += 6;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                consumeTo = j;
+                found = trial;
+            }
+        }
+    }
+    if (consumeTo < 0) {
+        return {true, false, {}, true}; // nothing forms a syllable: no-op
+    }
     int next = consumeTo + 1;
     bool skippedSpace = false;
     while (next < static_cast<int>(cells_.size()) && cells_[next].text == " ") {
