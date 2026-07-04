@@ -151,7 +151,6 @@ private:
     void freezeSyllable();   // raw syl_ -> English cells
     void freezeAll();        // all three, in order
     void moveAutoCommit();   // pull chewing's auto-committed front chars into cells_
-    bool shouldPreferLiteralAmbiguousStart(char c) const;
     bool cellLooksLiteralish(const Cell &cell) const;
     int literalContextBiasAt(int idx) const;
 

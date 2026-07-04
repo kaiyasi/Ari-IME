@@ -255,6 +255,18 @@ void test_common_mixed_literals() {
     check_eq(pe("README.md"), "README.md", "filename stays literal");
     check_eq(pe("APIji3"), "API我", "acronym followed by zhuyin converts");
     check_eq(pe("HTTPsu3"), "HTTP你", "uppercase acronym followed by zhuyin converts");
+
+    if (inputer::isValidSyllable(".3-3", /*allowTone=*/true)) {
+        check_eq(pe("https://ari-ime.test/.3-3"),
+                 "https://ari-ime.test/.3-3",
+                 "URL suffix that resembles symbol-led zhuyin stays literal");
+        check_eq(pe("README.3-3"), "README.3-3",
+                 "filename suffix that resembles symbol-led zhuyin stays literal");
+        check_eq(pe("v1.0.0.3-3"), "v1.0.0.3-3",
+                 "version-like suffix that resembles symbol-led zhuyin stays literal");
+        check(pe("acer.3-3") != "acer.3-3",
+              "plain English word tail can still peel a symbol-led zhuyin suffix");
+    }
 }
 
 void test_eten_typing() {
@@ -505,6 +517,8 @@ void test_phrase_priority() {
     int rawIndex = find_visible_candidate(c, "原始鍵 su3");
     check(rawIndex < 0 || rawIndex > singleIndex,
           "raw-key fallback stays behind phrase choices in Chinese context");
+    check(rawIndex < 0 || rawIndex == static_cast<int>(c.size()) - 1,
+          "raw-key fallback stays at the end of the visible candidate page");
 }
 
 // Live typing and the selection window must agree on the preferred phrase:
@@ -631,7 +645,7 @@ void test_candidate_ranking_prefers_current_choice() {
           "reopened candidates prefer the current explicit choice");
 }
 
-void test_symbol_heavy_context_promotes_raw_keys() {
+void test_symbol_heavy_context_keeps_chinese_first() {
     SymbolLeadCase openParen;
     if (!find_symbol_lead_case('(', openParen)) {
         inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
@@ -650,8 +664,11 @@ void test_symbol_heavy_context_promotes_raw_keys() {
     s.key(FcitxKey_Down); // open candidates on the converted cell
     auto cands = s.cand();
     check(!cands.empty(), "symbol-led context opens candidates");
-    check(cands[0] == "原始鍵 " + openParen.keys,
-          "symbol-heavy context promotes raw-key fallback");
+    check(cands[0] != "原始鍵 " + openParen.keys,
+          "symbol-heavy context still keeps Chinese candidates ahead of raw keys");
+    int rawIndex = find_visible_candidate(cands, "原始鍵 " + openParen.keys);
+    check(rawIndex < 0 || rawIndex == static_cast<int>(cands.size()) - 1,
+          "raw-key fallback remains available as the last visible choice");
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
@@ -750,6 +767,20 @@ void test_paste_at_caret() {
     Sim onlyWs;
     onlyWs.b.pasteAtCaret("\n\t");
     check_eq(onlyWs.preedit(), " ", "paste of only separators becomes a space");
+}
+
+void test_paste_caret_with_multi_codepoint_cells() {
+    Sim s;
+    s.b.setFullWidthPunct(true);
+    s.type("^su3");         // ……你
+    s.key(FcitxKey_Left);   // caret between …… and 你
+    check(s.b.caretChar() == 2,
+          "caret counts the full-width ellipsis as two visible characters");
+    s.b.pasteAtCaret("ABC");
+    check_eq(s.preedit(), "……ABC你",
+             "paste stays at the visible caret after a multi-codepoint cell");
+    check(s.b.caretChar() == 5,
+          "caret stays right after pasted text in multi-codepoint context");
 }
 
 void test_midstring_delete_boundaries() {
@@ -1672,25 +1703,25 @@ void test_ambiguous_symbol_boundary_literals() {
 
     Sim start;
     start.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
-    start.key('-'); // 精業: '-' can map to a zhuyin slot, but at a boundary prefer punctuation.
-    check_eq(start.preedit(), "-", "boundary symbol-like zhuyin key stays literal at start");
+    start.key('-'); // 精業: '-' is a valid zhuyin key and now stays pending first.
+    check_eq(start.preedit(), "-", "boundary symbol-like zhuyin key stays pending at start");
     start.key(FcitxKey_space);
-    check_eq(start.preedit(), "- ",
-             "boundary symbol-like zhuyin key stays literal before whitespace");
+    check(start.preedit() != "- ",
+          "complete tone-1 symbol-led syllable converts before falling back to literal");
 
     Sim afterSpace;
     afterSpace.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
     afterSpace.key(FcitxKey_space);
     afterSpace.key('-');
     check_eq(afterSpace.preedit(), " -",
-             "boundary symbol-like zhuyin key stays literal after whitespace");
+             "a symbol-like zhuyin key still shows raw while the syllable is incomplete");
 
     Sim symbolHeavy;
     symbolHeavy.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
     symbolHeavy.key('-');
     symbolHeavy.key('?');
     check_eq(symbolHeavy.preedit(), "-?",
-             "symbol-heavy input keeps symbol-like zhuyin key literal");
+             "invalid symbol-heavy sequence still falls back to literal");
 
     Sim chinese;
     chinese.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
@@ -1701,18 +1732,28 @@ void test_ambiguous_symbol_boundary_literals() {
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 
-    Sim literalDigits;
-    literalDigits.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
-    literalDigits.type("su3");
-    literalDigits.type(",3-3");
-    check_eq(literalDigits.preedit(), "你,3-3",
-             "symbol-digit-hyphen sequence stays literal after Chinese");
+    if (inputer::isValidSyllable(",3-3", /*allowTone=*/true)) {
+        Sim afterChinese;
+        afterChinese.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
+        afterChinese.type("su3");
+        afterChinese.type(",3-3");
+        check(afterChinese.preedit() != "你,3-3",
+              "complete symbol-led syllable converts after Chinese text");
 
-    Sim literalAtStart;
-    literalAtStart.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
-    literalAtStart.type(",3-3");
-    check_eq(literalAtStart.preedit(), ",3-3",
-             "symbol-digit-hyphen sequence stays literal at start");
+        Sim atStart;
+        atStart.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
+        atStart.type(",3-3");
+        check(atStart.preedit() != ",3-3",
+              "complete symbol-led syllable converts at start");
+    }
+
+    if (inputer::isValidSyllable(".3-3", /*allowTone=*/true)) {
+        Sim dotted;
+        dotted.b.setKeyboardLayout(inputer::KeyboardLayout::Default);
+        dotted.type(".3-3");
+        check(dotted.preedit() != ".3-3",
+              "dot-led zhuyin is preferred over punctuation-heavy literal input");
+    }
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Ibm);
 
@@ -1819,9 +1860,10 @@ int main() {
     test_candidate_direct_selection();
     test_pin_earlier_pick();
     test_candidate_ranking_prefers_current_choice();
-    test_symbol_heavy_context_promotes_raw_keys();
+    test_symbol_heavy_context_keeps_chinese_first();
     test_insert_chinese_midstring();
     test_paste_at_caret();
+    test_paste_caret_with_multi_codepoint_cells();
     test_midstring_delete_boundaries();
     test_up_navigates_not_revert();
     test_revert_entry();

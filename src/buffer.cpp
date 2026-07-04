@@ -280,6 +280,25 @@ bool canPeelSymbolLedBody(const std::string &body) {
     });
 }
 
+bool isAsciiWord(const std::string &s) {
+    return !s.empty() &&
+           std::all_of(s.begin(), s.end(),
+                       [](char c) { return (c >= 'A' && c <= 'Z') ||
+                                           (c >= 'a' && c <= 'z'); });
+}
+
+bool canPeelSymbolLedFromEnglish(const std::string &prefix,
+                                 const std::string &body) {
+    if (!canPeelSymbolLedBody(body)) {
+        return false;
+    }
+    // Symbol-led syllables are valid mixed-input Chinese, but in technical
+    // literals (URLs, filenames, versions, identifiers) the same suffixes are
+    // much more likely to be punctuation. Only peel them out of a plain English
+    // word tail, or from the start of the token.
+    return prefix.empty() || isAsciiWord(prefix);
+}
+
 bool hasAsciiDigit(const std::string &s) {
     return std::any_of(s.begin(), s.end(), [](char c) {
         return c >= '0' && c <= '9';
@@ -454,9 +473,19 @@ int Buffer::caretChar() const {
     // inserting mid-string, park it at the insertion point — right after the
     // head cells and the live typing tail, i.e. just before the parked tail_.
     if (selecting_) {
-        // Picking mode parks on the cell being re-picked; caret mode shows the
-        // bare caret between cells (one codepoint per cell, so index == caretPos_).
-        return candOpen_ ? selectionChar() : caretPos_;
+        // Picking mode parks on the cell being re-picked. In caret mode the
+        // insertion point is between cells_, but some literal cells (for
+        // example "……") span more than one Unicode codepoint, so sum the real
+        // displayed character widths instead of assuming one cell == one char.
+        if (candOpen_) {
+            return selectionChar();
+        }
+        int idx = 0;
+        for (int i = 0; i < caretPos_ && i < static_cast<int>(cells_.size());
+             ++i) {
+            idx += utf8Count(cells_[i].text);
+        }
+        return idx;
     }
     if (tail_.empty()) {
         return -1;
@@ -610,9 +639,6 @@ KeyResult Buffer::handleChar(char c, bool literal) {
         if (s == 3) {
             return handleLiteralChar(c); // a tone cannot start a syllable
         }
-        if (shouldPreferLiteralAmbiguousStart(c)) {
-            return handleLiteralChar(c);
-        }
         syl_.push_back(c);
         return {true, false, {}, true}; // raw until a tone completes it
     }
@@ -722,16 +748,6 @@ KeyResult Buffer::flipToEnglish(char trailing) {
     return {true, false, {}, true};
 }
 
-bool Buffer::shouldPreferLiteralAmbiguousStart(char c) const {
-    if (!inputer::isSymbolLikeZhuyinKey(c)) {
-        return false;
-    }
-    // Punctuation-looking zhuyin starts are too ambiguous to convert eagerly:
-    // stage them as literal text first, then recover them later only if the
-    // following keys prove a valid symbol-led syllable.
-    return syl_.empty();
-}
-
 bool Buffer::cellLooksLiteralish(const Cell &cell) const {
     if (cell.chinese) {
         return false;
@@ -805,15 +821,18 @@ int Buffer::candidateScore(const SelCand &cand) const {
         selCursor_ + 1 < static_cast<int>(cells_.size()) &&
         cells_[selCursor_ + 1].chinese;
     if (cand.down < 0) {
-        int score = -48 + literalBias * 10;
+        // "Raw keys" is a recovery path, not a primary interpretation: keep it
+        // available everywhere, but behind real Chinese candidates unless the
+        // surrounding context is overwhelmingly literal.
+        int score = -96 + literalBias * 6;
         if (hasChineseLeft) {
-            score -= 12;
+            score -= 18;
         }
         if (hasChineseRight) {
-            score -= 12;
+            score -= 18;
         }
-        if (literalBias >= 5) {
-            score += 18;
+        if (literalBias >= 7) {
+            score += 14;
         }
         return score;
     }
@@ -874,6 +893,12 @@ int Buffer::candidateScore(const SelCand &cand) const {
 void Buffer::rankSelCands() {
     std::stable_sort(selCands_.begin(), selCands_.end(),
                      [this](const SelCand &a, const SelCand &b) {
+                         if (a.down < 0 || b.down < 0) {
+                             if (a.down < 0 && b.down < 0) {
+                                 return a.order < b.order;
+                             }
+                             return b.down < 0;
+                         }
                          int scoreA = candidateScore(a);
                          int scoreB = candidateScore(b);
                          if (scoreA != scoreB) {
@@ -893,9 +918,10 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
     // clear symbol-led zhuyin body, recover that longer suffix first instead of
     // peeling only the shortest alphabetic tail.
     for (std::size_t k = 0; k < buf.size(); ++k) {
+        std::string prefix = buf.substr(0, k);
         std::string body = buf.substr(k);
         if (!inputer::isValidSyllable(body, /*allowTone=*/false) ||
-            !canPeelSymbolLedBody(body)) {
+            !canPeelSymbolLedFromEnglish(prefix, body)) {
             continue;
         }
         std::string syllable = inputer::canonicalKeys(body);
@@ -905,7 +931,7 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
         }
 
         freezeRun();
-        for (char c : buf.substr(0, k)) {
+        for (char c : prefix) {
             cells_.push_back({false, std::string(1, c), {}});
         }
         zhuyin_.feedSequence(syllable);
@@ -958,9 +984,10 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
 bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
     const std::string &buf = englishBuf_;
     for (std::size_t k = 0; k < buf.size(); ++k) {
+        std::string prefix = buf.substr(0, k);
         std::string body = buf.substr(k);
         if (!inputer::isValidSyllable(body, /*allowTone=*/false) ||
-            !canPeelSymbolLedBody(body)) {
+            !canPeelSymbolLedFromEnglish(prefix, body)) {
             continue;
         }
         std::string syllable = inputer::canonicalKeys(body);
@@ -969,7 +996,7 @@ bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
         }
 
         freezeRun();
-        for (char c : buf.substr(0, k)) {
+        for (char c : prefix) {
             cells_.push_back({false, std::string(1, c), {}});
         }
         zhuyin_.feedSequence(syllable);
