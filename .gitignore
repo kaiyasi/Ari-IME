@@ -1,5 +1,7 @@
 build/
 build-*/
+src/
 pkg/
 *.pkg.tar.*
 *.gcov
+*.tar.gz
