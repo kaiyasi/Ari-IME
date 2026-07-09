@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.0 - 2026-07-09
+
+- Degraded gracefully when the libchewing engine fails to initialize: retry
+  against the read-only system dictionary, otherwise fall back to plain-English
+  passthrough (with a one-time hint) instead of silently swallowing keys.
+- Added an optional, user-configurable `FullWidthPunctuationToggle` shortcut to
+  flip full-width punctuation live; unset by default so no application shortcut
+  is reserved.
+- Added Ubuntu/Debian support: apt dependency documentation, a `debian/`
+  packaging directory, and a native Ubuntu build/test/package CI workflow.
+- Documented known limitations in `ISSUES.md` and extended the version
+  consistency check to cover `debian/changelog`.
+- Closed a test-isolation gap: `TempConfigHome` now also sandboxes `HOME`,
+  `XDG_DATA_HOME`, and `CHEWING_USER_PATH`, since libchewing 0.12 resolves its
+  learned dictionary through those rather than only the path passed to
+  `chewing_new2`. Tests are now deterministic regardless of the developer's
+  real day-to-day typing.
+- Pinned libchewing's learned dictionary to Ari's own data directory via
+  `CHEWING_USER_PATH` (set only while the context is built), so learning no
+  longer lands in — and pollutes — the shared `$XDG_DATA_HOME/chewing`
+  directory used by other libchewing input methods.
+- `scripts/reset-user-data.sh` now also clears libchewing's learned files
+  (`chewing.dat`, `chewing-deleted.dat`), lists every file it will remove, and
+  gained `--include-shared` to optionally reset the shared chewing directory
+  left behind by older builds.
+
 ## 1.1.0 - 2026-07-01
 
 - Refined symbol-led Bopomofo handling so sequences such as `.3-3` can be

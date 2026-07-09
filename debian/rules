@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+# Build the Fcitx5 addon with the CMake buildsystem. dh runs the CTest suite
+# automatically for the cmake buildsystem; the tests isolate their own temp
+# dictionaries so they are safe to run during the package build.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON

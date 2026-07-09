@@ -42,11 +42,18 @@ extract_srcinfo_version() {
     sed -n 's/^[[:space:]]*pkgver = \(.*\)$/\1/p' .SRCINFO | head -n1
 }
 
+extract_debian_version() {
+    # First changelog entry: "fcitx5-ari-ime (1.1.0) unstable; ..."
+    [[ -f debian/changelog ]] || return 0
+    sed -n '1s/^[^(]*(\([^)]*\)).*/\1/p' debian/changelog
+}
+
 check_versions() {
-    local cmake_version pkgbuild_version srcinfo_version
+    local cmake_version pkgbuild_version srcinfo_version debian_version
     cmake_version="$(extract_cmake_version)"
     pkgbuild_version="$(extract_pkgbuild_version)"
     srcinfo_version="$(extract_srcinfo_version)"
+    debian_version="$(extract_debian_version)"
 
     if [[ -z "$cmake_version" || -z "$pkgbuild_version" || -z "$srcinfo_version" ]]; then
         printf 'Failed to read version from CMakeLists.txt, PKGBUILD, or .SRCINFO\n' >&2
@@ -56,6 +63,12 @@ check_versions() {
           "$cmake_version" != "$srcinfo_version" ]]; then
         printf 'Version mismatch: CMake=%s PKGBUILD=%s .SRCINFO=%s\n' \
             "$cmake_version" "$pkgbuild_version" "$srcinfo_version" >&2
+        exit 1
+    fi
+    # The Debian packaging is optional; only enforce it when present.
+    if [[ -n "$debian_version" && "$cmake_version" != "$debian_version" ]]; then
+        printf 'Version mismatch: CMake=%s debian/changelog=%s\n' \
+            "$cmake_version" "$debian_version" >&2
         exit 1
     fi
     printf 'Ari IME version: v%s\n' "$cmake_version"

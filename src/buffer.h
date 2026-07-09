@@ -94,6 +94,9 @@ public:
     // current 中/英 mode hint.
     bool isForcedEnglish() const { return forcedEnglish_; }
     bool isFullWidthPunct() const { return fullWidthPunct_; }
+    // False when the 注音 engine failed to load; the engine degrades to
+    // plain-English passthrough and the frontend can warn the user once.
+    bool engineReady() const { return zhuyin_.ok(); }
     inputer::KeyboardLayout keyboardLayout() const { return layout_; }
 
 private:

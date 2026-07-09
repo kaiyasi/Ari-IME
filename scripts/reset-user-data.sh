@@ -18,30 +18,60 @@ resolve_user_data_dir() {
     exit 2
 }
 
+# libchewing 0.12 keeps its learned dictionary at CHEWING_USER_PATH, falling back
+# to $XDG_DATA_HOME/chewing (then $HOME/.local/share/chewing). Ari now pins
+# CHEWING_USER_PATH to its own data directory, so fresh learning lands there; this
+# resolves the *shared* location where pre-fix (or other-IME) learning may sit.
+resolve_shared_chewing_dir() {
+    if [[ -n "${CHEWING_USER_PATH:-}" ]]; then
+        printf '%s\n' "$CHEWING_USER_PATH"
+        return
+    fi
+    if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+        printf '%s/chewing\n' "$XDG_DATA_HOME"
+        return
+    fi
+    if [[ -n "${HOME:-}" ]]; then
+        printf '%s/.local/share/chewing\n' "$HOME"
+        return
+    fi
+    printf '\n'
+}
+
 usage() {
     cat <<'EOF'
-Usage: scripts/reset-user-data.sh [--yes] [--no-backup]
+Usage: scripts/reset-user-data.sh [--yes] [--no-backup] [--include-shared]
 
-Backs up Ari IME's learned user dictionary and removes the active userdict file.
-This resets only per-user learned phrase/homophone data. Built-in libchewing
-dictionary resources are not touched.
+Resets Ari IME's learned data: userdict.dat plus libchewing's learned files
+(chewing.dat, chewing-deleted.dat) in Ari's own data directory. Built-in
+libchewing dictionary resources are not touched.
+
+libchewing 0.12 stored learning in a SHARED directory ($XDG_DATA_HOME/chewing)
+before Ari pinned it to its own directory. That shared data may also be used by
+other libchewing input methods (fcitx5-chewing, ibus-chewing), so it is left
+alone unless you pass --include-shared.
+
+Options:
+  --yes             do not prompt for confirmation
+  --no-backup       delete instead of backing up to .bak.<timestamp>
+  --include-shared  ALSO reset the shared chewing directory (affects any other
+                    libchewing input method that shares it)
 
 Environment overrides:
   INPUTER_USER_DATA_DIR  exact user-data directory to reset
   XDG_CONFIG_HOME        standard config root (uses $XDG_CONFIG_HOME/inputer)
+  CHEWING_USER_PATH      explicit libchewing learned-dictionary directory
 EOF
 }
 
 confirm=0
 backup=1
+include_shared=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
-    --yes)
-        confirm=1
-        ;;
-    --no-backup)
-        backup=0
-        ;;
+    --yes) confirm=1 ;;
+    --no-backup) backup=0 ;;
+    --include-shared) include_shared=1 ;;
     -h|--help)
         usage
         exit 0
@@ -56,20 +86,51 @@ while [[ $# -gt 0 ]]; do
 done
 
 user_data_dir="$(resolve_user_data_dir)"
-dict_path="$user_data_dir/userdict.dat"
+shared_dir="$(resolve_shared_chewing_dir)"
 
-if [[ ! -e "$dict_path" ]]; then
-    printf 'No learned user dictionary found at %s\n' "$dict_path"
+# Ari-owned files (Ari's own directory).
+targets=(
+    "$user_data_dir/userdict.dat"
+    "$user_data_dir/chewing.dat"
+    "$user_data_dir/chewing-deleted.dat"
+)
+# Shared chewing files, only when explicitly requested and not Ari's own dir.
+if [[ "$include_shared" -eq 1 && -n "$shared_dir" &&
+      "$shared_dir" != "$user_data_dir" ]]; then
+    targets+=(
+        "$shared_dir/chewing.dat"
+        "$shared_dir/chewing-deleted.dat"
+    )
+fi
+
+existing=()
+for t in "${targets[@]}"; do
+    [[ -e "$t" ]] && existing+=("$t")
+done
+
+# Notice when shared data exists but was not selected for reset.
+if [[ "$include_shared" -ne 1 && -n "$shared_dir" &&
+      "$shared_dir" != "$user_data_dir" ]]; then
+    if [[ -e "$shared_dir/chewing.dat" || -e "$shared_dir/chewing-deleted.dat" ]]; then
+        printf 'Note: shared libchewing learning exists in %s\n' "$shared_dir"
+        printf '      (possibly used by other chewing input methods). Pass --include-shared to reset it too.\n'
+    fi
+fi
+
+if [[ "${#existing[@]}" -eq 0 ]]; then
+    printf 'No learned Ari IME data found under %s\n' "$user_data_dir"
     exit 0
 fi
 
 if [[ "$confirm" -ne 1 ]]; then
-    printf 'About to reset Ari IME learned data: %s\n' "$dict_path"
+    printf 'About to reset the following Ari IME learned data:\n'
+    for t in "${existing[@]}"; do
+        printf '  %s\n' "$t"
+    done
     printf 'This keeps built-in dictionaries intact. Continue? [y/N] '
     read -r answer
     case "$answer" in
-    y|Y|yes|YES)
-        ;;
+    y|Y|yes|YES) ;;
     *)
         printf 'Aborted.\n'
         exit 1
@@ -77,13 +138,14 @@ if [[ "$confirm" -ne 1 ]]; then
     esac
 fi
 
-mkdir -p "$user_data_dir"
-
-if [[ "$backup" -eq 1 ]]; then
-    backup_path="$dict_path.bak.$(date +%Y%m%d-%H%M%S)"
-    mv "$dict_path" "$backup_path"
-    printf 'Backed up learned dictionary to %s\n' "$backup_path"
-else
-    rm -f "$dict_path"
-    printf 'Removed learned dictionary %s\n' "$dict_path"
-fi
+stamp="$(date +%Y%m%d-%H%M%S)"
+for t in "${existing[@]}"; do
+    if [[ "$backup" -eq 1 ]]; then
+        backup_path="$t.bak.$stamp"
+        mv "$t" "$backup_path"
+        printf 'Backed up %s -> %s\n' "$t" "$backup_path"
+    else
+        rm -f "$t"
+        printf 'Removed %s\n' "$t"
+    fi
+done

@@ -1,0 +1,33 @@
+Source: fcitx5-ari-ime
+Section: utils
+Priority: optional
+Maintainer: Kaiyasi <zengcode0315@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               extra-cmake-modules,
+               pkg-config,
+               libfcitx5core-dev,
+               libfcitx5config-dev,
+               libfcitx5utils-dev,
+               fcitx5-modules,
+               libchewing3-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/kaiyasi/Ari-IME
+Rules-Requires-Root: no
+
+Package: fcitx5-ari-ime
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         fcitx5,
+         libchewing3,
+         hicolor-icon-theme
+Description: Fcitx5 mixed Bopomofo/English input without mode switching
+ Ari IME is a Fcitx5 input method for Traditional Chinese that lets you type
+ Bopomofo (注音) and English together without switching modes. Every key first
+ shows as itself; keys only become Chinese once they form a complete, toned
+ 注音 syllable (for example "su3" becomes 你). The whole pre-edit may freely
+ mix English and Chinese in any order (for example "acer螢幕") and is only sent
+ to the application on Enter.
+ .
+ Conversion, phrasing and per-user learning are provided by libchewing.

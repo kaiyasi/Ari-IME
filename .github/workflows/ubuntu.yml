@@ -1,0 +1,73 @@
+name: Ubuntu
+
+# Native Ubuntu build so the addon is verified against the libchewing / fcitx5
+# versions the distribution ships (which differ from the Arch check.yml matrix).
+# This is the continuous guarantee behind the Ubuntu/Debian install docs.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Test (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake extra-cmake-modules g++ pkg-config \
+            fcitx5 libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
+            fcitx5-modules libchewing3-dev hicolor-icon-theme
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Report dependency versions
+        run: |
+          cmake --version | head -1
+          pkg-config --modversion chewing || true
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install smoke check
+        run: DESTDIR="$PWD/dest" cmake --install build
+
+  package:
+    name: Debian package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            devscripts debhelper dpkg-dev \
+            cmake extra-cmake-modules g++ pkg-config \
+            libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
+            fcitx5-modules libchewing3-dev hicolor-icon-theme
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build .deb
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Show built package
+        run: |
+          ls -la ../*.deb
+          dpkg-deb -I ../*.deb

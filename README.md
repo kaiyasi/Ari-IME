@@ -27,9 +27,11 @@ phrasing and per-user learning.
   `?` → ？, `\` → 、, `^` → ……, `(` → （, `{` → 『, etc. It applies
   in mixed Chinese/English pre-edit text, including common symbols such as
   `@` → ＠, `%` → ％, `_` → ＿, `` ` `` → ｀ and `"` → ＂. Off by default
-  (half-width), with a transient hint when the setting changes. Ari IME
-  deliberately does not reserve a fixed punctuation toggle shortcut, so common
-  application shortcuts such as `Ctrl+.` remain available.
+  (half-width), with a transient hint when the setting changes. Ari IME reserves
+  no punctuation toggle shortcut by default, so common application shortcuts such
+  as `Ctrl+.` remain available; you may optionally bind one via the
+  **FullWidthPunctuationToggle** config option (a modifier is required), which
+  flips the setting live and persists it.
 - **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
   up, and the mode persists until toggled again.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
@@ -103,6 +105,30 @@ On Arch Linux:
 sudo pacman -S fcitx5 hicolor-icon-theme libchewing extra-cmake-modules cmake gcc
 ```
 
+On Ubuntu / Debian:
+
+```sh
+sudo apt install \
+  cmake extra-cmake-modules g++ pkg-config \
+  fcitx5 libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
+  fcitx5-modules libchewing3-dev hicolor-icon-theme
+```
+
+`fcitx5-modules` provides the clipboard module headers (`clipboard_public.h`,
+`Fcitx5ModuleClipboard`) that the Ctrl+V paste path links against. Ubuntu builds
+against whatever libchewing the distribution ships (for example libchewing 0.8.x
+on Ubuntu 24.04), which may differ from the 0.12.0 used in CI; candidate ordering
+can differ slightly as a result — see [ISSUES.md](ISSUES.md). No source changes
+are needed: the build uses `GNUInstallDirs`, so the module installs to the
+distribution's multiarch fcitx5 directory (e.g.
+`/usr/lib/x86_64-linux-gnu/fcitx5`) which fcitx5 scans automatically. Install with
+`-DCMAKE_INSTALL_PREFIX=/usr` (see below) so the descriptors land under `/usr/share`.
+
+If libchewing's system dictionary lives in a non-standard location, set
+`CHEWING_PATH` to point at it; Ari IME otherwise falls back to a read-only chewing
+context when its own user-dictionary directory is not writable, so composition
+keeps working even without per-user learning.
+
 ## Build & install
 
 ```sh
@@ -111,9 +137,27 @@ cmake --build build
 sudo cmake --install build
 ```
 
-Then restart fcitx5 and add **Ari IME** in `fcitx5-configtool` (or your IME
-configuration). Per-addon options (keyboard layout, full-width punctuation)
-appear under the addon's config page.
+On Ubuntu/Debian (and other distros where fcitx5 only scans `/usr`), add
+`-DCMAKE_INSTALL_PREFIX=/usr` to the configure step so the addon and descriptors
+install where fcitx5 looks for them. On Debian/Ubuntu you can also build a `.deb`
+straight from the tree with `dpkg-buildpackage -us -uc -b` (see the `debian/`
+directory).
+
+Then restart fcitx5:
+
+```sh
+fcitx5 -r
+```
+
+Add **Ari IME** in fcitx5-configtool:
+
+1. Run `fcitx5-configtool` from a terminal or your application launcher —
+   not your desktop environment's system input settings.
+2. Go to the **Input Method** tab → click **+** → search **Ari** → select
+   **Ari IME** → click **OK**.
+
+Per-addon options (keyboard layout, full-width punctuation) appear under the
+addon's config page.
 
 ## Tests
 
@@ -205,17 +249,25 @@ candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
-[docs/release-1.1.0.md](docs/release-1.1.0.md).
+[docs/release-2.0.0.md](docs/release-2.0.0.md).
 
 ## Resetting learned data
 
-Ari IME stores only its learned per-user dictionary in:
+Ari IME stores its learned per-user data in its own directory:
 
-- `${INPUTER_USER_DATA_DIR}/userdict.dat`, when `INPUTER_USER_DATA_DIR` is set
-- otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/inputer/userdict.dat`
+- `${INPUTER_USER_DATA_DIR}`, when `INPUTER_USER_DATA_DIR` is set
+- otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/inputer/`
 
-This file contains learned phrase/homophone preferences. It is safe to reset
-without affecting libchewing's built-in/base dictionary.
+That directory holds `userdict.dat` plus libchewing's learned files
+(`chewing.dat`, `chewing-deleted.dat`). Ari pins `CHEWING_USER_PATH` to this
+directory so learning does not leak into the shared `$XDG_DATA_HOME/chewing`
+used by other libchewing input methods. These files hold learned
+phrase/homophone preferences and are safe to reset without affecting
+libchewing's built-in/base dictionary.
+
+Older Ari builds (before this pinning) may have left learned data in
+`~/.local/share/chewing`; pass `--include-shared` to the reset script below to
+clear that shared location too (it may be shared with other chewing IMEs).
 
 To reset learned data safely for development or local troubleshooting:
 

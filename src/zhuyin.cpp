@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Kaiyasi
 #include "zhuyin.h"
 
+#include <cstdlib>
 #include <string>
 
 #include <chewing.h>
@@ -9,13 +10,69 @@
 #include "constants.h"
 #include "layout.h"
 
+namespace {
+
+// RAII helper that sets an environment variable for the duration of the scope
+// and restores the previous value (or unsets it) afterwards. Used to pin
+// libchewing's learned-dictionary location only while we build our context, so
+// a sibling libchewing input method in the same process is not redirected.
+class ScopedEnv {
+public:
+    ScopedEnv(const char *name, const std::string &value) : name_(name) {
+        if (value.empty()) {
+            return;
+        }
+        if (const char *old = std::getenv(name)) {
+            had_ = true;
+            old_ = old;
+        }
+        setenv(name, value.c_str(), 1);
+        active_ = true;
+    }
+    ~ScopedEnv() {
+        if (!active_) {
+            return;
+        }
+        if (had_) {
+            setenv(name_, old_.c_str(), 1);
+        } else {
+            unsetenv(name_);
+        }
+    }
+    ScopedEnv(const ScopedEnv &) = delete;
+    ScopedEnv &operator=(const ScopedEnv &) = delete;
+
+private:
+    const char *name_;
+    std::string old_;
+    bool had_ = false;
+    bool active_ = false;
+};
+
+} // namespace
+
 Zhuyin::Zhuyin() {
     std::error_code ec;
     const bool haveUserDataDir = inputer::ensureUserDataDir(ec);
     const std::string path =
         haveUserDataDir ? inputer::userDictionaryPath().string() : std::string{};
+    // libchewing 0.12 stores its learned user dictionary (chewing.dat /
+    // chewing-deleted.dat) at CHEWING_USER_PATH, falling back to
+    // $XDG_DATA_HOME/chewing — NOT the `userpath` file below. Left to the
+    // default it pollutes the shared chewing data directory used by every
+    // libchewing input method. Pin it to Ari's own data directory so learning
+    // stays self-contained and resettable; restored right after construction.
+    const std::string dataDir =
+        haveUserDataDir ? inputer::userDataDir().string() : std::string{};
+    ScopedEnv chewingUserPath("CHEWING_USER_PATH", dataDir);
     ctx_ = chewing_new2(nullptr, path.empty() ? nullptr : path.c_str(), nullptr,
                         nullptr);
+    if (!ctx_ && !path.empty()) {
+        // The user-dictionary path was unusable (unwritable directory, corrupt
+        // file). Retry against chewing's built-in read-only dictionary so the
+        // engine still works this session; we only lose per-user learning.
+        ctx_ = chewing_new2(nullptr, nullptr, nullptr, nullptr);
+    }
     if (!ctx_) {
         return;
     }

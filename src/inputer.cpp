@@ -240,6 +240,14 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
     auto *ic = keyEvent.inputContext();
     auto *state = ic->propertyFor(&factory_);
 
+    // If the 注音 engine failed to initialise, warn once. Typing still works via
+    // the buffer's plain-English degrade path, so we do not swallow the event.
+    if (!state->buffer.engineReady() && !state->engineErrorNotified) {
+        state->engineErrorNotified = true;
+        instance_->showCustomInputMethodInformation(
+            ic, "注音引擎載入失敗，暫以英文輸入");
+    }
+
     // Apply current config (cheap + idempotent) so toggling it in configtool
     // takes effect on every context without per-state bookkeeping.
     inputer::KeyboardLayout layout = applyConfig();
@@ -259,6 +267,23 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
         instance_->showCustomInputMethodInformation(
             ic, state->buffer.isFullWidthPunct() ? "標點 全形" : "標點 半形");
         updateUI(ic, state->buffer);
+    }
+
+    // Optional user-configured shortcut to toggle full-width punctuation. Empty
+    // by default so no application shortcut is reserved; a modifier is required
+    // by the config constraint, so this never shadows plain typing.
+    if (!config_.fullWidthPunctuationToggle->empty() &&
+        keyEvent.key().normalize().checkKeyList(
+            *config_.fullWidthPunctuationToggle)) {
+        bool on = !*config_.fullWidthPunctuation;
+        config_.fullWidthPunctuation.setValue(on);
+        fcitx::safeSaveAsIni(config_, "conf/inputer.conf");
+        state->buffer.setFullWidthPunct(on);
+        instance_->showCustomInputMethodInformation(ic,
+                                                    on ? "標點 全形" : "標點 半形");
+        updateUI(ic, state->buffer);
+        keyEvent.filterAndAccept();
+        return;
     }
 
     // Ctrl+V / Shift+Insert paste clipboard text into our editable pre-edit

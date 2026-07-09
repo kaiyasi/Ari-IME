@@ -575,8 +575,10 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
 // ---------------------------------------------------------------------------
 
 KeyResult Buffer::handleChar(char c, bool literal) {
-    // Forced pure-English mode: everything is literal text in the English tail.
-    if (forcedEnglish_) {
+    // Forced pure-English mode, or a failed 注音 engine: everything is literal
+    // text in the English tail. Degrading on engine failure keeps keystrokes
+    // visible instead of being silently swallowed by no-op chewing calls.
+    if (forcedEnglish_ || !zhuyin_.ok()) {
         englishBuf_.push_back(c);
         return {true, false, {}, true};
     }

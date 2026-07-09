@@ -1,0 +1,6 @@
+fcitx5-ari-ime (2.0.0) unstable; urgency=medium
+
+  * Initial Debian/Ubuntu packaging for Ari IME.
+  * Builds the Fcitx5 addon via CMake and runs the CTest suite at build time.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Thu, 09 Jul 2026 12:00:00 +0000

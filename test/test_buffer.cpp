@@ -225,6 +225,10 @@ void test_typing() {
     check_eq(pe("hello"), "hello", "type hello (english)");
     check_eq(pe("apple"), "apple", "type apple (english)");
     check_eq(pe("su3hello"), "你hello", "type su3hello (mixed)");
+    // Chinese → English → Chinese: the second syllable must freeze the earlier
+    // run + English into cells and start a fresh chewing run (integrateSyllable's
+    // non-empty englishBuf_ branch), not silently reset the earlier run.
+    check_eq(pe("su3helloji3"), "你hello我", "type su3helloji3 (中英中)");
     check_eq(pe("s3u"), "你", "type s3u (out of order)");
     check_eq(pe("su"), "su", "type su (no tone stays raw)");
     check_eq(pe("aceru/6aj4"), "acer螢幕", "type aceru/6aj4 (peel)");

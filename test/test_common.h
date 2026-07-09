@@ -41,7 +41,10 @@ public:
     explicit TempConfigHome(const std::string &name, bool disableAutoLearn = true)
         : savedXdg_(captureEnv("XDG_CONFIG_HOME")),
           savedDisableLearn_(captureEnv("INPUTER_DISABLE_AUTOLEARN")),
-          savedUserDataDir_(captureEnv("INPUTER_USER_DATA_DIR")) {
+          savedUserDataDir_(captureEnv("INPUTER_USER_DATA_DIR")),
+          savedHome_(captureEnv("HOME")),
+          savedXdgData_(captureEnv("XDG_DATA_HOME")),
+          savedChewingUserPath_(captureEnv("CHEWING_USER_PATH")) {
         static int counter = 0;
         path_ = std::filesystem::temp_directory_path() /
                 (name + "-" + std::to_string(getpid()) + "-" +
@@ -52,6 +55,16 @@ public:
         setenv("XDG_CONFIG_HOME", path_.c_str(), 1);
         userDataDir_ = path_ / "inputer";
         setenv("INPUTER_USER_DATA_DIR", userDataDir_.c_str(), 1);
+        // libchewing 0.12 resolves its learned user dictionary through
+        // CHEWING_USER_PATH / XDG_DATA_HOME (and, failing those, $HOME), NOT
+        // solely through the path Ari passes to chewing_new2. Redirect all of
+        // them into the sandbox so a developer's real day-to-day typing (which
+        // promotes homophones like 妳 over 你) cannot leak into the tests.
+        setenv("HOME", path_.c_str(), 1);
+        setenv("XDG_DATA_HOME", (path_ / "data").c_str(), 1);
+        setenv("CHEWING_USER_PATH", (path_ / "chewing").c_str(), 1);
+        std::filesystem::create_directories(path_ / "data", ec);
+        std::filesystem::create_directories(path_ / "chewing", ec);
         if (disableAutoLearn) {
             setenv("INPUTER_DISABLE_AUTOLEARN", "1", 1);
         } else {
@@ -63,6 +76,9 @@ public:
         restoreEnv("XDG_CONFIG_HOME", savedXdg_);
         restoreEnv("INPUTER_DISABLE_AUTOLEARN", savedDisableLearn_);
         restoreEnv("INPUTER_USER_DATA_DIR", savedUserDataDir_);
+        restoreEnv("HOME", savedHome_);
+        restoreEnv("XDG_DATA_HOME", savedXdgData_);
+        restoreEnv("CHEWING_USER_PATH", savedChewingUserPath_);
         std::error_code ec;
         std::filesystem::remove_all(path_, ec);
     }
@@ -92,6 +108,9 @@ private:
     std::optional<std::string> savedXdg_;
     std::optional<std::string> savedDisableLearn_;
     std::optional<std::string> savedUserDataDir_;
+    std::optional<std::string> savedHome_;
+    std::optional<std::string> savedXdgData_;
+    std::optional<std::string> savedChewingUserPath_;
 };
 
 } // namespace test

@@ -35,13 +35,20 @@ FCITX_CONFIGURATION(
     fcitx::Option<bool> showStatusLine{
         this, "ShowStatusLine",
         _("Show composition status text in the auxiliary line (for example 中 · 大千 · 半形標點) while composing."),
-        false};);
+        false};
+    fcitx::KeyListOption fullWidthPunctuationToggle{
+        this, "FullWidthPunctuationToggle",
+        _("Optional shortcut to toggle full-width punctuation on/off. Empty by default so no application shortcut is reserved; set for example Control+period. A modifier is required."),
+        {}, fcitx::KeyListConstrain()};);
 
 // Per-input-context state, owned by fcitx and created on demand.
 class InputerState : public fcitx::InputContextProperty {
 public:
     InputerState() = default;
     Buffer buffer;
+    // Set once we have warned the user that the 注音 engine failed to load, so
+    // the transient hint is not shown on every keystroke.
+    bool engineErrorNotified = false;
 };
 
 class InputerEngine : public fcitx::InputMethodEngineV2 {

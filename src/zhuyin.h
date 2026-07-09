@@ -23,6 +23,11 @@ public:
     Zhuyin(const Zhuyin &) = delete;
     Zhuyin &operator=(const Zhuyin &) = delete;
 
+    // False when the libchewing context failed to initialise (missing system
+    // dictionary, etc.). The engine should then degrade to plain-English
+    // passthrough instead of silently swallowing keys.
+    bool ok() const { return ctx_ != nullptr; }
+
     // Clear all internal buffers but keep settings + learned user dictionary.
     void resetAll();
     void setKeyboardLayout(inputer::KeyboardLayout layout);
