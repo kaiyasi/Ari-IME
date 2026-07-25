@@ -95,16 +95,35 @@ state machine is built around one-key-per-Bopomofo-symbol layouts.
 
 ## Install on Arch Linux
 
-The recommended AUR package downloads the tested, prebuilt runtime and does not
-install a compiler, CMake or other build tools:
+Choose one of the two AUR packages below. They conflict with each other because
+both install the same input-method module.
+
+### Prebuilt package (recommended)
+
+[`fcitx5-ari-ime-bin`](https://aur.archlinux.org/packages/fcitx5-ari-ime-bin)
+downloads the tested GitHub Release binary. It does not install a compiler,
+CMake or other build tools:
 
 ```sh
 yay -S fcitx5-ari-ime-bin
 # or: paru -S fcitx5-ari-ime-bin
 ```
 
-Binary archives and checksums are also available from GitHub Releases. Developers
-who need a source build can clone this repository and use the instructions below.
+Binary archives and SHA-256 checksums are also available from
+[GitHub Releases](https://github.com/kaiyasi/Ari-IME/releases).
+
+### Build from source
+
+[`fcitx5-ari-ime`](https://aur.archlinux.org/packages/fcitx5-ari-ime) downloads
+the tagged source and builds it locally:
+
+```sh
+yay -S fcitx5-ari-ime
+# or: paru -S fcitx5-ari-ime
+```
+
+Developers can instead clone this repository and use the manual source-build
+instructions below.
 
 ## Source-build dependencies
 
