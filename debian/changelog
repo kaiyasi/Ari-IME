@@ -1,3 +1,10 @@
+fcitx5-ari-ime (2.0.1) unstable; urgency=medium
+
+  * Add offline contextual homophone correction and punctuation-boundary tests.
+  * Preserve learned data while migrating to libchewing's chewing.dat name.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 26 Jul 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.0.0) unstable; urgency=medium
 
   * Initial Debian/Ubuntu packaging for Ari IME.

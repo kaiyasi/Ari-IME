@@ -38,6 +38,13 @@ phrasing and per-user learning.
   keyboard layout and punctuation mode while composing. This status line is off
   by default and can be re-enabled in the addon config.
 - **Per-user learning** — chewing records your homophone/phrase choices.
+- **Offline context correction** — local phrase context fixes high-confidence
+  conversational homophones (for example `你應該是是` -> `你應該試試`)
+  through libchewing's own candidates, so selection, raw-key restoration and
+  per-user learning continue to work. No text or API key leaves the machine.
+- **Punctuation-aware boundaries** — a literal symbol can be followed directly
+  by Zhuyin (`(hk4g4` -> `(測試`) without trapping the following keys in an
+  English token.
 
 ## Keys
 

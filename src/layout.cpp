@@ -15,6 +15,10 @@
 namespace inputer {
 namespace {
 
+// Slot probing needs no user dictionary. Suppress libchewing's expected
+// first-run "chewing.dat not found" diagnostic for this temporary context.
+void quietChewingLogger(void *, int, const char *, ...) {}
+
 char foldBopomofoKey(char c) {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
 }
@@ -59,7 +63,8 @@ std::array<int8_t, 128> buildSlots(KeyboardLayout layout) {
     std::array<int8_t, 128> slots{};
     slots.fill(kNoZhuyinSlot);
 
-    ChewingContext *ctx = chewing_new2(nullptr, nullptr, nullptr, nullptr);
+    ChewingContext *ctx =
+        chewing_new2(nullptr, nullptr, quietChewingLogger, nullptr);
     if (!ctx) {
         return slots;
     }

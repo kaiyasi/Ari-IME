@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.1 - 2026-07-26
+
+- Added fully offline, high-confidence context correction for conversational
+  homophones while preserving libchewing candidate restoration and learning.
+- Added regression coverage for punctuation-to-Zhuyin boundaries such as
+  `(hk4g4` -> `(測試` and contextual `你應該試試` conversion.
+- Migrated legacy `userdict.dat` learning data non-destructively to
+  libchewing 0.12's standard `chewing.dat` name and silenced expected
+  first-run dictionary diagnostics.
+
 ## 2.0.0 - 2026-07-09
 
 - Degraded gracefully when the libchewing engine fails to initialize: retry

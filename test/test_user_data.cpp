@@ -148,11 +148,34 @@ void test_learning_can_restart_after_reset() {
     check(fileSize(dict) > 0, "relearned dictionary file is non-empty");
 }
 
+void test_legacy_dictionary_is_seeded_for_libchewing() {
+    test::TempConfigHome configHome("inputer-userdata-migration-test", false);
+    std::error_code ec;
+    const std::filesystem::path dir = inputer::userDataDir();
+    std::filesystem::create_directories(dir, ec);
+    check(!ec, "migration test creates user data directory");
+
+    const std::filesystem::path legacy = dir / "userdict.dat";
+    const std::filesystem::path standard = dir / "chewing.dat";
+    check(teachSingleChoice("妳"),
+          "migration test creates a valid learned dictionary");
+    check(fileExists(legacy), "migration setup has legacy userdict.dat");
+    std::filesystem::remove(standard, ec);
+    check(!ec, "migration setup removes only the standard-name copy");
+
+    check(inputer::ensureUserDataDir(ec), "legacy dictionary migration succeeds");
+    check(fileExists(standard), "migration seeds chewing.dat");
+    check(fileExists(legacy), "migration preserves userdict.dat");
+    check(fileSize(standard) == fileSize(legacy),
+          "migrated dictionary preserves legacy contents");
+}
+
 } // namespace
 
 int main() {
     test_test_isolation_disables_learning();
     test_reset_only_clears_user_dictionary();
     test_learning_can_restart_after_reset();
+    test_legacy_dictionary_is_seeded_for_libchewing();
     return test::finish();
 }

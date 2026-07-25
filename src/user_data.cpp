@@ -45,6 +45,25 @@ bool ensureUserDataDir(std::error_code &ec) {
         return false;
     }
     std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        return false;
+    }
+
+    // libchewing 0.12 consults CHEWING_USER_PATH/chewing.dat even when Ari
+    // supplies its historical userdict.dat explicitly. Preserve the old file
+    // and seed the standard name on upgrade so existing learning is retained
+    // without a noisy "Dictionary file not found" diagnostic.
+    const std::filesystem::path legacy = dir / "userdict.dat";
+    const std::filesystem::path standard = dir / "chewing.dat";
+    std::error_code inspectEc;
+    if (!std::filesystem::exists(standard, inspectEc) && !inspectEc &&
+        std::filesystem::exists(legacy, inspectEc) && !inspectEc) {
+        std::filesystem::copy_file(legacy, standard,
+                                   std::filesystem::copy_options::none, ec);
+        if (ec == std::errc::file_exists) {
+            ec.clear(); // another context completed the same migration
+        }
+    }
     return !ec;
 }
 

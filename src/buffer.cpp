@@ -703,8 +703,63 @@ void Buffer::integrateSyllable(const std::string &body) {
         runReadings_ = {body};
     }
     normalizeRunToTop();
+    applyLocalContextPrediction();
     moveAutoCommit();
     token_ = Token::Chinese;
+}
+
+bool Buffer::chooseSingleAt(int charPos, const std::string &text) {
+    zhuyin_.closeCandidates();
+    zhuyin_.handleHome();
+    for (int i = 0; i < charPos; ++i) {
+        zhuyin_.handleRight();
+    }
+    if (!zhuyin_.openCandidates()) {
+        return false;
+    }
+    for (int guard = 0; guard < inputer::kMaxSyllables; ++guard) {
+        if (zhuyin_.candidateCount() <= 0) {
+            zhuyin_.closeCandidates();
+            return false;
+        }
+        if (utf8Count(zhuyin_.candidate(0)) <= 1) {
+            break;
+        }
+        zhuyin_.handleDown();
+    }
+    for (int i = 0; i < zhuyin_.candidateCount(); ++i) {
+        if (zhuyin_.candidate(i) == text) {
+            chooseGlobalCandidate(i);
+            return true;
+        }
+    }
+    zhuyin_.closeCandidates();
+    return false;
+}
+
+void Buffer::applyLocalContextPrediction() {
+    const std::string text = zhuyin_.preedit();
+    const std::string mistaken = "應該是是";
+    if (text.size() < mistaken.size() ||
+        text.compare(text.size() - mistaken.size(), mistaken.size(), mistaken) != 0 ||
+        runReadings_.size() < 4) {
+        return;
+    }
+
+    // The final two glyphs must really be the same ㄕˋ reading. This prevents a
+    // textual match produced by unrelated readings from triggering the rule.
+    const auto &first = runReadings_[runReadings_.size() - 2];
+    const auto &second = runReadings_[runReadings_.size() - 1];
+    if (first != second) {
+        return;
+    }
+
+    const int start = utf8Count(text) - 2;
+    if (chooseSingleAt(start, "試")) {
+        chooseSingleAt(start + 1, "試");
+    }
+    zhuyin_.closeCandidates();
+    zhuyin_.handleEnd();
 }
 
 void Buffer::normalizeRunToTop() {

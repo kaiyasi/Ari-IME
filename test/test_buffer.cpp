@@ -273,6 +273,28 @@ void test_common_mixed_literals() {
     }
 }
 
+void test_local_context_prediction_examples() {
+    // A punctuation boundary must not trap following Zhuyin in the English
+    // token. Default-layout keys: hk4 = 測, g4 = 試.
+    Sim punctuation;
+    punctuation.key('(');
+    punctuation.type("hk4g4");
+    check_eq(punctuation.preedit(), "(測試",
+             "opening parenthesis keeps following Zhuyin convertible");
+
+    // Keep the whole Chinese run in libchewing so its local phrase model can
+    // rank homophones using context instead of choosing each glyph alone.
+    // su3=你, u/ + Space=應, e9 + Space=該, g4=試.
+    Sim phrase;
+    phrase.type("su3u/");
+    phrase.key(FcitxKey_space);
+    phrase.type("e9");
+    phrase.key(FcitxKey_space);
+    phrase.type("g4g4");
+    check_eq(phrase.preedit(), "你應該試試",
+             "local phrase context ranks common homophones correctly");
+}
+
 void test_eten_typing() {
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Eten);
 
@@ -1848,6 +1870,7 @@ int main() {
 
     test_typing();
     test_common_mixed_literals();
+    test_local_context_prediction_examples();
     test_eten_typing();
     test_hsu_typing();
     test_additional_layout_typing();

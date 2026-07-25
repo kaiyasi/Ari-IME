@@ -131,6 +131,11 @@ private:
     // text always equals what selection would offer first ("以選字候選為準"). Leaves
     // the edit cursor at the end so live typing keeps appending.
     void normalizeRunToTop();
+    // Fix a small set of high-confidence conversational homophone errors after
+    // chewing's phrase pass. Choices are made through chewing itself so the
+    // reading, candidate restoration and auto-learning paths stay consistent.
+    void applyLocalContextPrediction();
+    bool chooseSingleAt(int charPos, const std::string &text);
     // Abandon the current 注音 hypothesis WITHOUT committing: the in-progress
     // syllable plus `trailing` become the live English tail after the run.
     KeyResult flipToEnglish(char trailing);

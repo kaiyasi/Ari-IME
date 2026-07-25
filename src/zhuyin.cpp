@@ -12,6 +12,12 @@
 
 namespace {
 
+// libchewing logs an error for a missing user dictionary even though an empty
+// dictionary is the normal first-run state and will be created by autoLearn.
+// Ari reports actual context-creation failure through engineReady(), so keep
+// the library's low-level logger quiet instead of flooding fcitx's stderr.
+void quietChewingLogger(void *, int, const char *, ...) {}
+
 // RAII helper that sets an environment variable for the duration of the scope
 // and restores the previous value (or unsets it) afterwards. Used to pin
 // libchewing's learned-dictionary location only while we build our context, so
@@ -65,13 +71,13 @@ Zhuyin::Zhuyin() {
     const std::string dataDir =
         haveUserDataDir ? inputer::userDataDir().string() : std::string{};
     ScopedEnv chewingUserPath("CHEWING_USER_PATH", dataDir);
-    ctx_ = chewing_new2(nullptr, path.empty() ? nullptr : path.c_str(), nullptr,
-                        nullptr);
+    ctx_ = chewing_new2(nullptr, path.empty() ? nullptr : path.c_str(),
+                        quietChewingLogger, nullptr);
     if (!ctx_ && !path.empty()) {
         // The user-dictionary path was unusable (unwritable directory, corrupt
         // file). Retry against chewing's built-in read-only dictionary so the
         // engine still works this session; we only lose per-user learning.
-        ctx_ = chewing_new2(nullptr, nullptr, nullptr, nullptr);
+        ctx_ = chewing_new2(nullptr, nullptr, quietChewingLogger, nullptr);
     }
     if (!ctx_) {
         return;

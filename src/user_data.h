@@ -19,8 +19,9 @@ std::filesystem::path userDictionaryPath();
 // Whether automatic per-user learning is enabled for this process.
 bool autoLearnEnabled();
 
-// Ensure the per-user data directory exists. Returns false only when no usable
-// path can be resolved or directory creation fails.
+// Ensure the per-user data directory exists and non-destructively seed
+// libchewing 0.12's standard chewing.dat from Ari's legacy userdict.dat when
+// needed. Returns false only when setup or migration fails.
 bool ensureUserDataDir(std::error_code &ec);
 
 // Remove only Ari IME's learned user dictionary file. Missing files are treated
