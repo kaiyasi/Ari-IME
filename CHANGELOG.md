@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.3 - 2026-07-26
+
+- Added an automated Arch x86_64 binary release pipeline that builds and tests
+  each tag in a clean Arch container before publishing a stripped runtime
+  archive and checksum to GitHub Releases.
+- Enabled a `fcitx5-ari-ime-bin` AUR package with runtime dependencies only;
+  source builds remain available directly from GitHub.
+
 ## 2.0.2 - 2026-07-26
 
 - Optimized AUR build dependencies by relying on Arch's required `base-devel`

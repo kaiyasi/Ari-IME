@@ -1,3 +1,9 @@
+fcitx5-ari-ime (2.0.3) unstable; urgency=medium
+
+  * Add automated Arch x86_64 binary release packaging.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 26 Jul 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.0.2) unstable; urgency=medium
 
   * Optimize Arch/AUR build dependency metadata.

@@ -1,0 +1,49 @@
+name: Binary release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  arch-x86_64:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Install build tools
+        run: >-
+          pacman -Syu --noconfirm --needed
+          base-devel cmake extra-cmake-modules fcitx5 libchewing
+          hicolor-icon-theme github-cli
+
+      - uses: actions/checkout@v4
+
+      - name: Build and test
+        run: |
+          cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build-release --parallel
+          ctest --test-dir build-release --output-on-failure
+
+      - name: Create runtime archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="fcitx5-ari-ime-bin-${version}-x86_64.tar.zst"
+          DESTDIR="$PWD/stage" cmake --install build-release
+          strip --strip-unneeded stage/usr/lib/fcitx5/inputer.so
+          tar --zstd -cf "$archive" -C stage usr
+          sha256sum "$archive" > "$archive.sha256"
+          printf 'ARCHIVE=%s\n' "$archive" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "$ARCHIVE" "$ARCHIVE.sha256"
+          --repo "$GITHUB_REPOSITORY"
+          --title "Ari IME $GITHUB_REF_NAME"
+          --generate-notes
