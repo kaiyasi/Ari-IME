@@ -93,7 +93,20 @@ keyboard-layout hint.
 Pinyin keyboard modes are intentionally not exposed here because this engine's
 state machine is built around one-key-per-Bopomofo-symbol layouts.
 
-## Dependencies
+## Install on Arch Linux
+
+The recommended AUR package downloads the tested, prebuilt runtime and does not
+install a compiler, CMake or other build tools:
+
+```sh
+yay -S fcitx5-ari-ime-bin
+# or: paru -S fcitx5-ari-ime-bin
+```
+
+Binary archives and checksums are also available from GitHub Releases. Developers
+who need a source build can clone this repository and use the instructions below.
+
+## Source-build dependencies
 
 - fcitx5 (and `Fcitx5Core` / `Fcitx5Config` / `Fcitx5Utils` /
   `Fcitx5ModuleClipboard` development files)
@@ -106,7 +119,7 @@ The automated tests are written to tolerate libchewing dictionary ranking
 changes where Ari IME does not own the exact candidate order. Current local and
 CI verification is exercised with libchewing 0.12.0 on Arch Linux.
 
-On Arch Linux:
+For a source build on Arch Linux:
 
 ```sh
 sudo pacman -S fcitx5 hicolor-icon-theme libchewing extra-cmake-modules cmake gcc

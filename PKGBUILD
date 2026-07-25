@@ -9,7 +9,7 @@ license=('GPL-3.0-or-later')
 depends=('fcitx5' 'hicolor-icon-theme' 'libchewing')
 makedepends=('cmake' 'extra-cmake-modules')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('0af3587c490ff0daa1b5abbe1601a6a876dd2fbc076b4438e9ba83e4c0ab9e02')
 
 _srcdir="Ari-IME-$pkgver"
 
