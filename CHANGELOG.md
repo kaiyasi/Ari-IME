@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 - 2026-07-26
+
+- Optimized AUR build dependencies by relying on Arch's required `base-devel`
+  environment instead of redundantly declaring `gcc` in `makedepends`.
+- Kept runtime dependencies limited to Fcitx5, libchewing and the lightweight
+  hicolor icon theme required by the installed input-method icon.
+
 ## 2.0.1 - 2026-07-26
 
 - Added fully offline, high-confidence context correction for conversational
