@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.1.1 - 2026-08-11
+
+- Replaced the single-key tone-one input-category gate with an output-based
+  decision: a key converts only when libchewing actually produces a Han
+  character. The rule is covered across every supported keyboard layout, so
+  literal keys such as `a` / `b` and valid conversions such as `u` -> `一` no
+  longer depend on a hand-selected key list.
+
 ## 2.1.0 - 2026-08-11
 
 - Added multi-level `Ctrl+Z` for recent candidate choices and `Shift+Delete` to

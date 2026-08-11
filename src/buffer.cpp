@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <string>
 
 #include <fcitx-utils/keysym.h>
@@ -67,6 +68,46 @@ bool isIgnoredPasteFormat(const std::string &ch) {
 bool isAsciiWhitespace(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
            c == '\v';
+}
+
+bool containsHanCharacter(const std::string &text) {
+    for (std::size_t i = 0; i < text.size();) {
+        const unsigned char lead = static_cast<unsigned char>(text[i]);
+        std::uint32_t codepoint = 0;
+        std::size_t length = 0;
+        if ((lead & 0x80) == 0) {
+            codepoint = lead;
+            length = 1;
+        } else if ((lead & 0xE0) == 0xC0) {
+            codepoint = lead & 0x1F;
+            length = 2;
+        } else if ((lead & 0xF0) == 0xE0) {
+            codepoint = lead & 0x0F;
+            length = 3;
+        } else if ((lead & 0xF8) == 0xF0) {
+            codepoint = lead & 0x07;
+            length = 4;
+        } else {
+            ++i;
+            continue;
+        }
+        if (i + length > text.size()) {
+            break;
+        }
+        for (std::size_t j = 1; j < length; ++j) {
+            codepoint =
+                (codepoint << 6) |
+                (static_cast<unsigned char>(text[i + j]) & 0x3F);
+        }
+        if ((codepoint >= 0x3400 && codepoint <= 0x4DBF) ||
+            (codepoint >= 0x4E00 && codepoint <= 0x9FFF) ||
+            (codepoint >= 0xF900 && codepoint <= 0xFAFF) ||
+            (codepoint >= 0x20000 && codepoint <= 0x2FA1F)) {
+            return true;
+        }
+        i += length;
+    }
+    return false;
 }
 
 int keypadAscii(fcitx::KeySym sym) {
@@ -143,7 +184,8 @@ bool syllableConverts(const std::string &canonicalKeys) {
     static inputer::KeyboardLayout probeLayout = inputer::KeyboardLayout::Default;
     probe = probeForCurrentLayout(probe, probeLayout);
     probe->feedSequence(canonicalKeys);
-    return probe->hasConverted() && !probe->hasBopomofo();
+    return probe->hasConverted() && !probe->hasBopomofo() &&
+           containsHanCharacter(probe->preedit());
 }
 
 // Whether a bopomofo body (no tone) yields a character under 一聲 (the tone the
@@ -154,7 +196,8 @@ bool syllableConvertsTone1(const std::string &canonicalBody) {
     probe = probeForCurrentLayout(probe, probeLayout);
     probe->feedSequence(canonicalBody);
     probe->handleSpace(); // 一聲
-    return probe->hasConverted() && !probe->hasBopomofo();
+    return probe->hasConverted() && !probe->hasBopomofo() &&
+           containsHanCharacter(probe->preedit());
 }
 
 // chewing natively maps the shifted / standalone punctuation keys to full-width
@@ -1061,17 +1104,14 @@ KeyResult Buffer::handleSpace() {
     // character (a lone 聲母 like "t" does not — fall through to a literal space).
     if (!forcedEnglish_ && token_ == Token::Chinese && !syl_.empty()) {
         const std::string body = inputer::canonicalKeys(syl_);
-        // A standalone all-letter token in non-canonical slot order is much more
-        // likely to be English (notably the shell command "ls") than an
-        // out-of-order tone-1 syllable. Keep contextual runs eligible so chewing
-        // can still resolve a real Chinese word from the preceding characters.
-        const bool singleKeyHasSyllableBody =
-            syl_.size() == 1 && inputer::hasMedialOrFinal(body);
-        const bool ambiguousStandaloneEnglish =
-            !zhuyin_.hasConverted() && isAsciiWord(syl_) &&
-            ((!singleKeyHasSyllableBody && syl_.size() == 1) || body != syl_);
+        // Preserve likely out-of-order English words such as "ls". Single keys
+        // have no whitelist: the isolated chewing probe below decides solely
+        // from whether Space produces a real Han character.
+        const bool ambiguousMultiLetterEnglish =
+            syl_.size() > 1 && !zhuyin_.hasConverted() && isAsciiWord(syl_) &&
+            body != syl_;
         if (inputer::isValidSyllable(body, /*allowTone=*/false) &&
-            !ambiguousStandaloneEnglish &&
+            !ambiguousMultiLetterEnglish &&
             syllableConvertsTone1(body)) {
             if (!englishBuf_.empty()) {
                 freezeRun();

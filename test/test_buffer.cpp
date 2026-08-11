@@ -119,6 +119,61 @@ std::string bu4_default() {
     return out;
 }
 
+bool contains_han_character(const std::string &text) {
+    for (std::size_t i = 0; i < text.size();) {
+        const unsigned char lead = static_cast<unsigned char>(text[i]);
+        std::uint32_t codepoint = 0;
+        std::size_t length = 0;
+        if ((lead & 0x80) == 0) {
+            codepoint = lead;
+            length = 1;
+        } else if ((lead & 0xE0) == 0xC0) {
+            codepoint = lead & 0x1F;
+            length = 2;
+        } else if ((lead & 0xF0) == 0xE0) {
+            codepoint = lead & 0x0F;
+            length = 3;
+        } else if ((lead & 0xF8) == 0xF0) {
+            codepoint = lead & 0x07;
+            length = 4;
+        } else {
+            ++i;
+            continue;
+        }
+        if (i + length > text.size()) {
+            break;
+        }
+        for (std::size_t j = 1; j < length; ++j) {
+            codepoint =
+                (codepoint << 6) |
+                (static_cast<unsigned char>(text[i + j]) & 0x3F);
+        }
+        if ((codepoint >= 0x3400 && codepoint <= 0x4DBF) ||
+            (codepoint >= 0x4E00 && codepoint <= 0x9FFF) ||
+            (codepoint >= 0xF900 && codepoint <= 0xFAFF) ||
+            (codepoint >= 0x20000 && codepoint <= 0x2FA1F)) {
+            return true;
+        }
+        i += length;
+    }
+    return false;
+}
+
+std::string direct_tone1_conversion(inputer::KeyboardLayout layout, char key) {
+    Zhuyin direct;
+    if (!direct.ok()) {
+        return {};
+    }
+    direct.setKeyboardLayout(layout);
+    if (key >= 'A' && key <= 'Z') {
+        key = static_cast<char>(key + ('a' - 'A'));
+    }
+    direct.feedSequence(std::string(1, key));
+    direct.handleSpace();
+    const std::string out = direct.preedit();
+    return contains_han_character(out) ? out : std::string{};
+}
+
 struct SymbolLeadCase {
     inputer::KeyboardLayout layout;
     std::string keys;
@@ -241,7 +296,7 @@ void test_typing() {
     check_eq(pe("API"), "API", "all-caps acronym stays English");
 }
 
-void test_ambiguous_tone1_space_falls_back_to_english() {
+void test_tone1_space_uses_conversion_result() {
     for (char letter : {'a', 'b'}) {
         Sim singleLetter;
         singleLetter.key(letter);
@@ -270,6 +325,41 @@ void test_ambiguous_tone1_space_falls_back_to_english() {
     singleVowel.type("-4"); // default layout: ㄦˋ
     check_eq(singleVowel.preedit(), "一二",
              "single-key tone-one syllable can precede another numeral");
+
+    const inputer::KeyboardLayout layouts[] = {
+        inputer::KeyboardLayout::Default,
+        inputer::KeyboardLayout::Eten,
+        inputer::KeyboardLayout::Hsu,
+        inputer::KeyboardLayout::Ibm,
+        inputer::KeyboardLayout::GinYieh,
+        inputer::KeyboardLayout::Dvorak,
+        inputer::KeyboardLayout::Carpalx,
+        inputer::KeyboardLayout::ColemakDhAnsi,
+        inputer::KeyboardLayout::ColemakDhOrth,
+        inputer::KeyboardLayout::Workman,
+        inputer::KeyboardLayout::Colemak,
+    };
+    for (const auto layout : layouts) {
+        inputer::setCurrentKeyboardLayout(layout);
+        for (int value = 33; value <= 126; ++value) {
+            const char key = static_cast<char>(value);
+            if (inputer::zhuyinSlot(key) < 0 || inputer::isToneKey(key)) {
+                continue;
+            }
+            const std::string expected = direct_tone1_conversion(layout, key);
+            Sim actual;
+            actual.b.setKeyboardLayout(layout);
+            actual.key(key);
+            actual.key(FcitxKey_space);
+            const std::string literal = std::string(1, key) + " ";
+            const std::string label =
+                std::string(inputer::keyboardLayoutName(layout)) +
+                " single-key tone-one decision for " + key;
+            check_eq(actual.preedit(), expected.empty() ? literal : expected,
+                     label.c_str());
+        }
+    }
+    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 
 void test_common_mixed_literals() {
@@ -2100,7 +2190,7 @@ int main() {
     test::TempConfigHome configHome("inputer-buffer-test-config");
 
     test_typing();
-    test_ambiguous_tone1_space_falls_back_to_english();
+    test_tone1_space_uses_conversion_result();
     test_common_mixed_literals();
     test_local_context_prediction_examples();
     test_eten_typing();
