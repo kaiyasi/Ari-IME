@@ -156,6 +156,10 @@ fuzz_checks() {
         -DBUILD_TESTING=OFF
     run cmake --build "$fuzz_dir" --target fuzz_buffer
     local fuzz_args=("-runs=${INPUTER_FUZZ_RUNS:-256}")
+    if [[ -n "${INPUTER_FUZZ_ARTIFACT_DIR:-}" ]]; then
+        mkdir -p "$INPUTER_FUZZ_ARTIFACT_DIR"
+        fuzz_args+=("-artifact_prefix=${INPUTER_FUZZ_ARTIFACT_DIR%/}/")
+    fi
     local fuzz_work_dir=""
     if [[ -d "$fuzz_corpus_dir" ]]; then
         fuzz_work_dir="$(mktemp -d /tmp/inputer-fuzz-corpus-XXXXXX)"

@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+## 2.1.0 - 2026-08-11
+
+- Added multi-level `Ctrl+Z` for recent candidate choices and `Shift+Delete` to
+  forget only the highlighted personal dictionary entry.
+- Prevented password and sensitive fields from writing per-user learning data.
+- Added phrase-aware `Ctrl+Left` / `Ctrl+Right` navigation using libchewing's
+  recognized intervals, with ordinary English word boundaries in mixed text.
+- Enabled caret editing in forced-English mode and explicit `Ctrl+Shift`
+  Chinese punctuation insertion at a mid-string caret.
+- Made ordinary punctuation context-independent and half-width by default;
+  `Ctrl+Shift` plus a punctuation key now requests the Chinese form explicitly,
+  while the existing opt-in full-width mode remains available.
+- Restored valid single-key tone-one syllables such as `u` + Space → `一`
+  without regressing literal one-letter English tokens such as `a ` and `b `.
+- Weighted unchanged conversions as weak positive learning evidence while
+  giving explicit character and phrase selections roughly four times the
+  learning weight plus a short local-context reinforcement pass.
+- Restored libchewing's native conditional phrase scoring as the automatic
+  context engine instead of overriding it with static first-candidate and
+  sentence-specific correction rules.
+- Added deterministic coverage for `我的` / `跑得快` contextual homophones and
+  for one explicit phrase choice outweighing three unchanged commits.
+
 ## 2.0.3 - 2026-07-26
 
 - Added an automated Arch x86_64 binary release pipeline that builds and tests

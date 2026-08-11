@@ -4,6 +4,7 @@
 #define INPUTER_BUFFER_H
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <fcitx-utils/key.h>
@@ -13,11 +14,19 @@
 
 // Result of feeding one key into the state machine, applied by the engine.
 struct KeyResult {
+    KeyResult(bool handled = false, bool hasCommit = false,
+              std::string commitText = {}, bool updateUI = false,
+              bool notifyMode = false, std::string notification = {})
+        : handled(handled), hasCommit(hasCommit),
+          commitText(std::move(commitText)), updateUI(updateUI),
+          notifyMode(notifyMode), notification(std::move(notification)) {}
+
     bool handled = false;      // If false, let the application handle the key.
     bool hasCommit = false;    // commitText should be committed to the client.
     std::string commitText;
     bool updateUI = false;     // Engine should refresh pre-edit + candidates.
     bool notifyMode = false;   // Engine should pop a transient 中/英 mode hint.
+    std::string notification;  // Optional transient action result.
 };
 
 // Per-input-context state machine implementing ASUS-style simultaneous mixed
@@ -77,10 +86,12 @@ public:
     // Tracks the selected cell while selecting and the insertion point while
     // typing mid-string, so the caret never jumps to the end during insertion.
     int caretChar() const;
+    bool isEditing() const { return selecting_; }
+    bool isPicking() const { return selecting_ && candOpen_; }
 
     // --- Configuration (driven by the fcitx5 addon config) ---
-    // When on, non-注音 punctuation keys produce chewing's full-width Chinese
-    // punctuation (e.g. '<' -> ，, '?' -> ？); off (default) keeps them literal.
+    // Ordinary punctuation stays literal regardless of surrounding language.
+    // When this is on, punctuation is forced full-width without a modifier.
     bool setFullWidthPunct(bool on) {
         if (fullWidthPunct_ == on) {
             return false;
@@ -89,6 +100,8 @@ public:
         return true;
     }
     bool setKeyboardLayout(inputer::KeyboardLayout layout);
+    // The frontend disables learning for password and other sensitive fields.
+    void setLearningAllowed(bool allowed) { learningAllowed_ = allowed; }
 
     // Forced pure-English mode (toggled by Ctrl+Space); lets the engine show the
     // current 中/英 mode hint.
@@ -113,6 +126,13 @@ private:
         bool locked = false; // the user explicitly picked this character; pin it
                              // (as a single) whenever the run is re-fed, so it
                              // survives later picks elsewhere in the run.
+        int selectionGroup = 0; // non-zero cells were picked together as one
+                                // explicit word/phrase learning event.
+    };
+
+    struct SelectionUndo {
+        std::vector<Cell> cells;
+        int nextSelectionGroup = 1;
     };
 
     // --- Typing path ---
@@ -125,17 +145,6 @@ private:
     // extending it so chewing's phrasing spans contiguous Chinese. English in
     // front of it freezes the old run first, preserving order.
     void integrateSyllable(const std::string &body);
-    // chewing's auto-conversion can differ from the top of its own candidate list
-    // (e.g. it auto-picks 妳好 while the selection window ranks 你好 first). Greedily
-    // re-pick candidate[0] of the longest interval left-to-right so the displayed
-    // text always equals what selection would offer first ("以選字候選為準"). Leaves
-    // the edit cursor at the end so live typing keeps appending.
-    void normalizeRunToTop();
-    // Fix a small set of high-confidence conversational homophone errors after
-    // chewing's phrase pass. Choices are made through chewing itself so the
-    // reading, candidate restoration and auto-learning paths stay consistent.
-    void applyLocalContextPrediction();
-    bool chooseSingleAt(int charPos, const std::string &text);
     // Abandon the current 注音 hypothesis WITHOUT committing: the in-progress
     // syllable plus `trailing` become the live English tail after the run.
     KeyResult flipToEnglish(char trailing);
@@ -148,10 +157,12 @@ private:
     KeyResult handleEnter();
     KeyResult handleBackspace();
     KeyResult handleDelete();
-    // On commit, replay each Chinese run into chewing with the user's chosen
-    // characters selected and commit it, so chewing's autoLearn records the
-    // phrase/homophone frequencies (personal adaptation over time).
+    // On commit, learn every accepted Chinese run once, then give explicitly
+    // selected words/phrases extra passes plus a small surrounding-context pass.
+    // This keeps unchanged text as weak positive evidence while deliberate
+    // corrections adapt substantially faster.
     void learnFromCells();
+    void learnRange(int start, int end, int passes);
 
     // --- Freezing the live tail (run / English / syllable) into cells_ ---
     void freezeRun();        // live chewing run -> Chinese cells (with readings)
@@ -212,7 +223,13 @@ private:
     // Write chewing's current buffer back over the run's cell texts.
     void applyRunToCells();
     KeyResult moveSelCursor(int delta);     // step to the adjacent cell
+    KeyResult moveCaretByPhrase(int direction);
+    std::vector<int> phraseBoundaries();
     KeyResult pickCandidate(int pageIndex); // pick a candidate on the current page
+    KeyResult forgetHighlightedCandidate();
+    void rememberSelectionUndo();
+    void clearSelectionUndo();
+    KeyResult undoSelection();
     // Type while selecting: leave selection and resume the NORMAL typing path
     // right at the cursor cell. Everything from the cursor onward is parked in
     // tail_ so the keystroke (and whatever follows) composes exactly as it would
@@ -237,6 +254,7 @@ private:
 
     bool forcedEnglish_ = false;
     bool fullWidthPunct_ = false;
+    bool learningAllowed_ = true;
     inputer::KeyboardLayout layout_ = inputer::KeyboardLayout::Default;
     Token token_ = Token::Chinese;
     std::vector<Cell> cells_;             // finalized pre-edit, before the live tail
@@ -252,6 +270,8 @@ private:
     int selRunStart_ = 0;                // contiguous Chinese run under the cursor
     int selRunEnd_ = 0;                  // (inclusive)
     bool runLoaded_ = false;             // zhuyin_ holds [start..end] with its locks
+    int nextSelectionGroup_ = 1;         // groups phrase picks for weighted learning
+    std::vector<SelectionUndo> selectionUndo_; // recent candidate choices only
     std::vector<SelCand> selCands_;      // merged phrase+single candidate list
     int selPage_ = 0;                    // page (of 9) within selCands_
     int highlight_ = 0;                  // highlighted candidate within the page

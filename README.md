@@ -21,27 +21,38 @@ phrasing and per-user learning.
   pinned. Candidates can be picked by number key or direct click/touch, and
   multi-page lists show their current page in the auxiliary line. The labeled
   `原始鍵 ...` candidate restores a converted character back to its raw keys.
+  `Ctrl+Z` restores recent candidate choices until text is otherwise edited;
+  `Shift+Delete` forgets the highlighted personal candidate without removing
+  the same word from the built-in dictionary.
 - **Consistent phrasing** — the character shown while typing matches the top
   candidate the selection window offers ("以選字候選為準").
-- **Full-width punctuation (optional)** — toggle in config; `<` → ，, `>` → 。,
-  `?` → ？, `\` → 、, `^` → ……, `(` → （, `{` → 『, etc. It applies
-  in mixed Chinese/English pre-edit text, including common symbols such as
-  `@` → ＠, `%` → ％, `_` → ＿, `` ` `` → ｀ and `"` → ＂. Off by default
-  (half-width), with a transient hint when the setting changes. Ari IME reserves
-  no punctuation toggle shortcut by default, so common application shortcuts such
-  as `Ctrl+.` remain available; you may optionally bind one via the
-  **FullWidthPunctuationToggle** config option (a modifier is required), which
+- **Explicit Chinese punctuation** — ordinary punctuation stays literal and
+  half-width regardless of surrounding Chinese or English. Hold `Ctrl+Shift`
+  with a punctuation key to request its Chinese form temporarily: comma → ，,
+  period → 。, slash → ？, apostrophe → 、, `(` → （, `{` → 『, etc.
+  **FullWidthPunctuation** remains available for users who explicitly prefer
+  full-width symbols without holding a modifier, including `@` → ＠,
+  `%` → ％, `_` → ＿, `` ` `` → ｀ and `"` → ＂.
+  Ari IME reserves no punctuation toggle shortcut by default, so common
+  application shortcuts such as `Ctrl+.` remain available;
+  **FullWidthPunctuationToggle** can optionally bind a modifier shortcut that
   flips the setting live and persists it.
+  `Alt` punctuation remains available to applications instead of being captured.
 - **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
   up, and the mode persists until toggled again.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
   keyboard layout and punctuation mode while composing. This status line is off
   by default and can be re-enabled in the addon config.
-- **Per-user learning** — chewing records your homophone/phrase choices.
-- **Offline context correction** — local phrase context fixes high-confidence
-  conversational homophones (for example `你應該是是` -> `你應該試試`)
-  through libchewing's own candidates, so selection, raw-key restoration and
-  per-user learning continue to work. No text or API key leaves the machine.
+- **Weighted per-user learning** — pressing Enter gives an unchanged conversion
+  one weak positive learning pass. An explicitly selected character or phrase
+  receives three extra passes (roughly 4:1), plus one short surrounding-context
+  pass, so deliberate choices adapt faster without treating accepted defaults
+  as mistakes.
+  Password and sensitive input fields never write learning data.
+- **Automatic offline context** — libchewing's local phrase model uses
+  surrounding words to distinguish homophones such as `我的` and `跑得快`.
+  Personal weights feed the same model automatically; there is no external AI,
+  network request, model download or setting to enable.
 - **Punctuation-aware boundaries** — a literal symbol can be followed directly
   by Zhuyin (`(hk4g4` -> `(測試`) without trapping the following keys in an
   English token.
@@ -56,13 +67,16 @@ phrasing and per-user learning.
 | ↑ | open/reinterpret the current pre-edit cell |
 | Tab / Shift+Tab (in candidates) | move candidate highlight forward / backward |
 | Home / End | jump to the beginning / end of the pre-edit |
+| Ctrl+Left / Ctrl+Right | move by libchewing phrase boundaries or English words |
 | Delete | delete the character right of the caret, or the focused candidate cell |
+| Shift+Delete (in candidates) | forget the highlighted personal learning record |
 | PageUp / PageDown | move between candidate pages |
 | number `1`–`9` | pick a candidate |
 | Backspace (in selection) | delete the focused character and leave selection |
 | Esc | clear pre-edit, or close selection/candidates first |
 | Enter | commit the whole pre-edit to the application |
 | Ctrl+V / Shift+Insert | paste clipboard text at the current pre-edit caret, with control/newline-like separators folded into visible spaces and zero-width artifacts removed |
+| Ctrl+Z | restore the most recent candidate choice while it is still the latest edit |
 | Ctrl+Space | toggle forced English mode |
 
 Numeric-keypad navigation keys are treated like their main-keyboard equivalents
@@ -276,7 +290,9 @@ the check script copies those seeds into a temporary corpus first so local fuzz
 runs do not dirty the tracked seed directory. Printable ASCII bytes in those
 seeds are interpreted as direct key presses. Set
 `INPUTER_FUZZ_RUNS` to adjust the run count, or `INPUTER_FUZZ_CORPUS_DIR` to
-point at another corpus directory.
+point at another corpus directory. Set `INPUTER_FUZZ_ARTIFACT_DIR` to make
+libFuzzer write crash reproducers to a dedicated directory for CI artifact
+upload.
 
 GitHub also runs a separate scheduled/manual **Nightly Fuzz** workflow with a
 larger default run count. Trigger it manually from Actions and set the `runs`
@@ -307,6 +323,9 @@ libchewing's built-in/base dictionary.
 Older Ari builds (before this pinning) may have left learned data in
 `~/.local/share/chewing`; pass `--include-shared` to the reset script below to
 clear that shared location too (it may be shared with other chewing IMEs).
+Learning collected before the weighted scheme does not distinguish unchanged
+output from explicit selections. It remains usable, but a one-time reset is a
+useful diagnostic if old candidate ordering still feels inconsistent.
 
 To reset learned data safely for development or local troubleshooting:
 

@@ -59,8 +59,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run long fuzz checks
-        run: >
-          INPUTER_CHECK_MODE=fuzz
-          INPUTER_CXX_COMPILER_LAUNCHER=ccache
-          INPUTER_FUZZ_RUNS=${{ github.event.inputs.runs || '5000' }}
-          scripts/check.sh
+        env:
+          INPUTER_CHECK_MODE: fuzz
+          INPUTER_CXX_COMPILER_LAUNCHER: ccache
+          INPUTER_FUZZ_RUNS: ${{ github.event.inputs.runs || '5000' }}
+          INPUTER_FUZZ_ARTIFACT_DIR: fuzz-artifacts
+        run: scripts/check.sh
+
+      - name: Upload fuzz crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: long-fuzz-artifacts-${{ github.run_id }}
+          path: fuzz-artifacts
+          if-no-files-found: ignore

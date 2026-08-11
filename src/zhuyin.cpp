@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include <chewing.h>
 
@@ -89,10 +90,20 @@ Zhuyin::Zhuyin() {
     chewing_set_autoLearn(
         ctx_, inputer::autoLearnEnabled() ? AUTOLEARN_ENABLED
                                           : AUTOLEARN_DISABLED);
+#if defined(CHEWING_VERSION_MAJOR) && defined(CHEWING_VERSION_MINOR) &&           \
+    (CHEWING_VERSION_MAJOR > 0 || CHEWING_VERSION_MINOR >= 9)
+    // Newer libchewing versions can rank candidates by learned frequency. Query
+    // the option because it is not present in every build with the config API.
+    constexpr const char *kSortByFrequency =
+        "chewing.sort_candidates_by_frequency";
+    if (chewing_config_has_option(ctx_, kSortByFrequency) == 1) {
+        chewing_config_set_int(ctx_, kSortByFrequency, 1);
+    }
+#endif
     chewing_set_spaceAsSelection(ctx_, 0);    // We drive selection ourselves.
     chewing_set_escCleanAllBuf(ctx_, 1);
     chewing_set_candPerPage(ctx_, inputer::kCandPerPage);
-    chewing_set_maxChiSymbolLen(ctx_, 20);
+    chewing_set_maxChiSymbolLen(ctx_, inputer::kMaxCompositionChars);
 }
 
 Zhuyin::~Zhuyin() {
@@ -215,6 +226,55 @@ void Zhuyin::handleEnd() {
     if (ctx_) {
         chewing_handle_End(ctx_);
     }
+}
+
+int Zhuyin::forgetUserPhrase(const std::string &phrase) {
+    if (!ctx_ || phrase.empty() || chewing_userphrase_enumerate(ctx_) != 0) {
+        return -1;
+    }
+
+    std::vector<std::string> readings;
+    unsigned int phraseLen = 0;
+    unsigned int bopomofoLen = 0;
+    while (chewing_userphrase_has_next(ctx_, &phraseLen, &bopomofoLen) == 1) {
+        if (phraseLen == 0 || bopomofoLen == 0) {
+            continue;
+        }
+        std::vector<char> phraseBuf(phraseLen);
+        std::vector<char> bopomofoBuf(bopomofoLen);
+        if (chewing_userphrase_get(ctx_, phraseBuf.data(), phraseLen,
+                                   bopomofoBuf.data(), bopomofoLen) == 0 &&
+            phrase == phraseBuf.data()) {
+            readings.emplace_back(bopomofoBuf.data());
+        }
+    }
+
+    int removed = 0;
+    for (const auto &reading : readings) {
+        const int count =
+            chewing_userphrase_remove(ctx_, phrase.c_str(), reading.c_str());
+        if (count < 0) {
+            return -1;
+        }
+        removed += count;
+    }
+    return removed;
+}
+
+std::vector<std::pair<int, int>> Zhuyin::phraseIntervals() {
+    std::vector<std::pair<int, int>> out;
+    if (!ctx_) {
+        return out;
+    }
+    chewing_interval_Enumerate(ctx_);
+    while (chewing_interval_hasNext(ctx_) == 1) {
+        IntervalType interval{};
+        chewing_interval_Get(ctx_, &interval);
+        if (interval.from >= 0 && interval.to > interval.from) {
+            out.emplace_back(interval.from, interval.to);
+        }
+    }
+    return out;
 }
 
 bool Zhuyin::absorbed() const {

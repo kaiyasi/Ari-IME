@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/textformatflags.h>
@@ -67,6 +68,64 @@ std::size_t utf8Offset(const std::string &s, int n) {
         i += utf8CharLen(s, i);
     }
     return i;
+}
+
+std::vector<std::string> utf8Chars(const std::string &s) {
+    std::vector<std::string> out;
+    for (std::size_t i = 0; i < s.size();) {
+        const std::size_t len = utf8CharLen(s, i);
+        out.push_back(s.substr(i, len));
+        i += len;
+    }
+    return out;
+}
+
+fcitx::Text buildEditingPreview(const std::string &text, int position,
+                                bool picking) {
+    constexpr int kContextChars = 10;
+    const auto chars = utf8Chars(text);
+    const int total = static_cast<int>(chars.size());
+    position = std::clamp(position, 0, total);
+    const int start = std::max(0, position - kContextChars);
+    const int end = std::min(total, position + kContextChars + (picking ? 1 : 0));
+
+    fcitx::Text preview;
+    if (start > 0) {
+        preview.append("…", fcitx::TextFormatFlag::NoFlag);
+    }
+    for (int i = start; i < end; ++i) {
+        if (!picking && i == position) {
+            preview.append("|", fcitx::TextFormatFlag::HighLight);
+        }
+        preview.append(chars[i], picking && i == position
+                                     ? fcitx::TextFormatFlag::HighLight
+                                     : fcitx::TextFormatFlag::NoFlag);
+    }
+    if (!picking && position == end) {
+        preview.append("|", fcitx::TextFormatFlag::HighLight);
+    }
+    if (end < total) {
+        preview.append("…", fcitx::TextFormatFlag::NoFlag);
+    }
+    return preview;
+}
+
+int utf8Count(const std::string &s) {
+    return static_cast<int>(utf8Chars(s).size());
+}
+
+std::string joinAuxParts(const std::vector<std::string> &parts) {
+    std::string out;
+    for (const auto &part : parts) {
+        if (part.empty()) {
+            continue;
+        }
+        if (!out.empty()) {
+            out += " · ";
+        }
+        out += part;
+    }
+    return out;
 }
 
 // Build the pre-edit text. The whole string is underlined to signal it is
@@ -139,27 +198,32 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
 
     const std::string preeditStr = buffer.preeditText();
     const int selChar = buffer.selectionChar();
+    const int caretChar = buffer.caretChar();
     // The caret follows the insertion point while typing mid-string (selChar is
     // -1 then); the aux-line highlight below still keys off selChar.
-    setPreedit(ic, buildPreedit(preeditStr, buffer.caretChar()));
+    setPreedit(ic, buildPreedit(preeditStr, caretChar));
 
     // The inline pre-edit above is rendered by the client application, which may
     // ignore per-segment styling (some paint the whole pre-edit reversed). So we
     // ALSO show the string in fcitx's own auxiliary line during selection, with
     // only the selected character highlighted — fcitx draws this with its own
     // theme, so the single-character mark is reliable regardless of the client.
-    if (selChar >= 0) {
-        fcitx::Text aux;
-        int idx = 0;
-        for (std::size_t i = 0; i < preeditStr.size();) {
-            std::size_t len = utf8CharLen(preeditStr, i);
-            aux.append(preeditStr.substr(i, len),
-                       idx == selChar ? fcitx::TextFormatFlag::HighLight
-                                      : fcitx::TextFormatFlag::NoFlag);
-            i += len;
-            ++idx;
+    if (buffer.isEditing()) {
+        const int position = buffer.isPicking() ? selChar : caretChar;
+        panel.setAuxUp(
+            buildEditingPreview(preeditStr, position, buffer.isPicking()));
+    }
+
+    const int totalChars = utf8Count(preeditStr);
+    std::string positionText;
+    if (buffer.isEditing()) {
+        if (buffer.isPicking()) {
+            positionText = "選字 " + std::to_string(selChar + 1) + "/" +
+                           std::to_string(totalChars);
+        } else {
+            positionText = "游標 " + std::to_string(std::max(caretChar, 0)) + "/" +
+                           std::to_string(totalChars);
         }
-        panel.setAuxUp(aux);
     }
 
     auto candidates = buffer.candidates();
@@ -188,21 +252,28 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
 
         int page = buffer.candidatePage();
         int pages = buffer.candidatePageCount();
-        std::string auxDown;
+        std::vector<std::string> auxParts;
         if (pages > 1) {
-            auxDown = "候選 " + std::to_string(page) + "/" +
-                      std::to_string(pages) + " · ";
+            auxParts.push_back("候選 " + std::to_string(page) + "/" +
+                               std::to_string(pages));
         }
+        auxParts.push_back(positionText);
         if (*config_.showStatusLine) {
-            auxDown += statusText(buffer);
-        } else if (pages > 1 && auxDown.size() >= 3) {
-            auxDown.erase(auxDown.size() - 3); // drop the trailing " · "
+            auxParts.push_back(statusText(buffer));
         }
+        const std::string auxDown = joinAuxParts(auxParts);
         if (!auxDown.empty()) {
             panel.setAuxDown(fcitx::Text(auxDown));
         }
-    } else if (!preeditStr.empty() && *config_.showStatusLine) {
-        panel.setAuxDown(fcitx::Text(statusText(buffer)));
+    } else {
+        std::vector<std::string> auxParts{positionText};
+        if (!preeditStr.empty() && *config_.showStatusLine) {
+            auxParts.push_back(statusText(buffer));
+        }
+        const std::string auxDown = joinAuxParts(auxParts);
+        if (!auxDown.empty()) {
+            panel.setAuxDown(fcitx::Text(auxDown));
+        }
     }
 
     ic->updatePreedit();
@@ -226,6 +297,9 @@ void InputerEngine::applyResult(fcitx::InputContext *ic, Buffer &buffer,
         instance_->showCustomInputMethodInformation(
             ic, buffer.isForcedEnglish() ? "英 English" : "中 中文");
     }
+    if (!result.notification.empty()) {
+        instance_->showCustomInputMethodInformation(ic, result.notification);
+    }
     if (result.updateUI) {
         updateUI(ic, buffer);
     }
@@ -239,6 +313,8 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
 
     auto *ic = keyEvent.inputContext();
     auto *state = ic->propertyFor(&factory_);
+    state->buffer.setLearningAllowed(!ic->capabilityFlags().test(
+        fcitx::CapabilityFlag::PasswordOrSensitive));
 
     // If the 注音 engine failed to initialise, warn once. Typing still works via
     // the buffer's plain-English degrade path, so we do not swallow the event.

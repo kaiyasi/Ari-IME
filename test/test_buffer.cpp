@@ -218,8 +218,7 @@ void test_typing() {
         return s.preedit();
     };
     check_eq(pe("su3"), "你", "type su3");
-    // Live typing normalizes to the top selection candidate (你好), matching what
-    // the candidate window offers first — see normalizeRunToTop.
+    // The clean local dictionary's contextual conversion for ㄋㄧˇㄏㄠˇ.
     check_eq(pe("su3cl3"), "你好", "type su3cl3");
     check_eq(pe("ji3"), "我", "type ji3");
     check_eq(pe("hello"), "hello", "type hello (english)");
@@ -240,6 +239,37 @@ void test_typing() {
     check_eq(pe("Su3CL3"), "你好", "type mixed-case 注音 -> 你好");
     check_eq(pe("Acer"), "Acer", "uppercase-led English keeps its case");
     check_eq(pe("API"), "API", "all-caps acronym stays English");
+}
+
+void test_ambiguous_tone1_space_falls_back_to_english() {
+    for (char letter : {'a', 'b'}) {
+        Sim singleLetter;
+        singleLetter.key(letter);
+        singleLetter.key(FcitxKey_space);
+        check_eq(singleLetter.preedit(), std::string(1, letter) + " ",
+                 "single English letter stays literal on space");
+    }
+
+    Sim command;
+    command.type("ls");
+    command.key(FcitxKey_space);
+    check_eq(command.preedit(), "ls ",
+             "out-of-order standalone ls stays English on space");
+
+    Sim canonical;
+    canonical.type("sl"); // standard layout: ㄋㄠ in canonical slot order
+    canonical.key(FcitxKey_space);
+    check(canonical.preedit() != "sl ",
+          "canonical tone-1 syllable still converts on space");
+
+    Sim singleVowel;
+    singleVowel.key('u'); // default layout: ㄧ
+    singleVowel.key(FcitxKey_space);
+    check_eq(singleVowel.preedit(), "一",
+             "single-key medial still converts under tone one");
+    singleVowel.type("-4"); // default layout: ㄦˋ
+    check_eq(singleVowel.preedit(), "一二",
+             "single-key tone-one syllable can precede another numeral");
 }
 
 void test_common_mixed_literals() {
@@ -293,6 +323,19 @@ void test_local_context_prediction_examples() {
     phrase.type("g4g4");
     check_eq(phrase.preedit(), "你應該試試",
              "local phrase context ranks common homophones correctly");
+
+    // The same ㄉㄜ˙ reading should follow the surrounding phrase rather than a
+    // global one-character preference. ji3=我, 2k7=的/得, ql3=跑,
+    // dj94=快 in the default layout.
+    Sim possessive;
+    possessive.type("ji32k7");
+    check_eq(possessive.preedit(), "我的",
+             "local context chooses possessive 的");
+
+    Sim complement;
+    complement.type("ql32k7dj94");
+    check_eq(complement.preedit(), "跑得快",
+             "local context chooses complement 得");
 }
 
 void test_eten_typing() {
@@ -520,6 +563,21 @@ void test_forced_english_persists_across_reset() {
              "typing after forced English Escape remains literal");
 }
 
+void test_forced_english_caret_editing() {
+    Sim s;
+    s.press(fcitx::Key(FcitxKey_space, fcitx::KeyState::Ctrl));
+    s.type("acb");
+    s.key(FcitxKey_Left);
+    s.key(FcitxKey_BackSpace);
+    s.type("B");
+    check_eq(s.preedit(), "aBb",
+             "forced English supports caret movement and mid-string editing");
+
+    s.key(FcitxKey_Up);
+    check_eq(s.preedit(), "aBb",
+             "forced English caret does not reinterpret text as Zhuyin");
+}
+
 void test_backspace() {
     Sim s;
     s.type("su3cl3"); // 你好
@@ -547,18 +605,17 @@ void test_phrase_priority() {
           "raw-key fallback stays at the end of the visible candidate page");
 }
 
-// Live typing and the selection window must agree on the preferred phrase:
-// normalizeRunToTop re-picks candidate[0] for multi-char intervals so the text
-// shown while typing equals what selection offers first (你好, not auto 妳好).
+// The selection window keeps libchewing's contextual live result first instead
+// of replacing it with an unrelated static candidate-list order.
 void test_live_matches_top_candidate() {
     Sim s;
     s.type("su3cl3");
-    check_eq(s.preedit(), "你好", "live shows top candidate 你好");
+    const std::string live = s.preedit();
     s.key(FcitxKey_Left); // caret between 你 and 好
     s.key(FcitxKey_Left); // caret before 你
     s.key(FcitxKey_Down); // open candidates for 你
     auto c = s.cand();
-    check(!c.empty() && c[0] == "你好", "selection top candidate matches live");
+    check(!c.empty() && c[0] == live, "selection top candidate matches live");
 }
 
 void test_phrase_pick() {
@@ -609,12 +666,11 @@ void test_candidate_direct_selection() {
     check(r.handled, "direct candidate selection handles single candidate");
     check_eq(single.preedit(), "妳好",
              "direct single candidate rewrites focused cell");
-    check(single.b.selectionChar() == 1,
-          "direct single candidate advances to next cell");
-    single.key(FcitxKey_Escape);
+    check(!single.b.isEditing() && single.b.selectionChar() == -1,
+          "direct single candidate exits correction mode");
     single.type("1j4");
-    check_eq(single.preedit(), "妳" + bu + "好",
-             "typing after direct pick Escape resumes before next cell");
+    check_eq(single.preedit(), "妳好" + bu,
+             "typing after direct pick resumes at end");
 
     Sim stale;
     stale.type("su3");
@@ -640,18 +696,20 @@ void test_pin_earlier_pick() {
     KeyResult pinned = s.b.selectCandidate(niPinnedIndex);
     check(pinned.handled, "pinning test picks 妳 directly");
     check_eq(s.preedit(), "妳好", "picked 妳 single");
-    check(s.b.selectionChar() == 1, "pick advances the window to the next cell");
-    // Still picking, now on 好: fix it to 郝. The earlier 妳 pick must stay locked.
-    s.key(FcitxKey_Down);  // 郝
-    s.key(FcitxKey_Return);
+    check(!s.b.isEditing(), "pick exits correction mode");
+    // Reopen correction on 好 and fix it to 郝. The earlier 妳 pick must stay locked.
+    s.key(FcitxKey_Home);
+    s.key(FcitxKey_Right);
+    s.key(FcitxKey_Down);
+    int haoPinnedIndex = find_visible_candidate(s.cand(), "郝");
+    check(haoPinnedIndex >= 0, "visible candidates include 郝 for pinning test");
+    KeyResult haoPinned = s.b.selectCandidate(haoPinnedIndex);
+    check(haoPinned.handled, "pinning test picks 郝 directly");
     check_eq(s.preedit(), "妳郝", "earlier 妳 stays locked after picking 郝");
-    check(s.b.selectionChar() == -1,
-          "consecutive picks close candidate window at tail");
-    check(s.b.caretChar() == utf8_count(s.preedit()),
-          "consecutive picks leave caret at end of pre-edit");
+    check(!s.b.isEditing(), "second pick returns to append mode");
     s.type("1j4");
     check_eq(s.preedit(), "妳郝" + bu,
-             "typing after consecutive picks appends after fixed text");
+             "typing after reopened correction appends after fixed text");
 }
 
 void test_candidate_ranking_prefers_current_choice() {
@@ -663,12 +721,62 @@ void test_candidate_ranking_prefers_current_choice() {
     KeyResult picked = s.b.selectCandidate(niIndex);
     check(picked.handled, "direct pick selects 妳");
     check_eq(s.preedit(), "妳", "explicit pick updates preedit");
-    s.key(FcitxKey_Escape);
     s.key(FcitxKey_Home);
     s.key(FcitxKey_Down);
     auto reopened = s.cand();
     check(!reopened.empty() && reopened[0] == "妳",
           "reopened candidates prefer the current explicit choice");
+}
+
+void test_candidate_selection_undo() {
+    Sim empty;
+    KeyResult r = empty.press(
+        fcitx::Key(FcitxKey_z, fcitx::KeyState::Ctrl));
+    check(!r.handled, "Ctrl+Z without a candidate choice passes through");
+
+    Sim phrase;
+    phrase.type("su3cl3");
+    phrase.key(FcitxKey_Home);
+    phrase.key(FcitxKey_Down);
+    const int phraseIndex = find_visible_candidate(phrase.cand(), "妳好");
+    check(phraseIndex >= 0, "selection undo setup includes 妳好");
+    phrase.b.selectCandidate(phraseIndex);
+    check_eq(phrase.preedit(), "妳好", "selection undo setup picks phrase");
+    r = phrase.press(fcitx::Key(FcitxKey_z, fcitx::KeyState::Ctrl));
+    check(r.handled, "Ctrl+Z handles a recent candidate choice");
+    check_eq(r.notification, "已復原選字", "selection undo reports its action");
+    check_eq(phrase.preedit(), "你好", "Ctrl+Z restores text before phrase pick");
+
+    Sim multiple;
+    multiple.type("su3cl3");
+    multiple.key(FcitxKey_Home);
+    multiple.key(FcitxKey_Down);
+    const int niIndex = find_visible_candidate(multiple.cand(), "妳");
+    check(niIndex >= 0, "multi-level undo setup includes 妳");
+    multiple.b.selectCandidate(niIndex);
+    multiple.key(FcitxKey_Home);
+    multiple.key(FcitxKey_Right);
+    multiple.key(FcitxKey_Down);
+    const int haoIndex = find_visible_candidate(multiple.cand(), "郝");
+    check(haoIndex >= 0, "multi-level undo setup includes 郝");
+    multiple.b.selectCandidate(haoIndex);
+    check_eq(multiple.preedit(), "妳郝", "multi-level undo applies two choices");
+    multiple.press(fcitx::Key(FcitxKey_z, fcitx::KeyState::Ctrl));
+    check_eq(multiple.preedit(), "妳好", "first Ctrl+Z restores latest choice");
+    multiple.press(fcitx::Key(FcitxKey_z, fcitx::KeyState::Ctrl));
+    check_eq(multiple.preedit(), "你好", "second Ctrl+Z restores earlier choice");
+
+    Sim invalidated;
+    invalidated.type("su3");
+    invalidated.key(FcitxKey_Down);
+    const int altIndex = find_visible_candidate(invalidated.cand(), "妳");
+    check(altIndex >= 0, "undo invalidation setup includes 妳");
+    invalidated.b.selectCandidate(altIndex);
+    invalidated.type("cl3");
+    r = invalidated.press(fcitx::Key(FcitxKey_z, fcitx::KeyState::Ctrl));
+    check(!r.handled, "typing after a choice releases Ctrl+Z to the application");
+    check_eq(invalidated.preedit(), "妳好",
+             "released application undo does not alter the active preedit");
 }
 
 void test_symbol_heavy_context_keeps_chinese_first() {
@@ -909,14 +1017,11 @@ void test_candidate_paging() {
     check(!pick.preedit().empty() && pick.preedit() != "你好",
           "cross-page pick rewrites focused cell");
     std::string pickedFirst = utf8_char_at(pick.preedit(), 0);
-    check(pick.b.selectionChar() == 1,
-          "cross-page pick advances candidate window to next cell");
-    pick.key(FcitxKey_Escape);
-    check(pick.b.caretChar() == 1,
-          "cross-page pick Escape preserves next-cell caret");
+    check(!pick.b.isEditing() && pick.b.selectionChar() == -1,
+          "cross-page pick exits correction mode");
     pick.type("1j4");
-    check_eq(pick.preedit(), pickedFirst + bu + "好",
-             "typing after cross-page pick Escape inserts before next cell");
+    check_eq(pick.preedit(), pickedFirst + "好" + bu,
+             "typing after cross-page pick appends at end");
 }
 
 void test_candidate_tab_navigation() {
@@ -1468,6 +1573,56 @@ void test_caret_delete_home_end() {
     check_eq(e.preedit(), "你好" + bu, "End moves insertion to the end");
 }
 
+void test_phrase_cursor_navigation() {
+    Sim chinese;
+    chinese.type("su3cl3");
+    chinese.press(fcitx::Key(FcitxKey_Left, fcitx::KeyState::Ctrl));
+    check(chinese.b.isEditing(), "Ctrl+Left enters caret editing");
+    check(chinese.b.caretChar() == 0,
+          "Ctrl+Left follows libchewing phrase boundary");
+    chinese.press(fcitx::Key(FcitxKey_Right, fcitx::KeyState::Ctrl));
+    check(chinese.b.caretChar() == 2,
+          "Ctrl+Right advances over the recognized Chinese phrase");
+
+    Sim english;
+    english.b.pasteAtCaret("alpha beta");
+    english.press(fcitx::Key(FcitxKey_Left, fcitx::KeyState::Ctrl));
+    check(english.b.caretChar() == 6,
+          "Ctrl+Left moves over one English word");
+    english.press(fcitx::Key(FcitxKey_Left, fcitx::KeyState::Ctrl));
+    check(english.b.caretChar() == 5,
+          "Ctrl+Left treats separating space as its own boundary");
+    english.press(fcitx::Key(FcitxKey_Left, fcitx::KeyState::Ctrl));
+    check(english.b.caretChar() == 0,
+          "Ctrl+Left reaches the previous English word boundary");
+
+    KeyResult shifted = english.press(fcitx::Key(
+        FcitxKey_Right,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(!shifted.handled,
+          "Ctrl+Shift+Arrow remains available for application text selection");
+}
+
+void test_long_chinese_candidate_window_alignment() {
+    Sim s;
+    for (int i = 0; i < 10; ++i) {
+        s.type("su3cl31j4");
+    }
+    const std::string before = s.preedit();
+    check(utf8_count(before) == 30,
+          "long candidate test composes more than chewing's active window");
+    const std::string first = utf8_char_at(before, 0);
+
+    s.key(FcitxKey_Home);
+    s.key(FcitxKey_Down);
+    const auto candidates = s.cand();
+    check(!candidates.empty(), "long preedit opens candidates at the first cell");
+    check(!candidates.empty() && utf8_char_at(candidates.front(), 0) == first,
+          "long preedit candidate window stays aligned with the first cell");
+    check(s.b.selectionChar() == 0,
+          "long preedit selection marker stays on the requested first cell");
+}
+
 void test_direct_navigation_enters_editing() {
     const std::string bu = bu4_default();
 
@@ -1598,12 +1753,53 @@ void test_picking_delete_focused_cell() {
 }
 
 void test_fullwidth_punct() {
-    // Default (half-width): punctuation keys stay literal English.
+    // Default punctuation is literal regardless of surrounding language. Users
+    // request Chinese punctuation explicitly with Ctrl+Shift.
     Sim h;
     h.type("su3");
     h.key('<');
     h.key('?');
-    check_eq(h.preedit(), "你<?", "default keeps half-width punctuation");
+    check_eq(h.preedit(), "你<?", "default keeps punctuation after Chinese literal");
+
+    Sim literalEnglish;
+    literalEnglish.type("API");
+    literalEnglish.key('?');
+    check_eq(literalEnglish.preedit(), "API?",
+             "default keeps punctuation after English half-width");
+
+    Sim explicitChinese;
+    explicitChinese.type("su3");
+    KeyResult explicitComma = explicitChinese.press(fcitx::Key(
+        FcitxKey_less,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    KeyResult explicitQuestion = explicitChinese.press(fcitx::Key(
+        FcitxKey_question,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(explicitComma.handled && explicitQuestion.handled,
+          "Ctrl+Shift punctuation is handled explicitly");
+    check_eq(explicitChinese.preedit(), "你，？",
+             "Ctrl+Shift punctuation produces Chinese forms");
+
+    Sim explicitAfterEnglish;
+    explicitAfterEnglish.type("API");
+    KeyResult explicitEnglishQuestion = explicitAfterEnglish.press(fcitx::Key(
+        FcitxKey_question,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(explicitEnglishQuestion.handled,
+          "Ctrl+Shift punctuation is independent of English context");
+    check_eq(explicitAfterEnglish.preedit(), "API？",
+             "explicit Chinese punctuation also works after English");
+
+    Sim explicitMidstring;
+    explicitMidstring.type("su3cl3");
+    explicitMidstring.key(FcitxKey_Left);
+    KeyResult explicitMiddle = explicitMidstring.press(fcitx::Key(
+        FcitxKey_less,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(explicitMiddle.handled,
+          "Ctrl+Shift punctuation works while caret editing");
+    check_eq(explicitMidstring.preedit(), "你，好",
+             "explicit Chinese punctuation inserts at the caret");
 
     // Full-width mode: non-注音 punctuation keys become Chinese punctuation, while
     // 注音 韻母 keys (',' = ㄝ) still form bopomofo.
@@ -1623,7 +1819,43 @@ void test_fullwidth_punct() {
     quote.key('[');            // 「
     quote.type("su3");
     quote.key(']');            // 」
-    check_eq(quote.preedit(), "「你」", "fullwidth corner quotes");
+    quote.key('\'');           // 、
+    check_eq(quote.preedit(), "「你」、", "fullwidth corner quotes and dunhao");
+
+    Sim ctrlShiftDunhao;
+    ctrlShiftDunhao.type("su3");
+    KeyResult ctrlShiftDunhaoResult = ctrlShiftDunhao.press(fcitx::Key(
+        FcitxKey_quotedbl,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(ctrlShiftDunhaoResult.handled,
+          "Ctrl+Shift+' is handled as Chinese punctuation");
+    check_eq(ctrlShiftDunhao.preedit(), "你、", "Ctrl+Shift+' inserts dunhao");
+
+    Sim normalizedCtrlShiftDunhao;
+    normalizedCtrlShiftDunhao.type("su3");
+    KeyResult normalizedResult = normalizedCtrlShiftDunhao.press(
+        fcitx::Key(FcitxKey_quotedbl, fcitx::KeyState::Ctrl));
+    check(normalizedResult.handled,
+          "normalized Ctrl+Shift+' is handled as Chinese punctuation");
+    check_eq(normalizedCtrlShiftDunhao.preedit(), "你、",
+             "normalized Ctrl+Shift+' inserts dunhao");
+
+    Sim ctrlPassthrough;
+    KeyResult ctrlResult = ctrlPassthrough.press(
+        fcitx::Key(FcitxKey_apostrophe, fcitx::KeyState::Ctrl));
+    check(!ctrlResult.handled, "Ctrl+' remains available to applications");
+
+    Sim altPassthrough;
+    KeyResult altResult = altPassthrough.press(
+        fcitx::Key(FcitxKey_apostrophe, fcitx::KeyState::Alt));
+    check(!altResult.handled, "Alt+' remains available to applications");
+
+    KeyResult altQuestionResult = altPassthrough.press(
+        fcitx::Key(FcitxKey_question,
+                   fcitx::KeyStates{fcitx::KeyState::Alt,
+                                    fcitx::KeyState::Shift}));
+    check(!altQuestionResult.handled,
+          "Alt punctuation remains available to applications");
 
     Sim paired;
     paired.b.setFullWidthPunct(true);
@@ -1655,8 +1887,7 @@ void test_fullwidth_punct() {
     symbols.key('_');
     symbols.key('`');
     symbols.key('"');
-    symbols.key('\'');
-    check_eq(symbols.preedit(), "＠＃＄％＆＊＋＝｜～＿｀＂＇",
+    check_eq(symbols.preedit(), "＠＃＄％＆＊＋＝｜～＿｀＂",
              "fullwidth common ASCII symbols");
 
     Sim e;
@@ -1869,6 +2100,7 @@ int main() {
     test::TempConfigHome configHome("inputer-buffer-test-config");
 
     test_typing();
+    test_ambiguous_tone1_space_falls_back_to_english();
     test_common_mixed_literals();
     test_local_context_prediction_examples();
     test_eten_typing();
@@ -1880,6 +2112,7 @@ int main() {
     test_enter_commit();
     test_forced_english_toggle();
     test_forced_english_persists_across_reset();
+    test_forced_english_caret_editing();
     test_backspace();
     test_phrase_priority();
     test_live_matches_top_candidate();
@@ -1887,6 +2120,7 @@ int main() {
     test_candidate_direct_selection();
     test_pin_earlier_pick();
     test_candidate_ranking_prefers_current_choice();
+    test_candidate_selection_undo();
     test_symbol_heavy_context_keeps_chinese_first();
     test_insert_chinese_midstring();
     test_paste_at_caret();
@@ -1901,6 +2135,8 @@ int main() {
     test_commit_after_pick();
     test_selection_backspace();
     test_caret_delete_home_end();
+    test_phrase_cursor_navigation();
+    test_long_chinese_candidate_window_alignment();
     test_direct_navigation_enters_editing();
     test_escape_behavior();
     test_candidate_control_closes_to_caret();

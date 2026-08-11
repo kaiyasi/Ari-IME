@@ -9,6 +9,7 @@
 
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
+#include <chewing.h>
 
 #include "buffer.h"
 #include "test_common.h"
@@ -73,6 +74,26 @@ bool teachSingleChoice(const std::string &candidate) {
     }
     KeyResult pick = sim.b.selectCandidate(idx);
     if (!pick.handled) {
+        return false;
+    }
+    sim.key(FcitxKey_Return);
+    return !sim.committed.empty();
+}
+
+bool commitDefault(const std::string &keys) {
+    Sim sim;
+    sim.type(keys);
+    sim.key(FcitxKey_Return);
+    return !sim.committed.empty();
+}
+
+bool teachPhraseChoice(const std::string &keys, const std::string &candidate) {
+    Sim sim;
+    sim.type(keys);
+    sim.key(FcitxKey_Home);
+    sim.key(FcitxKey_Down);
+    const int idx = findVisibleCandidate(sim.cand(), candidate);
+    if (idx < 0 || !sim.b.selectCandidate(idx).handled) {
         return false;
     }
     sim.key(FcitxKey_Return);
@@ -148,6 +169,104 @@ void test_learning_can_restart_after_reset() {
     check(fileSize(dict) > 0, "relearned dictionary file is non-empty");
 }
 
+void test_learning_changes_future_conversion() {
+#if defined(CHEWING_VERSION_MAJOR) && defined(CHEWING_VERSION_MINOR) &&           \
+    (CHEWING_VERSION_MAJOR > 0 || CHEWING_VERSION_MINOR >= 9)
+    test::TempConfigHome configHome("inputer-userdata-ranking-test", false);
+    check(inputer::autoLearnEnabled(),
+          "candidate ranking test runs with auto-learning enabled");
+
+    Sim before;
+    before.type("su3");
+    check_eq(before.preedit(), "你", "clean dictionary starts with base conversion");
+
+    check(teachSingleChoice("妳"), "explicit choice commits for learning");
+
+    Sim after;
+    after.type("su3");
+    check_eq(after.preedit(), "妳",
+             "learned homophone becomes the future default conversion");
+#endif
+}
+
+void test_explicit_phrase_outweighs_accepted_defaults() {
+#if defined(CHEWING_VERSION_MAJOR) && defined(CHEWING_VERSION_MINOR) &&           \
+    (CHEWING_VERSION_MAJOR > 0 || CHEWING_VERSION_MINOR >= 9)
+    test::TempConfigHome configHome("inputer-userdata-weight-test", false);
+
+    for (int i = 0; i < 3; ++i) {
+        check(commitDefault("su3cl3"),
+              "unchanged contextual default commits as weak evidence");
+    }
+    check(teachPhraseChoice("su3cl3", "妳好"),
+          "explicit phrase choice commits as strong evidence");
+
+    Sim after;
+    after.type("su3cl3");
+    check_eq(after.preedit(), "妳好",
+             "one explicit phrase choice outweighs three accepted defaults");
+#endif
+}
+
+void test_sensitive_field_does_not_learn() {
+#if defined(CHEWING_VERSION_MAJOR) && defined(CHEWING_VERSION_MINOR) &&           \
+    (CHEWING_VERSION_MAJOR > 0 || CHEWING_VERSION_MINOR >= 9)
+    test::TempConfigHome configHome("inputer-sensitive-learning-test", false);
+
+    {
+        Sim sensitive;
+        sensitive.b.setLearningAllowed(false);
+        sensitive.type("su3");
+        sensitive.key(FcitxKey_Down);
+        const int idx = findVisibleCandidate(sensitive.cand(), "妳");
+        check(idx >= 0, "sensitive learning setup includes 妳");
+        check(sensitive.b.selectCandidate(idx).handled,
+              "sensitive field can still choose a candidate");
+        sensitive.key(FcitxKey_Return);
+    }
+
+    {
+        Sim afterSensitive;
+        afterSensitive.type("su3");
+        check_eq(afterSensitive.preedit(), "你",
+                 "sensitive-field candidate choice is not learned");
+    }
+
+    check(teachSingleChoice("妳"),
+          "ordinary field still learns after sensitive commit");
+    Sim afterOrdinary;
+    afterOrdinary.type("su3");
+    check_eq(afterOrdinary.preedit(), "妳",
+             "ordinary-field learning remains enabled");
+#endif
+}
+
+void test_forget_personal_candidate() {
+#if defined(CHEWING_VERSION_MAJOR) && defined(CHEWING_VERSION_MINOR) &&           \
+    (CHEWING_VERSION_MAJOR > 0 || CHEWING_VERSION_MINOR >= 9)
+    test::TempConfigHome configHome("inputer-forget-learning-test", false);
+    check(teachSingleChoice("妳"), "forget setup learns 妳");
+
+    {
+        Sim learned;
+        learned.type("su3");
+        check_eq(learned.preedit(), "妳", "forget setup promotes learned candidate");
+        learned.key(FcitxKey_Down);
+        KeyResult forgotten = learned.press(fcitx::Key(
+            FcitxKey_Delete,
+            fcitx::KeyStates{fcitx::KeyState::Shift}));
+        check(forgotten.handled, "Shift+Delete handles candidate forgetting");
+        check(forgotten.notification.find("已忘記") == 0,
+              "candidate forgetting reports success");
+    }
+
+    Sim afterForget;
+    afterForget.type("su3");
+    check_eq(afterForget.preedit(), "你",
+             "forgotten personal candidate no longer wins conversion");
+#endif
+}
+
 void test_legacy_dictionary_is_seeded_for_libchewing() {
     test::TempConfigHome configHome("inputer-userdata-migration-test", false);
     std::error_code ec;
@@ -176,6 +295,10 @@ int main() {
     test_test_isolation_disables_learning();
     test_reset_only_clears_user_dictionary();
     test_learning_can_restart_after_reset();
+    test_learning_changes_future_conversion();
+    test_explicit_phrase_outweighs_accepted_defaults();
+    test_sensitive_field_does_not_learn();
+    test_forget_personal_candidate();
     test_legacy_dictionary_is_seeded_for_libchewing();
     return test::finish();
 }

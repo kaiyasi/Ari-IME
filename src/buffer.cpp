@@ -114,6 +114,14 @@ bool hasWordModifier(const fcitx::Key &key) {
         fcitx::KeyState::Ctrl, fcitx::KeyState::Alt, fcitx::KeyState::Super});
 }
 
+bool isShiftedAsciiPunctuation(fcitx::KeySym sym) {
+    if (sym < 33 || sym > 126) {
+        return false;
+    }
+    constexpr std::string_view shifted = R"(~!@#$%^&*()_+{}|:"<>?)";
+    return shifted.find(static_cast<char>(sym)) != std::string_view::npos;
+}
+
 Zhuyin *probeForCurrentLayout(Zhuyin *&probe,
                               inputer::KeyboardLayout &probeLayout) {
     inputer::KeyboardLayout layout = inputer::currentKeyboardLayout();
@@ -150,10 +158,11 @@ bool syllableConvertsTone1(const std::string &canonicalBody) {
 }
 
 // chewing natively maps the shifted / standalone punctuation keys to full-width
-// Chinese punctuation (e.g. '<' -> ，, '>' -> 。, '?' -> ？, '[' -> 「). Return that
-// mapping for key `c`, or empty for letters/digits/unmapped keys (so they keep the
-// literal English path). The 注音 韻母 keys ', . ; / -' never reach here — they form
-// bopomofo (ㄝㄡㄤㄥㄦ) and must not be repurposed.
+// Chinese punctuation (e.g. '<' -> ，, '>' -> 。, '?' -> ？, '[' -> 「,
+// '\'' -> 、). Return that mapping for key `c`, or empty for letters/digits/
+// unmapped keys (so they keep the literal English path). The 注音 韻母 keys
+// ', . ; / -' never reach here — they form bopomofo (ㄝㄡㄤㄥㄦ) and must not be
+// repurposed.
 std::string chinesePunct(char c) {
     if (std::isalnum(static_cast<unsigned char>(c))) {
         return {};
@@ -178,7 +187,6 @@ std::string chinesePunct(char c) {
     case '_': return "＿";
     case '`': return "｀";
     case '"': return "＂";
-    case '\'': return "＇";
     default: break;
     }
     // Intentionally leaked, like the syllable probes above.
@@ -322,6 +330,8 @@ void Buffer::reset() {
     selCands_.clear();
     selPage_ = 0;
     runLoaded_ = false;
+    nextSelectionGroup_ = 1;
+    selectionUndo_.clear();
     zhuyin_.resetAll();
 }
 
@@ -519,15 +529,72 @@ KeyResult Buffer::handleKey(const fcitx::Key &key) {
 }
 
 KeyResult Buffer::handleAuto(const fcitx::Key &key) {
-    if (hasWordModifier(key)) {
-        return {false, false, {}, false};
+    auto sym = normalizeKeySym(key.sym());
+
+    const bool ctrlOnly = key.states().test(fcitx::KeyState::Ctrl) &&
+                          !key.states().testAny(fcitx::KeyStates{
+                              fcitx::KeyState::Shift, fcitx::KeyState::Alt,
+                              fcitx::KeyState::Super});
+    if (sym == FcitxKey_z && ctrlOnly && !selectionUndo_.empty()) {
+        return undoSelection();
     }
 
+    const bool ctrlNavigation =
+        key.states().test(fcitx::KeyState::Ctrl) &&
+        !key.states().testAny(fcitx::KeyStates{
+            fcitx::KeyState::Shift, fcitx::KeyState::Alt,
+            fcitx::KeyState::Super}) &&
+        (sym == FcitxKey_Left || sym == FcitxKey_Right);
+
+    const bool shiftedApostrophe = sym == FcitxKey_apostrophe ||
+                                   sym == FcitxKey_quotedbl;
+    const bool ctrl = key.states().test(fcitx::KeyState::Ctrl);
+    const bool explicitShift = key.states().test(fcitx::KeyState::Shift) ||
+                               isShiftedAsciiPunctuation(sym);
+    const bool ctrlShift = ctrl && explicitShift;
+    const bool explicitChinesePunctuation =
+        !forcedEnglish_ && ctrlShift &&
+        (shiftedApostrophe ||
+         (sym >= 33 && sym <= 126 &&
+          !chinesePunct(static_cast<char>(sym)).empty()));
+
     if (selecting_) {
+        if (explicitChinesePunctuation) {
+            return beginInsert(candOpen_ ? selCursor_ : caretPos_, key);
+        }
+        if (hasWordModifier(key) && !ctrlNavigation) {
+            return {false, false, {}, false};
+        }
         return handleSelecting(key);
     }
 
-    auto sym = normalizeKeySym(key.sym());
+    if (ctrlNavigation) {
+        return enterSelection(key);
+    }
+
+    // Chinese punctuation is an explicit gesture, independent of surrounding
+    // language: Ctrl+Shift plus a punctuation key requests the corresponding
+    // Chinese form. Some frontends encode Shift only in the resulting keysym,
+    // so recognize shifted ASCII symbols even when the Shift state bit is gone.
+    if (!forcedEnglish_ && ctrlShift && shiftedApostrophe) {
+        clearSelectionUndo();
+        freezeAll();
+        cells_.push_back({false, "、", {}});
+        return {true, false, {}, true};
+    }
+    if (!forcedEnglish_ && ctrlShift && sym >= 33 && sym <= 126) {
+        std::string punct = chinesePunct(static_cast<char>(sym));
+        if (!punct.empty()) {
+            clearSelectionUndo();
+            freezeAll();
+            cells_.push_back({false, punct, {}});
+            return {true, false, {}, true};
+        }
+    }
+
+    if (hasWordModifier(key)) {
+        return {false, false, {}, false};
+    }
 
     if (sym == FcitxKey_space) {
         return handleSpace();
@@ -556,7 +623,7 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
          sym == FcitxKey_Right || sym == FcitxKey_Up ||
          sym == FcitxKey_Home || sym == FcitxKey_Begin ||
          sym == FcitxKey_End) &&
-        !forcedEnglish_) {
+        (!forcedEnglish_ || (sym != FcitxKey_Down && sym != FcitxKey_Up))) {
         return enterSelection(key);
     }
 
@@ -575,6 +642,7 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
 // ---------------------------------------------------------------------------
 
 KeyResult Buffer::handleChar(char c, bool literal) {
+    clearSelectionUndo();
     // Forced pure-English mode, or a failed 注音 engine: everything is literal
     // text in the English tail. Degrading on engine failure keeps keystrokes
     // visible instead of being silently swallowed by no-op chewing calls.
@@ -622,17 +690,15 @@ KeyResult Buffer::handleChar(char c, bool literal) {
 
     int s = inputer::zhuyinSlot(c);
 
-    // Non-注音 printable (punctuation, uppercase, ...): break to English.
+    // Non-注音 printable (punctuation, uppercase, ...). Ordinary input remains
+    // literal regardless of context; only the explicit Ctrl+Shift gesture above
+    // or the user-enabled full-width mode converts punctuation.
     if (s < 0) {
-        // Full-width mode: route punctuation keys through chewing's native
-        // Chinese punctuation; everything else (letters) still breaks to English.
-        if (fullWidthPunct_) {
-            std::string punct = chinesePunct(c);
-            if (!punct.empty()) {
-                freezeAll();
-                cells_.push_back({false, punct, {}});
-                return {true, false, {}, true};
-            }
+        std::string punct = chinesePunct(c);
+        if (fullWidthPunct_ && !punct.empty()) {
+            freezeAll();
+            cells_.push_back({false, punct, {}});
+            return {true, false, {}, true};
         }
         return handleLiteralChar(c);
     }
@@ -702,97 +768,11 @@ void Buffer::integrateSyllable(const std::string &body) {
         zhuyin_.feedSequence(body);
         runReadings_ = {body};
     }
-    normalizeRunToTop();
-    applyLocalContextPrediction();
+    // Keep libchewing's contextual conversion. Its phrase scorer combines the
+    // built-in language model with local learned frequencies; forcing candidate
+    // zero here would discard that context before the user even sees it.
     moveAutoCommit();
     token_ = Token::Chinese;
-}
-
-bool Buffer::chooseSingleAt(int charPos, const std::string &text) {
-    zhuyin_.closeCandidates();
-    zhuyin_.handleHome();
-    for (int i = 0; i < charPos; ++i) {
-        zhuyin_.handleRight();
-    }
-    if (!zhuyin_.openCandidates()) {
-        return false;
-    }
-    for (int guard = 0; guard < inputer::kMaxSyllables; ++guard) {
-        if (zhuyin_.candidateCount() <= 0) {
-            zhuyin_.closeCandidates();
-            return false;
-        }
-        if (utf8Count(zhuyin_.candidate(0)) <= 1) {
-            break;
-        }
-        zhuyin_.handleDown();
-    }
-    for (int i = 0; i < zhuyin_.candidateCount(); ++i) {
-        if (zhuyin_.candidate(i) == text) {
-            chooseGlobalCandidate(i);
-            return true;
-        }
-    }
-    zhuyin_.closeCandidates();
-    return false;
-}
-
-void Buffer::applyLocalContextPrediction() {
-    const std::string text = zhuyin_.preedit();
-    const std::string mistaken = "應該是是";
-    if (text.size() < mistaken.size() ||
-        text.compare(text.size() - mistaken.size(), mistaken.size(), mistaken) != 0 ||
-        runReadings_.size() < 4) {
-        return;
-    }
-
-    // The final two glyphs must really be the same ㄕˋ reading. This prevents a
-    // textual match produced by unrelated readings from triggering the rule.
-    const auto &first = runReadings_[runReadings_.size() - 2];
-    const auto &second = runReadings_[runReadings_.size() - 1];
-    if (first != second) {
-        return;
-    }
-
-    const int start = utf8Count(text) - 2;
-    if (chooseSingleAt(start, "試")) {
-        chooseSingleAt(start + 1, "試");
-    }
-    zhuyin_.closeCandidates();
-    zhuyin_.handleEnd();
-}
-
-void Buffer::normalizeRunToTop() {
-    if (!zhuyin_.hasConverted()) {
-        return;
-    }
-    int n = utf8Count(zhuyin_.preedit());
-    int pos = 0;
-    for (int guard = 0; pos < n && guard < 64; ++guard) {
-        zhuyin_.closeCandidates();
-        zhuyin_.handleHome();
-        for (int i = 0; i < pos; ++i) {
-            zhuyin_.handleRight();
-        }
-        if (!zhuyin_.openCandidates() || zhuyin_.candidateCount() <= 0) {
-            zhuyin_.closeCandidates();
-            break;
-        }
-        // candidate(0) is the first item of the longest interval (page 0, index 0).
-        // Only re-pick multi-character phrases: chewing's per-character auto-choice
-        // is contextually better than the single-char candidate[0] (e.g. ㄕˋ
-        // auto-converts to 是, but candidate[0] is 市). Phrases are where the list
-        // order actually wins (你好 over the auto-picked 妳好).
-        int len = utf8Count(zhuyin_.candidate(0));
-        if (len >= 2) {
-            zhuyin_.chooseCandidate(0);
-            pos += len;
-        } else {
-            ++pos; // leave this single character as chewing's auto-conversion
-        }
-    }
-    zhuyin_.closeCandidates();
-    zhuyin_.handleEnd(); // keep appending at the tail for continued live typing
 }
 
 KeyResult Buffer::flipToEnglish(char trailing) {
@@ -948,24 +928,30 @@ int Buffer::candidateScore(const SelCand &cand) const {
 }
 
 void Buffer::rankSelCands() {
-    std::stable_sort(selCands_.begin(), selCands_.end(),
-                     [this](const SelCand &a, const SelCand &b) {
-                         if (a.down < 0 || b.down < 0) {
-                             if (a.down < 0 && b.down < 0) {
-                                 return a.order < b.order;
-                             }
-                             return b.down < 0;
-                         }
-                         int scoreA = candidateScore(a);
-                         int scoreB = candidateScore(b);
-                         if (scoreA != scoreB) {
-                             return scoreA > scoreB;
-                         }
-                         if (a.down != b.down) {
-                             return a.down < b.down;
-                         }
-                         return a.order < b.order;
-                     });
+    // stable_sort may allocate a temporary buffer through libstdc++'s
+    // deprecated temporary-buffer helpers. With Clang's ASan runtime this can
+    // trip alloc-dealloc-mismatch on the candidate path (the allocator pair is
+    // selected by the system libstdc++ headers). `order` is already a unique
+    // insertion-order tie breaker, so an in-place sort preserves the same
+    // ordering without that allocation path.
+    std::sort(selCands_.begin(), selCands_.end(),
+              [this](const SelCand &a, const SelCand &b) {
+                  if (a.down < 0 || b.down < 0) {
+                      if (a.down < 0 && b.down < 0) {
+                          return a.order < b.order;
+                      }
+                      return b.down < 0;
+                  }
+                  int scoreA = candidateScore(a);
+                  int scoreB = candidateScore(b);
+                  if (scoreA != scoreB) {
+                      return scoreA > scoreB;
+                  }
+                  if (a.down != b.down) {
+                      return a.down < b.down;
+                  }
+                  return a.order < b.order;
+              });
 }
 
 bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
@@ -1059,7 +1045,6 @@ bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
         zhuyin_.feedSequence(syllable);
         zhuyin_.handleSpace();
         runReadings_ = {syllable + " "};
-        normalizeRunToTop();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1071,11 +1056,22 @@ bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
 }
 
 KeyResult Buffer::handleSpace() {
+    clearSelectionUndo();
     // A pending bopomofo syllable: space is its 一聲. Convert it if that yields a
     // character (a lone 聲母 like "t" does not — fall through to a literal space).
     if (!forcedEnglish_ && token_ == Token::Chinese && !syl_.empty()) {
         const std::string body = inputer::canonicalKeys(syl_);
+        // A standalone all-letter token in non-canonical slot order is much more
+        // likely to be English (notably the shell command "ls") than an
+        // out-of-order tone-1 syllable. Keep contextual runs eligible so chewing
+        // can still resolve a real Chinese word from the preceding characters.
+        const bool singleKeyHasSyllableBody =
+            syl_.size() == 1 && inputer::hasMedialOrFinal(body);
+        const bool ambiguousStandaloneEnglish =
+            !zhuyin_.hasConverted() && isAsciiWord(syl_) &&
+            ((!singleKeyHasSyllableBody && syl_.size() == 1) || body != syl_);
         if (inputer::isValidSyllable(body, /*allowTone=*/false) &&
+            !ambiguousStandaloneEnglish &&
             syllableConvertsTone1(body)) {
             if (!englishBuf_.empty()) {
                 freezeRun();
@@ -1092,7 +1088,6 @@ KeyResult Buffer::handleSpace() {
             }
             zhuyin_.handleSpace();             // 一聲
             runReadings_.push_back(body + " "); // ' ' marks a 一聲 reading
-            normalizeRunToTop();
             moveAutoCommit();
             syl_.clear();
             token_ = Token::Chinese;
@@ -1119,12 +1114,22 @@ KeyResult Buffer::handleEnter() {
         return {false, false, {}, false}; // nothing pending: let Enter through
     }
     mergeTail();      // gather the live tail + parked tail into cells_ for learning
-    learnFromCells(); // teach chewing the chosen readings -> characters
+    if (learningAllowed_) {
+        learnFromCells(); // teach chewing the chosen readings -> characters
+    }
     reset();
     return {true, true, out, true};
 }
 
 void Buffer::learnFromCells() {
+    struct ExplicitSpan {
+        int start;
+        int end;
+        int runStart;
+        int runEnd;
+    };
+    std::vector<ExplicitSpan> explicitSpans;
+
     int i = 0;
     while (i < static_cast<int>(cells_.size())) {
         if (!cells_[i].chinese) {
@@ -1137,19 +1142,57 @@ void Buffer::learnFromCells() {
         }
         int e = i - 1;
 
-        // Rebuild the run in chewing from its readings, then force every cell to
-        // the user's chosen text so the commit teaches chewing those choices
-        // rather than its own defaults.
-        feedRun(s, e, 0);
-        relockRun(s, e, /*onlyLocked=*/false);
+        // Unchanged output is still useful evidence: one accepted pass gives it
+        // a low positive weight instead of treating "not selected" as wrong.
+        learnRange(s, e, 1);
 
-        zhuyin_.handleEnter(); // chewing's Enter commits AND runs autoLearn
-        zhuyin_.takeCommit();  // ack and discard (output came from cells_)
+        for (int j = s; j <= e;) {
+            if (cells_[j].selectionGroup == 0) {
+                ++j;
+                continue;
+            }
+            const int group = cells_[j].selectionGroup;
+            const int groupStart = j;
+            while (j <= e && cells_[j].selectionGroup == group) {
+                ++j;
+            }
+            explicitSpans.push_back({groupStart, j - 1, s, e});
+        }
+    }
+
+    for (const auto &span : explicitSpans) {
+        // The weak pass above plus these three passes gives a deliberate choice
+        // roughly four times the evidence of an unchanged conversion.
+        learnRange(span.start, span.end, 3);
+
+        // One short context pass teaches where this choice was made without
+        // turning an entire sentence into a high-weight personal phrase.
+        const int contextStart = std::max(span.runStart, span.start - 1);
+        const int contextEnd = std::min(span.runEnd, span.end + 1);
+        if (contextStart != span.start || contextEnd != span.end) {
+            learnRange(contextStart, contextEnd, 1);
+        }
     }
     zhuyin_.resetAll();
 }
 
+void Buffer::learnRange(int start, int end, int passes) {
+    for (int chunkStart = start; chunkStart <= end;
+         chunkStart += inputer::kMaxCompositionChars) {
+        const int chunkEnd =
+            std::min(end, chunkStart + inputer::kMaxCompositionChars - 1);
+        for (int pass = 0; pass < passes; ++pass) {
+            feedRun(chunkStart, chunkEnd, 0);
+            relockRun(chunkStart, chunkEnd, /*onlyLocked=*/false);
+            // Enter commits and updates libchewing's local model.
+            zhuyin_.handleEnter();
+            zhuyin_.takeCommit(); // Output already comes from cells_; discard replay.
+        }
+    }
+}
+
 KeyResult Buffer::handleBackspace() {
+    clearSelectionUndo();
     // Peel back through the live tail, then the run, then the finalized cells.
     if (!syl_.empty()) {
         syl_.pop_back();
@@ -1183,6 +1226,7 @@ KeyResult Buffer::handleBackspace() {
 }
 
 KeyResult Buffer::handleDelete() {
+    clearSelectionUndo();
     // Delete is caret-relative. During normal end-of-string composition there is
     // nothing to the right, but while inserting mid-string the parked tail_ is
     // exactly the text to the right of the caret.
@@ -1211,9 +1255,8 @@ int Buffer::feedRun(int start, int end, int offset) {
             zhuyin_.handleSpace(); // 一聲
         }
     }
-    // Align the run to the top candidates first (same "以選字候選為準" rule as live
-    // typing), then restore the user's explicit picks the fresh feed reverted.
-    normalizeRunToTop();
+    // Preserve libchewing's contextual conversion, then restore explicit picks
+    // that a fresh feed reverted.
     relockRun(start, end, /*onlyLocked=*/true);
     // Park the edit cursor on the character we want candidates for.
     zhuyin_.handleHome();
@@ -1350,6 +1393,15 @@ void Buffer::loadCellCandidates() {
     }
     int s, e;
     chineseRunAround(selCursor_, s, e);
+    if (e - s + 1 > inputer::kMaxCompositionChars) {
+        // Keep the target inside libchewing's active window. Prefer context on
+        // both sides, then slide at the sentence edges.
+        const int runStart = s;
+        const int half = inputer::kMaxCompositionChars / 2;
+        s = std::max(s, selCursor_ - half);
+        e = std::min(e, s + inputer::kMaxCompositionChars - 1);
+        s = std::max(runStart, e - inputer::kMaxCompositionChars + 1);
+    }
     int offset = selCursor_ - s;
     if (!runLoaded_ || s != selRunStart_ || e != selRunEnd_) {
         // A different run (or first time): feed it fresh.
@@ -1405,6 +1457,96 @@ KeyResult Buffer::moveSelCursor(int delta) {
     return {true, false, {}, true};
 }
 
+std::vector<int> Buffer::phraseBoundaries() {
+    const int count = static_cast<int>(cells_.size());
+    std::vector<int> boundaries{0, count};
+    auto add = [&boundaries](int value) { boundaries.push_back(value); };
+
+    for (int i = 0; i < count;) {
+        if (cells_[i].chinese) {
+            const int start = i;
+            while (i < count && cells_[i].chinese) {
+                ++i;
+            }
+            const int end = i;
+            std::vector<bool> covered(end - start, false);
+            for (int chunkStart = start; chunkStart < end;
+                 chunkStart += inputer::kMaxCompositionChars) {
+                const int chunkEnd = std::min(
+                    end, chunkStart + inputer::kMaxCompositionChars);
+                feedRun(chunkStart, chunkEnd - 1, 0);
+                for (const auto &[from, to] : zhuyin_.phraseIntervals()) {
+                    if (from < 0 || to <= from || chunkStart + to > chunkEnd) {
+                        continue;
+                    }
+                    add(chunkStart + from);
+                    add(chunkStart + to);
+                    for (int j = chunkStart - start + from;
+                         j < chunkStart - start + to; ++j) {
+                        covered[j] = true;
+                    }
+                }
+            }
+            for (int j = 0; j < end - start; ++j) {
+                if (!covered[j]) {
+                    add(start + j);
+                    add(start + j + 1);
+                }
+            }
+            continue;
+        }
+
+        const bool asciiWord = cells_[i].text.size() == 1 &&
+                               (std::isalnum(static_cast<unsigned char>(
+                                    cells_[i].text[0])) ||
+                                cells_[i].text[0] == '_');
+        const int start = i++;
+        if (asciiWord) {
+            while (i < count && !cells_[i].chinese &&
+                   cells_[i].text.size() == 1 &&
+                   (std::isalnum(static_cast<unsigned char>(cells_[i].text[0])) ||
+                    cells_[i].text[0] == '_')) {
+                ++i;
+            }
+        }
+        add(start);
+        add(i);
+    }
+
+    std::sort(boundaries.begin(), boundaries.end());
+    boundaries.erase(std::unique(boundaries.begin(), boundaries.end()),
+                     boundaries.end());
+    // A phrase explicitly chosen by the user is always one navigation unit,
+    // even if a later model refresh would segment it differently.
+    boundaries.erase(
+        std::remove_if(boundaries.begin(), boundaries.end(), [this, count](int b) {
+            return b > 0 && b < count && cells_[b - 1].selectionGroup != 0 &&
+                   cells_[b - 1].selectionGroup == cells_[b].selectionGroup;
+        }),
+        boundaries.end());
+    zhuyin_.resetAll();
+    runLoaded_ = false;
+    return boundaries;
+}
+
+KeyResult Buffer::moveCaretByPhrase(int direction) {
+    const auto boundaries = phraseBoundaries();
+    if (direction < 0) {
+        const auto it = std::lower_bound(boundaries.begin(), boundaries.end(),
+                                         caretPos_);
+        if (it != boundaries.begin()) {
+            caretPos_ = *std::prev(it);
+        }
+    } else {
+        const auto it = std::upper_bound(boundaries.begin(), boundaries.end(),
+                                         caretPos_);
+        if (it != boundaries.end()) {
+            caretPos_ = *it;
+        }
+    }
+    return {true, false, {}, true};
+}
+
 KeyResult Buffer::pickCandidate(int pageIndex) {
     int gi = selPage_ * inputer::kCandPerPage + pageIndex;
     if (gi < 0 || gi >= static_cast<int>(selCands_.size())) {
@@ -1413,6 +1555,7 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
         return {true, false, {}, true};
     }
     SelCand sc = selCands_[gi];
+    rememberSelectionUndo();
     if (sc.down < 0) {
         return revertCellToEnglish(); // the "raw keys" entry
     }
@@ -1435,26 +1578,62 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
     // Pin the characters the pick decided (one cell for a single, several for a
     // phrase) so re-opening selection later restores them (see relockRun).
     int picked = utf8Count(sc.text);
+    const int selectionGroup = nextSelectionGroup_++;
     for (int j = selCursor_; j < selCursor_ + picked &&
                             j <= selRunEnd_ && j < static_cast<int>(cells_.size());
          ++j) {
         cells_[j].locked = true;
+        cells_[j].selectionGroup = selectionGroup;
     }
-    // Advance past the characters this pick decided (one cell for a single,
-    // several for a phrase). If a character follows, keep the candidate window
-    // open on it so consecutive characters can be fixed; otherwise drop back to
-    // caret mode with the caret parked right after the picked text.
-    int next = selCursor_ + picked;
-    if (next < static_cast<int>(cells_.size())) {
-        selCursor_ = next;
-        caretPos_ = next;
-        runLoaded_ = false;
-        loadCellCandidates();
-        return {true, false, {}, true};
-    }
-    candOpen_ = false;
-    caretPos_ = static_cast<int>(cells_.size());
+    // A completed pick is the common exit point from correction: return to the
+    // normal append-at-end path so the next printable key continues the sentence.
+    // Users who want to fix another cell can move there and reopen candidates.
+    exitSelection();
     return {true, false, {}, true};
+}
+
+void Buffer::rememberSelectionUndo() {
+    constexpr std::size_t kMaxSelectionUndo = 8;
+    if (selectionUndo_.size() == kMaxSelectionUndo) {
+        selectionUndo_.erase(selectionUndo_.begin());
+    }
+    selectionUndo_.push_back({cells_, nextSelectionGroup_});
+}
+
+void Buffer::clearSelectionUndo() { selectionUndo_.clear(); }
+
+KeyResult Buffer::undoSelection() {
+    SelectionUndo snapshot = std::move(selectionUndo_.back());
+    selectionUndo_.pop_back();
+    exitSelection();
+    cells_ = std::move(snapshot.cells);
+    nextSelectionGroup_ = snapshot.nextSelectionGroup;
+    tail_.clear();
+    runReadings_.clear();
+    englishBuf_.clear();
+    syl_.clear();
+    token_ = Token::Chinese;
+    return {true, false, {}, true, false, "已復原選字"};
+}
+
+KeyResult Buffer::forgetHighlightedCandidate() {
+    const int gi = selPage_ * inputer::kCandPerPage + highlight_;
+    if (gi < 0 || gi >= static_cast<int>(selCands_.size()) ||
+        selCands_[gi].down < 0) {
+        return {true, false, {}, false, false, "這個項目沒有個人學習紀錄"};
+    }
+
+    const std::string phrase = selCands_[gi].text;
+    const int removed = zhuyin_.forgetUserPhrase(phrase);
+    if (removed <= 0) {
+        return {true, false, {}, false, false,
+                removed < 0 ? "無法移除個人學習紀錄"
+                            : "這個候選沒有個人學習紀錄"};
+    }
+
+    runLoaded_ = false;
+    loadCellCandidates();
+    return {true, false, {}, true, false, "已忘記「" + phrase + "」"};
 }
 
 void Buffer::mergeTail() {
@@ -1469,6 +1648,7 @@ void Buffer::pasteAtCaret(const std::string &text) {
     if (text.empty()) {
         return;
     }
+    clearSelectionUndo();
     // Resolve a single insertion index, whatever state we're in: while editing,
     // the caret position; while typing, the live tail folds into cells_ and the
     // insertion point is just before any parked tail_.
@@ -1557,6 +1737,7 @@ KeyResult Buffer::revertCellToEnglish() {
 }
 
 KeyResult Buffer::reinterpretFromCell() {
+    clearSelectionUndo();
     // Accumulate raw keys from the cursor cell forward (English cells contribute
     // their letter; a Chinese cell contributes its reading) until they form a
     // complete, convertible syllable. Look only a few cells ahead.
@@ -1676,6 +1857,18 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
     auto sym = normalizeKeySym(key.sym());
     const int N = static_cast<int>(cells_.size());
 
+    const bool ctrlNavigation =
+        key.states().test(fcitx::KeyState::Ctrl) &&
+        !key.states().testAny(fcitx::KeyStates{
+            fcitx::KeyState::Shift, fcitx::KeyState::Alt,
+            fcitx::KeyState::Super});
+    if (ctrlNavigation && sym == FcitxKey_Left) {
+        return moveCaretByPhrase(-1);
+    }
+    if (ctrlNavigation && sym == FcitxKey_Right) {
+        return moveCaretByPhrase(1);
+    }
+
     // Arrows move the caret between characters.
     if (sym == FcitxKey_Left) {
         if (caretPos_ > 0) {
@@ -1701,10 +1894,14 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
     // one to its RIGHT (at the end, the last character); ↑ additionally
     // reinterprets an English cell as 注音.
     if (sym == FcitxKey_Down || sym == FcitxKey_Up) {
+        if (forcedEnglish_) {
+            return {true, false, {}, false};
+        }
         int cell = caretPos_ < N ? caretPos_ : N - 1;
         return openCandidatesAt(cell, /*reinterpret=*/sym == FcitxKey_Up);
     }
     if (sym == FcitxKey_BackSpace) {
+        clearSelectionUndo();
         // Delete the character left of the caret (ordinary editing).
         if (caretPos_ > 0) {
             cells_.erase(cells_.begin() + caretPos_ - 1);
@@ -1716,6 +1913,7 @@ KeyResult Buffer::handleCaret(const fcitx::Key &key) {
         return {true, false, {}, true};
     }
     if (sym == FcitxKey_Delete) {
+        clearSelectionUndo();
         // Delete the character right of the caret.
         if (caretPos_ < N) {
             cells_.erase(cells_.begin() + caretPos_);
@@ -1767,6 +1965,23 @@ KeyResult Buffer::openCandidatesAt(int cell, bool reinterpret) {
 KeyResult Buffer::handlePicking(const fcitx::Key &key) {
     auto sym = normalizeKeySym(key.sym());
 
+    if (sym == FcitxKey_Delete &&
+        key.states().test(fcitx::KeyState::Shift)) {
+        return forgetHighlightedCandidate();
+    }
+
+    const bool ctrlNavigation =
+        key.states().test(fcitx::KeyState::Ctrl) &&
+        !key.states().testAny(fcitx::KeyStates{
+            fcitx::KeyState::Shift, fcitx::KeyState::Alt,
+            fcitx::KeyState::Super});
+    if (ctrlNavigation &&
+        (sym == FcitxKey_Left || sym == FcitxKey_Right)) {
+        candOpen_ = false;
+        caretPos_ = selCursor_;
+        return moveCaretByPhrase(sym == FcitxKey_Left ? -1 : 1);
+    }
+
     // ←/→ step to the adjacent character's candidates (fix several in a row).
     if (sym == FcitxKey_Left) {
         return moveSelCursor(-1);
@@ -1787,6 +2002,7 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
         return {true, false, {}, true};
     }
     if (sym == FcitxKey_BackSpace || sym == FcitxKey_Delete) {
+        clearSelectionUndo();
         // In picking mode the focused cell is the user's editing target, so
         // remove that cell and leave the caret at its former position.
         if (selCursor_ >= 0 && selCursor_ < static_cast<int>(cells_.size())) {

@@ -57,7 +57,18 @@ sudo pacman -U fcitx5-ari-ime-1.1.0-1-x86_64.pkg.tar.zst
 fcitx5 -r
 ```
 
-Then open `fcitx5-configtool` and add **Ari IME**.
+Then add Ari IME in fcitx5-configtool:
+
+1. Run `fcitx5-configtool` from a terminal or your application launcher.
+2. Go to the **Input Method** tab.
+3. Click **+** (Add Input Method).
+4. Search for **Ari** and select **Ari IME**.
+5. Click **OK** / **Apply**.
+
+> **Note:** Make sure you opened `fcitx5-configtool`, not your desktop
+> environment's system input settings or ibus/hime preferences — those panels
+> will not list Ari IME. If you see input methods such as 新注音 or 新酷音 that
+> you did not add, you are likely in the wrong settings panel.
 
 ### From Source
 

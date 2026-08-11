@@ -60,6 +60,9 @@ available:
 | Open candidates | Type `su3`, press Down | Candidate window opens on `你`; selected char is visually clear |
 | Pick by number | With candidates open, press `2` | Candidate is applied; preedit updates; no premature commit |
 | Pick by click/touch | Open candidates, click a visible candidate | Same result as number-key selection |
+| Continue after pick | Re-pick a character in a long preedit, then type another syllable | Candidate mode closes and new text appends at the end without extra Right/End keys |
+| Undo candidate choice | Pick two candidates, press Ctrl+Z twice | Each press restores one choice; after typing or deleting text, Ctrl+Z returns to the application |
+| Forget personal candidate | Highlight a previously learned candidate, press Shift+Delete | A transient success hint appears; a fresh composition no longer promotes that personal choice, while it remains selectable from the base dictionary |
 | Page candidates | Type `su3`, press Down, PageDown/PageUp | Candidate page changes; aux line shows page count |
 | Raw key revert | Type `su3`, press Down, Shift+Tab or Up to `原始鍵 su3`, press Enter | Preedit becomes `su3` |
 | Stale click resilience | Open candidates, rapidly page then click an old candidate position | Candidate window does not disappear unexpectedly |
@@ -72,6 +75,9 @@ available:
 | Insert in middle | Type `su3cl3`, press Left, type `1j4` | The current default ㄅㄨˋ candidate appears between `你` and `好` |
 | Delete right of caret | Type `su3cl3`, press Left, Delete | Preedit becomes `你` |
 | Close candidates | Type `su3`, Down, Esc, type `1j4` | Candidate window closes; next input inserts at caret |
+| Long preedit position | Compose more than 30 characters, then use Home/Left/Right and open candidates | Auxiliary lines show nearby text plus `游標 n/N` or `選字 n/N` |
+| Phrase navigation | Compose a Chinese phrase and mixed English words, then use Ctrl+Left/Ctrl+Right | Caret jumps by libchewing phrase intervals and English word boundaries; Ctrl+Shift+Arrow remains available to the application |
+| Forced-English editing | Toggle forced English, compose literal text, then use arrows, Backspace and mid-string typing | Literal preedit can be edited normally and Up does not reinterpret it as Zhuyin |
 
 ## Clipboard
 
@@ -99,8 +105,21 @@ available:
 | Full-width punctuation toggle | Toggle full-width punctuation in configtool | Transient `標點 全形` / `標點 半形` hint appears |
 | App shortcut passthrough | Press common app shortcuts such as Ctrl+. in VS Code or browser text fields | The app shortcut still works; Ari IME does not reserve a fixed punctuation toggle shortcut |
 | Status line | Compose any non-empty preedit | Aux line shows 中/英, keyboard layout, punctuation mode |
-| Full-width punctuation | Enable full-width punctuation; type `< > ? ( ) { } ! : \ ^ @ % + =` | Preedit uses Chinese punctuation forms, including `、`, `……`, and full-width symbols |
+| Literal punctuation | With full-width punctuation off, type `su3`, then `< > ?`; start a fresh preedit and type `API?` | Punctuation does not depend on language context: results are `你<>?` and `API?` |
+| Full-width punctuation | Enable full-width punctuation; type `< > ? ( ) { } ! : \ ^ ' @ % + =` | Preedit uses Chinese punctuation forms, including `、`, `……`, and full-width symbols |
+| Explicit Chinese punctuation | With full-width punctuation off, use Ctrl+Shift with comma, period, slash and apostrophe | Preedit adds `，。？、`; Ctrl+' and Alt punctuation remain available to the application |
+| Mid-string Chinese punctuation | Compose `你好`, move the caret between the characters, then press Ctrl+Shift+comma | Preedit becomes `你，好` |
 | Bopomofo punctuation keys | Enable full-width punctuation; type `xu,4` | `,` remains a Bopomofo final key, not `，` |
+
+## Per-user Learning
+
+| Scenario | Steps | Expected |
+|----------|-------|----------|
+| Learn a homophone | With learning enabled and fresh user data, type `su3`, choose `妳`, press Enter, then type `su3` again | `妳` becomes the default conversion on the next composition |
+| Weak versus strong evidence | With fresh data, type and commit `su3cl3` three times unchanged; then choose and commit the phrase `妳好` once; type `su3cl3` again | The one explicit phrase choice outweighs the three accepted defaults and produces `妳好` |
+| Automatic context | With fresh data, type `ji32k7`, then type `ql32k7dj94` in a fresh preedit | The same ㄉㄜ˙ reading follows context: `我的` and `跑得快` |
+| Sensitive field | In a password/sensitive field, choose a non-default candidate and commit; repeat in a normal field | The sensitive choice is not learned; the normal-field choice still is |
+| Commit boundary | Choose a non-default candidate, then reset the input method before pressing Enter | The uncommitted choice is not learned |
 
 ## Visual Checks
 

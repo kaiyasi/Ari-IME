@@ -4,6 +4,7 @@
 #define INPUTER_ZHUYIN_H
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "layout.h"
@@ -78,6 +79,13 @@ public:
     // Candidates on chewing's current page only (≤ candPerPage), so number keys
     // 1-9 line up with what chewing will select.
     std::vector<std::string> pageCandidates() const;
+
+    // Remove every personal-dictionary reading for an exact phrase. Built-in
+    // dictionary entries are unaffected. Returns the number removed, or -1.
+    int forgetUserPhrase(const std::string &phrase);
+    // Phrase segments recognized in the current pre-edit, as [from, to)
+    // character offsets. Used for Ctrl+Arrow navigation.
+    std::vector<std::pair<int, int>> phraseIntervals();
 
     // Current edit-cursor position (in characters) within the converted buffer.
     int cursorPos() const;

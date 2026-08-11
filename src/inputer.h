@@ -30,7 +30,7 @@ FCITX_CONFIGURATION(
         this, "KeyboardLayout", _("Keyboard layout"), inputer::KeyboardLayout::Default};
     fcitx::Option<bool> fullWidthPunctuation{
         this, "FullWidthPunctuation",
-        _("Use full-width Chinese punctuation for punctuation keys (for example < -> ，, > -> 。, ? -> ？, _ -> ＿). Off by default; no global shortcut is reserved."),
+        _("Always use full-width Chinese punctuation without a modifier. Off keeps ordinary punctuation literal; Ctrl+Shift plus a punctuation key produces its Chinese form temporarily."),
         false};
     fcitx::Option<bool> showStatusLine{
         this, "ShowStatusLine",

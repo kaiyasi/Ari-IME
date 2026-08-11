@@ -177,7 +177,7 @@ void applyByte(FuzzState &state, const uint8_t *data, std::size_t size,
         state.press(fcitx::Key(static_cast<fcitx::KeySym>(op)));
         return;
     }
-    switch (op % 8) {
+    switch (op % 10) {
     case 0:
     case 1:
     case 2:
@@ -204,6 +204,25 @@ void applyByte(FuzzState &state, const uint8_t *data, std::size_t size,
             state.buffer.selectCandidate(op % inputer::kCandPerPage);
         } else {
             state.buffer.pasteAtCaret(pastePayload(data, size, offset));
+        }
+        break;
+    case 8: {
+        static constexpr fcitx::KeySym ctrlKeys[] = {
+            FcitxKey_Left, FcitxKey_Right, FcitxKey_z};
+        state.press(fcitx::Key(ctrlKeys[op % 3], fcitx::KeyState::Ctrl));
+        break;
+    }
+    case 9:
+        if (op & 0x40) {
+            state.press(fcitx::Key(FcitxKey_Delete, fcitx::KeyState::Shift));
+        } else {
+            static constexpr fcitx::KeySym punctKeys[] = {
+                FcitxKey_less, FcitxKey_greater, FcitxKey_question,
+                FcitxKey_parenleft, FcitxKey_braceleft, FcitxKey_quotedbl};
+            state.press(fcitx::Key(
+                punctKeys[op % 6],
+                fcitx::KeyStates{fcitx::KeyState::Ctrl,
+                                 fcitx::KeyState::Shift}));
         }
         break;
     }
