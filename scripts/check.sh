@@ -91,10 +91,31 @@ check_srcinfo() {
     if ! command -v makepkg >/dev/null 2>&1; then
         return
     fi
+
+    print_srcinfo() {
+        # makepkg deliberately refuses to run as root, and the Arch container
+        # used by GitHub Actions runs steps as root.  SRCINFO generation only
+        # needs to parse the PKGBUILD, so run that read-only operation as the
+        # unprivileged nobody user when necessary.
+        if [[ "$(id -u)" -eq 0 ]]; then
+            if command -v runuser >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
+                runuser -u nobody -- env HOME=/tmp makepkg --printsrcinfo
+                return
+            fi
+            if command -v su >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
+                su nobody -s /bin/sh -c 'HOME=/tmp makepkg --printsrcinfo'
+                return
+            fi
+            printf 'Cannot run makepkg as root: no unprivileged user runner is available\n' >&2
+            return 1
+        fi
+        makepkg --printsrcinfo
+    }
+
     if [[ -f .SRCINFO ]]; then
         local srcinfo_tmp
         srcinfo_tmp="$(mktemp /tmp/inputer-srcinfo-XXXXXX)"
-        makepkg --printsrcinfo >"$srcinfo_tmp"
+        print_srcinfo >"$srcinfo_tmp"
         set +e
         run diff -u .SRCINFO "$srcinfo_tmp"
         local status=$?

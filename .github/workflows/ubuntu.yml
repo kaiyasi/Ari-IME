@@ -25,7 +25,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             cmake extra-cmake-modules g++ pkg-config \
             fcitx5 libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
-            fcitx5-modules libchewing3-dev hicolor-icon-theme
+            fcitx5-modules-dev libchewing3-dev hicolor-icon-theme
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -59,7 +59,7 @@ jobs:
             devscripts debhelper dpkg-dev \
             cmake extra-cmake-modules g++ pkg-config \
             libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
-            fcitx5-modules libchewing3-dev hicolor-icon-theme
+            fcitx5-modules-dev libchewing3-dev hicolor-icon-theme
 
       - name: Check out repository
         uses: actions/checkout@v4
