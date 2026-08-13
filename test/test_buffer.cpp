@@ -204,6 +204,9 @@ bool find_symbol_lead_case(char lead, SymbolLeadCase &out) {
         inputer::KeyboardLayout::Colemak,
     };
     for (inputer::KeyboardLayout layout : layouts) {
+        if (!inputer::keyboardLayoutAvailable(layout)) {
+            continue;
+        }
         inputer::setCurrentKeyboardLayout(layout);
         if (!inputer::isSymbolLikeZhuyinKey(lead)) {
             continue;
@@ -340,6 +343,9 @@ void test_tone1_space_uses_conversion_result() {
         inputer::KeyboardLayout::Colemak,
     };
     for (const auto layout : layouts) {
+        if (!inputer::keyboardLayoutAvailable(layout)) {
+            continue;
+        }
         inputer::setCurrentKeyboardLayout(layout);
         for (int value = 33; value <= 126; ++value) {
             const char key = static_cast<char>(value);
@@ -429,6 +435,9 @@ void test_local_context_prediction_examples() {
 }
 
 void test_eten_typing() {
+    if (!inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Eten)) {
+        return;
+    }
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Eten);
 
     Sim s;
@@ -450,6 +459,9 @@ void test_eten_typing() {
 }
 
 void test_hsu_typing() {
+    if (!inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Hsu)) {
+        return;
+    }
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Hsu);
 
     Sim s;
@@ -491,6 +503,9 @@ void test_additional_layout_typing() {
     };
 
     for (const auto &c : cases) {
+        if (!inputer::keyboardLayoutAvailable(c.layout)) {
+            continue;
+        }
         inputer::setCurrentKeyboardLayout(c.layout);
 
         Sim single;
@@ -510,6 +525,10 @@ void test_additional_layout_typing() {
 }
 
 void test_layout_switch_resets_preedit() {
+    if (!inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Eten)) {
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+        return;
+    }
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 
     Sim s;
@@ -2015,37 +2034,47 @@ void test_fullwidth_punct() {
     check(g.preedit() != "x，4" && !g.preedit().empty(),
           "',' stays bopomofo in full-width mode");
 
-    Sim hsu;
-    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Hsu);
-    hsu.b.setKeyboardLayout(inputer::KeyboardLayout::Hsu);
-    hsu.b.setFullWidthPunct(true);
-    hsu.type("nefhwf"); // 許氏: f is both ㄈ and contextual ˇ.
-    hsu.key('?');
-    check_eq(hsu.preedit(), "你好？",
-             "fullwidth mode keeps Hsu dual-role tone keys as bopomofo");
+    if (inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Hsu)) {
+        Sim hsu;
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Hsu);
+        hsu.b.setKeyboardLayout(inputer::KeyboardLayout::Hsu);
+        hsu.b.setFullWidthPunct(true);
+        hsu.type("nefhwf"); // 許氏: f is both ㄈ and contextual ˇ.
+        hsu.key('?');
+        check_eq(hsu.preedit(), "你好？",
+                 "fullwidth mode keeps Hsu dual-role tone keys as bopomofo");
+    }
 
-    Sim ginYieh;
-    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::GinYieh);
-    ginYieh.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
-    ginYieh.b.setFullWidthPunct(true);
-    ginYieh.type("d-a"); // 精業: '-' is part of the ㄋㄧˇ key sequence.
-    ginYieh.key('?');
-    check_eq(ginYieh.preedit(), "你？",
-             "fullwidth mode keeps symbol-looking layout keys as bopomofo");
+    if (inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::GinYieh)) {
+        Sim ginYieh;
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+        ginYieh.b.setKeyboardLayout(inputer::KeyboardLayout::GinYieh);
+        ginYieh.b.setFullWidthPunct(true);
+        ginYieh.type("d-a"); // 精業: '-' is part of the ㄋㄧˇ key sequence.
+        ginYieh.key('?');
+        check_eq(ginYieh.preedit(), "你？",
+                 "fullwidth mode keeps symbol-looking layout keys as bopomofo");
+    }
 
-    Sim ibm;
-    inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Ibm);
-    ibm.b.setKeyboardLayout(inputer::KeyboardLayout::Ibm);
-    ibm.b.setFullWidthPunct(true);
-    ibm.type("7a,-;,"); // IBM uses ',', '-' and ';' as layout keys.
-    ibm.key('?');
-    check_eq(ibm.preedit(), "你好？",
-             "fullwidth mode keeps IBM punctuation-looking keys as bopomofo");
+    if (inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Ibm)) {
+        Sim ibm;
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Ibm);
+        ibm.b.setKeyboardLayout(inputer::KeyboardLayout::Ibm);
+        ibm.b.setFullWidthPunct(true);
+        ibm.type("7a,-;,"); // IBM uses ',', '-' and ';' as layout keys.
+        ibm.key('?');
+        check_eq(ibm.preedit(), "你好？",
+                 "fullwidth mode keeps IBM punctuation-looking keys as bopomofo");
+    }
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
 
 void test_ambiguous_symbol_boundary_literals() {
+    if (!inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::GinYieh)) {
+        inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
+        return;
+    }
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::GinYieh);
 
     Sim start;

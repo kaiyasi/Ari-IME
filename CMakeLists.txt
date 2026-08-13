@@ -22,9 +22,25 @@ find_package(Fcitx5Config REQUIRED)
 find_package(Fcitx5Utils REQUIRED)
 find_package(Fcitx5ModuleClipboard REQUIRED) # clipboard_public.h for Ctrl+V paste
 
+# showCustomInputMethodInformation() was added in Fcitx5 5.1.11. Keep the
+# addon buildable with the older Fcitx5 shipped by Ubuntu 24.04; the fallback
+# uses the standard information popup and preserves the input behavior.
+set(INPUTER_HAVE_CUSTOM_INPUT_METHOD_INFORMATION OFF)
+if(DEFINED Fcitx5Core_VERSION AND
+   NOT Fcitx5Core_VERSION VERSION_LESS "5.1.11")
+    set(INPUTER_HAVE_CUSTOM_INPUT_METHOD_INFORMATION ON)
+endif()
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(Chewing REQUIRED IMPORTED_TARGET chewing)
 message(STATUS "Using chewing ${Chewing_VERSION}")
+
+# libchewing 0.6 (the version shipped by Ubuntu 24.04) predates the explicit
+# output acknowledgement API.  Its compatibility wrapper needs a harmless
+# ignored event after the commit buffer has been consumed instead.
+if(Chewing_VERSION VERSION_LESS "0.9.0")
+    add_compile_definitions(INPUTER_LIBCHEWING_LEGACY_OUTPUT)
+endif()
 
 include(GNUInstallDirs)
 
@@ -116,6 +132,11 @@ target_link_libraries(inputer
         Fcitx5::Module::Clipboard
         PkgConfig::Chewing
 )
+if(INPUTER_HAVE_CUSTOM_INPUT_METHOD_INFORMATION)
+    target_compile_definitions(inputer
+        PRIVATE INPUTER_HAVE_CUSTOM_INPUT_METHOD_INFORMATION
+    )
+endif()
 inputer_enable_warnings(inputer)
 inputer_enable_sanitizers(inputer)
 

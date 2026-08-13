@@ -116,6 +116,11 @@ Zhuyin::~Zhuyin() {
 void Zhuyin::resetAll() {
     if (ctx_) {
         chewing_Reset(ctx_);
+#ifdef INPUTER_LIBCHEWING_LEGACY_OUTPUT
+        // libchewing 0.6 resets the editor state but leaves its compatibility
+        // display buffer populated until Esc is handled explicitly.
+        chewing_handle_Esc(ctx_);
+#endif
     }
 }
 
@@ -396,6 +401,12 @@ std::string Zhuyin::takeCommit() {
             out = s;
         }
     }
+#ifdef INPUTER_LIBCHEWING_LEGACY_OUTPUT
+    // libchewing 0.6 has no chewing_ack(). Processing an ignored key performs
+    // the same output-buffer rollover without changing the composition.
+    chewing_handle_Default(ctx_, 0);
+#else
     chewing_ack(ctx_);
+#endif
     return out;
 }

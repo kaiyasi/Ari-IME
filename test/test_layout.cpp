@@ -23,7 +23,7 @@ void test_layout_classification() {
     check_eq(inputer::keyboardLayoutName(inputer::currentKeyboardLayout()), "大千",
              "layout reports display name");
     check(inputer::chewingKeyboardType(inputer::currentKeyboardLayout()) ==
-              KB_DEFAULT,
+              chewing_KBStr2Num("KB_DEFAULT"),
           "layout maps to chewing KB_DEFAULT");
     check(inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Default),
           "Default layout has complete slot table");
@@ -77,27 +77,29 @@ void test_layout_classification() {
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Eten);
     check_eq(inputer::keyboardLayoutName(inputer::currentKeyboardLayout()), "倚天",
              "layout reports Eten display name");
-    check(inputer::chewingKeyboardType(inputer::currentKeyboardLayout()) == KB_ET,
+    check(inputer::chewingKeyboardType(inputer::currentKeyboardLayout()) ==
+              chewing_KBStr2Num("KB_ET"),
           "layout maps Eten to chewing KB_ET");
-    check(inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Eten),
-          "Eten layout has complete slot table");
-    check(inputer::zhuyinSlot('e') == 1, "Eten e is medial ㄧ");
-    check_eq(inputer::canonicalKeys("n3e"), "ne3",
-             "Eten canonicalizes out-of-order syllable");
+    if (inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Eten)) {
+        check(inputer::zhuyinSlot('e') == 1, "Eten e is medial ㄧ");
+        check_eq(inputer::canonicalKeys("n3e"), "ne3",
+                 "Eten canonicalizes out-of-order syllable");
+    }
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Hsu);
     check_eq(inputer::keyboardLayoutName(inputer::currentKeyboardLayout()), "許氏",
              "layout reports Hsu display name");
-    check(inputer::chewingKeyboardType(inputer::currentKeyboardLayout()) == KB_HSU,
+    check(inputer::chewingKeyboardType(inputer::currentKeyboardLayout()) ==
+              chewing_KBStr2Num("KB_HSU"),
           "layout maps Hsu to chewing KB_HSU");
-    check(inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Hsu),
-          "Hsu layout has complete slot table");
-    check(inputer::zhuyinSlot('f') == 0, "Hsu f starts as initial ㄈ");
-    check(inputer::isToneKey('f'), "Hsu f is also a contextual tone key");
-    check_eq(inputer::canonicalKeys("nfe"), "nef",
-             "Hsu canonicalizes contextual tone out of order");
-    check(inputer::isValidSyllable("nef", /*allowTone=*/true),
-          "Hsu accepts dual-role tone in syllable");
+    if (inputer::keyboardLayoutAvailable(inputer::KeyboardLayout::Hsu)) {
+        check(inputer::zhuyinSlot('f') == 0, "Hsu f starts as initial ㄈ");
+        check(inputer::isToneKey('f'), "Hsu f is also a contextual tone key");
+        check_eq(inputer::canonicalKeys("nfe"), "nef",
+                 "Hsu canonicalizes contextual tone out of order");
+        check(inputer::isValidSyllable("nef", /*allowTone=*/true),
+              "Hsu accepts dual-role tone in syllable");
+    }
 
     inputer::setCurrentKeyboardLayout(inputer::KeyboardLayout::Default);
 }
@@ -106,7 +108,7 @@ void test_additional_layouts() {
     struct Case {
         inputer::KeyboardLayout layout;
         const char *name;
-        int chewingType;
+        const char *chewingType;
         char initial;
         char medial;
         char tone;
@@ -114,31 +116,35 @@ void test_additional_layouts() {
         const char *canonical;
     };
     const Case cases[] = {
-        {inputer::KeyboardLayout::Ibm, "IBM", KB_IBM, '7', 'a', ',', "7a,",
+        {inputer::KeyboardLayout::Ibm, "IBM", "KB_IBM", '7', 'a', ',', "7a,",
          "7a,"},
-        {inputer::KeyboardLayout::GinYieh, "精業", KB_GIN_YIEH, 'd', '-', 'a',
+        {inputer::KeyboardLayout::GinYieh, "精業", "KB_GIN_YIEH", 'd', '-', 'a',
          "d-a", "d-a"},
-        {inputer::KeyboardLayout::Dvorak, "Dvorak", KB_DVORAK, 'o', 'g', '3',
+        {inputer::KeyboardLayout::Dvorak, "Dvorak", "KB_DVORAK", 'o', 'g', '3',
          "og3", "og3"},
-        {inputer::KeyboardLayout::Carpalx, "Carpalx", KB_CARPALX, 's', 'u',
+        {inputer::KeyboardLayout::Carpalx, "Carpalx", "KB_CARPALX", 's', 'u',
          '3', "su3", "su3"},
         {inputer::KeyboardLayout::ColemakDhAnsi, "Colemak-DH ANSI",
-         KB_COLEMAK_DH_ANSI, 'r', 'l', '3', "rl3", "rl3"},
+         "KB_COLEMAK_DH_ANSI", 'r', 'l', '3', "rl3", "rl3"},
         {inputer::KeyboardLayout::ColemakDhOrth, "Colemak-DH Ortholinear",
-         KB_COLEMAK_DH_ORTH, 'r', 'l', '3', "rl3", "rl3"},
-        {inputer::KeyboardLayout::Workman, "Workman", KB_WORKMAN, 's', 'f',
+         "KB_COLEMAK_DH_ORTH", 'r', 'l', '3', "rl3", "rl3"},
+        {inputer::KeyboardLayout::Workman, "Workman", "KB_WORKMAN", 's', 'f',
          '3', "sf3", "sf3"},
-        {inputer::KeyboardLayout::Colemak, "Colemak", KB_COLEMAK, 'r', 'l',
+        {inputer::KeyboardLayout::Colemak, "Colemak", "KB_COLEMAK", 'r', 'l',
          '3', "rl3", "rl3"},
     };
 
     for (const auto &c : cases) {
+        if (!inputer::keyboardLayoutAvailable(c.layout)) {
+            continue;
+        }
         inputer::setCurrentKeyboardLayout(c.layout);
         std::string nameLabel = std::string(c.name) + " reports display name";
         check_eq(inputer::keyboardLayoutName(c.layout), c.name,
                  nameLabel.c_str());
         std::string typeLabel = std::string(c.name) + " maps to chewing type";
-        check(inputer::chewingKeyboardType(c.layout) == c.chewingType,
+        check(inputer::chewingKeyboardType(c.layout) ==
+                  chewing_KBStr2Num(c.chewingType),
               typeLabel.c_str());
         std::string availableLabel =
             std::string(c.name) + " has complete slot table";

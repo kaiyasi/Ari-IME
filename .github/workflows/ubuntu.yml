@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake extra-cmake-modules g++ pkg-config \
+            make cmake extra-cmake-modules g++ pkg-config \
             fcitx5 libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
             fcitx5-modules-dev libchewing3-dev hicolor-icon-theme
 
@@ -56,8 +56,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            devscripts debhelper dpkg-dev \
-            cmake extra-cmake-modules g++ pkg-config \
+            devscripts debhelper dpkg-dev build-essential \
+            make cmake extra-cmake-modules g++ pkg-config \
             libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
             fcitx5-modules-dev libchewing3-dev hicolor-icon-theme
 

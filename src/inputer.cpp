@@ -128,6 +128,16 @@ std::string joinAuxParts(const std::vector<std::string> &parts) {
     return out;
 }
 
+void showInputerInformation(fcitx::Instance *instance, fcitx::InputContext *ic,
+                            const std::string &message) {
+#ifdef INPUTER_HAVE_CUSTOM_INPUT_METHOD_INFORMATION
+    instance->showCustomInputMethodInformation(ic, message);
+#else
+    (void)message;
+    instance->showInputMethodInformation(ic);
+#endif
+}
+
 // Build the pre-edit text. The whole string is underlined to signal it is
 // uncommitted. When a character is being selected (selChar >= 0) the caret is
 // parked on it. We deliberately avoid per-segment highlight here: many clients
@@ -294,11 +304,12 @@ void InputerEngine::applyResult(fcitx::InputContext *ic, Buffer &buffer,
         ic->commitString(result.commitText);
     }
     if (result.notifyMode) {
-        instance_->showCustomInputMethodInformation(
+        showInputerInformation(
+            instance_,
             ic, buffer.isForcedEnglish() ? "英 English" : "中 中文");
     }
     if (!result.notification.empty()) {
-        instance_->showCustomInputMethodInformation(ic, result.notification);
+        showInputerInformation(instance_, ic, result.notification);
     }
     if (result.updateUI) {
         updateUI(ic, buffer);
@@ -320,7 +331,8 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
     // the buffer's plain-English degrade path, so we do not swallow the event.
     if (!state->buffer.engineReady() && !state->engineErrorNotified) {
         state->engineErrorNotified = true;
-        instance_->showCustomInputMethodInformation(
+        showInputerInformation(
+            instance_,
             ic, "注音引擎載入失敗，暫以英文輸入");
     }
 
@@ -336,11 +348,12 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
         if (layout != *config_.keyboardLayout) {
             message += " (設定不可用，已退回)";
         }
-        instance_->showCustomInputMethodInformation(ic, message);
+        showInputerInformation(instance_, ic, message);
         updateUI(ic, state->buffer);
     }
     if (punctChanged) {
-        instance_->showCustomInputMethodInformation(
+        showInputerInformation(
+            instance_,
             ic, state->buffer.isFullWidthPunct() ? "標點 全形" : "標點 半形");
         updateUI(ic, state->buffer);
     }
@@ -355,8 +368,8 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
         config_.fullWidthPunctuation.setValue(on);
         fcitx::safeSaveAsIni(config_, "conf/inputer.conf");
         state->buffer.setFullWidthPunct(on);
-        instance_->showCustomInputMethodInformation(ic,
-                                                    on ? "標點 全形" : "標點 半形");
+        showInputerInformation(instance_, ic,
+                               on ? "標點 全形" : "標點 半形");
         updateUI(ic, state->buffer);
         keyEvent.filterAndAccept();
         return;

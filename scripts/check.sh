@@ -96,15 +96,37 @@ check_srcinfo() {
         # makepkg deliberately refuses to run as root, and the Arch container
         # used by GitHub Actions runs steps as root.  SRCINFO generation only
         # needs to parse the PKGBUILD, so run that read-only operation as the
-        # unprivileged nobody user when necessary.
+        # unprivileged nobody user when necessary.  The checkout itself is
+        # usually root-owned in a container, so makepkg must run from a small
+        # writable temporary copy rather than the checkout directory.
         if [[ "$(id -u)" -eq 0 ]]; then
             if command -v runuser >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
-                runuser -u nobody -- env HOME=/tmp makepkg --printsrcinfo
-                return
+                local srcinfo_dir status
+                srcinfo_dir="$(mktemp -d /tmp/inputer-srcinfo-work-XXXXXX)"
+                cp PKGBUILD "$srcinfo_dir/PKGBUILD"
+                chown nobody:nobody "$srcinfo_dir" "$srcinfo_dir/PKGBUILD"
+                if (cd "$srcinfo_dir" &&
+                    runuser -u nobody -- env HOME=/tmp makepkg --printsrcinfo); then
+                    status=0
+                else
+                    status=$?
+                fi
+                rm -rf "$srcinfo_dir"
+                return "$status"
             fi
             if command -v su >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
-                su nobody -s /bin/sh -c 'HOME=/tmp makepkg --printsrcinfo'
-                return
+                local srcinfo_dir status
+                srcinfo_dir="$(mktemp -d /tmp/inputer-srcinfo-work-XXXXXX)"
+                cp PKGBUILD "$srcinfo_dir/PKGBUILD"
+                chown nobody:nobody "$srcinfo_dir" "$srcinfo_dir/PKGBUILD"
+                if (cd "$srcinfo_dir" &&
+                    su nobody -s /bin/sh -c 'HOME=/tmp makepkg --printsrcinfo'); then
+                    status=0
+                else
+                    status=$?
+                fi
+                rm -rf "$srcinfo_dir"
+                return "$status"
             fi
             printf 'Cannot run makepkg as root: no unprivileged user runner is available\n' >&2
             return 1
@@ -125,7 +147,7 @@ check_srcinfo() {
             exit "$status"
         fi
     else
-        run makepkg --printsrcinfo
+        run print_srcinfo
     fi
 }
 

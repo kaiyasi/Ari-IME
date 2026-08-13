@@ -272,26 +272,44 @@ const char *keyboardLayoutName(KeyboardLayout layout) {
     return "Unknown";
 }
 
-int chewingKeyboardType(KeyboardLayout layout) {
+const char *chewingKeyboardTypeName(KeyboardLayout layout) {
     switch (layout) {
-    case KeyboardLayout::Default: return KB_DEFAULT;
-    case KeyboardLayout::Eten: return KB_ET;
-    case KeyboardLayout::Hsu: return KB_HSU;
-    case KeyboardLayout::Ibm: return KB_IBM;
-    case KeyboardLayout::GinYieh: return KB_GIN_YIEH;
-    case KeyboardLayout::Dvorak: return KB_DVORAK;
-    case KeyboardLayout::Carpalx: return KB_CARPALX;
-    case KeyboardLayout::ColemakDhAnsi: return KB_COLEMAK_DH_ANSI;
-    case KeyboardLayout::ColemakDhOrth: return KB_COLEMAK_DH_ORTH;
-    case KeyboardLayout::Workman: return KB_WORKMAN;
-    case KeyboardLayout::Colemak: return KB_COLEMAK;
+    case KeyboardLayout::Default: return "KB_DEFAULT";
+    case KeyboardLayout::Eten: return "KB_ET";
+    case KeyboardLayout::Hsu: return "KB_HSU";
+    case KeyboardLayout::Ibm: return "KB_IBM";
+    case KeyboardLayout::GinYieh: return "KB_GIN_YIEH";
+    case KeyboardLayout::Dvorak: return "KB_DVORAK";
+    case KeyboardLayout::Carpalx: return "KB_CARPALX";
+    case KeyboardLayout::ColemakDhAnsi: return "KB_COLEMAK_DH_ANSI";
+    case KeyboardLayout::ColemakDhOrth: return "KB_COLEMAK_DH_ORTH";
+    case KeyboardLayout::Workman: return "KB_WORKMAN";
+    case KeyboardLayout::Colemak: return "KB_COLEMAK";
     }
-    return KB_DEFAULT;
+    return "KB_DEFAULT";
+}
+
+int chewingKeyboardType(KeyboardLayout layout) {
+    // chewing_KBStr2Num is available in old libchewing releases as well as
+    // current ones, while the KB_* enum constants are not exposed by the
+    // older headers shipped by Ubuntu 24.04.
+    return chewing_KBStr2Num(chewingKeyboardTypeName(layout));
 }
 
 bool keyboardLayoutAvailable(KeyboardLayout layout) {
-    return hasBaseSlot(layout, 0) && hasBaseSlot(layout, 1) &&
-           hasBaseSlot(layout, 2) && hasToneSlot(layout);
+    if (!hasBaseSlot(layout, 0) || !hasBaseSlot(layout, 1) ||
+        !hasBaseSlot(layout, 2) || !hasToneSlot(layout)) {
+        return false;
+    }
+    if (layout == KeyboardLayout::Default) {
+        return true;
+    }
+    // Some older libchewing builds accept the numeric layout identifier but
+    // still route the legacy key API through KB_DEFAULT. Do not advertise a
+    // layout whose probed key map is indistinguishable from the default map;
+    // the engine will fall back to a working layout instead of silently
+    // producing the wrong characters.
+    return slotsFor(layout) != slotsFor(KeyboardLayout::Default);
 }
 
 int zhuyinSlot(char c) {
