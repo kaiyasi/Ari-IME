@@ -1104,14 +1104,7 @@ KeyResult Buffer::handleSpace() {
     // character (a lone 聲母 like "t" does not — fall through to a literal space).
     if (!forcedEnglish_ && token_ == Token::Chinese && !syl_.empty()) {
         const std::string body = inputer::canonicalKeys(syl_);
-        // Preserve likely out-of-order English words such as "ls". Single keys
-        // have no whitelist: the isolated chewing probe below decides solely
-        // from whether Space produces a real Han character.
-        const bool ambiguousMultiLetterEnglish =
-            syl_.size() > 1 && !zhuyin_.hasConverted() && isAsciiWord(syl_) &&
-            body != syl_;
         if (inputer::isValidSyllable(body, /*allowTone=*/false) &&
-            !ambiguousMultiLetterEnglish &&
             syllableConvertsTone1(body)) {
             if (!englishBuf_.empty()) {
                 freezeRun();

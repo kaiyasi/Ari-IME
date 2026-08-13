@@ -159,16 +159,20 @@ bool contains_han_character(const std::string &text) {
     return false;
 }
 
-std::string direct_tone1_conversion(inputer::KeyboardLayout layout, char key) {
+std::string direct_tone1_conversion(inputer::KeyboardLayout layout,
+                                    const std::string &keys) {
     Zhuyin direct;
     if (!direct.ok()) {
         return {};
     }
     direct.setKeyboardLayout(layout);
-    if (key >= 'A' && key <= 'Z') {
-        key = static_cast<char>(key + ('a' - 'A'));
+    std::string folded = keys;
+    for (char &key : folded) {
+        if (key >= 'A' && key <= 'Z') {
+            key = static_cast<char>(key + ('a' - 'A'));
+        }
     }
-    direct.feedSequence(std::string(1, key));
+    direct.feedSequence(folded);
     direct.handleSpace();
     const std::string out = direct.preedit();
     return contains_han_character(out) ? out : std::string{};
@@ -308,11 +312,20 @@ void test_tone1_space_uses_conversion_result() {
                  "single English letter stays literal on space");
     }
 
-    Sim command;
-    command.type("ls");
-    command.key(FcitxKey_space);
-    check_eq(command.preedit(), "ls ",
-             "out-of-order standalone ls stays English on space");
+    // Space must use the same result-based decision for out-of-order bodies as
+    // it does for a single key. A broad ASCII-word guard would incorrectly
+    // turn valid combinations such as these into literal English + Space.
+    for (const std::string &keys : {std::string("ls"), std::string("ia"),
+                                    std::string("jco")}) {
+        Sim outOfOrder;
+        outOfOrder.type(keys);
+        outOfOrder.key(FcitxKey_space);
+        const std::string expected =
+            direct_tone1_conversion(inputer::KeyboardLayout::Default, keys);
+        check(!expected.empty(), "out-of-order tone-one probe yields Han output");
+        check_eq(outOfOrder.preedit(), expected.empty() ? keys + " " : expected,
+                 ("out-of-order tone-one converts " + keys).c_str());
+    }
 
     Sim canonical;
     canonical.type("sl"); // standard layout: ㄋㄠ in canonical slot order
@@ -352,7 +365,8 @@ void test_tone1_space_uses_conversion_result() {
             if (inputer::zhuyinSlot(key) < 0 || inputer::isToneKey(key)) {
                 continue;
             }
-            const std::string expected = direct_tone1_conversion(layout, key);
+            const std::string expected =
+                direct_tone1_conversion(layout, std::string(1, key));
             Sim actual;
             actual.b.setKeyboardLayout(layout);
             actual.key(key);

@@ -49,7 +49,7 @@ available:
 |----------|-------|----------|
 | Mixed Chinese/English | Type `aceru/6aj4`, press Enter | Preedit shows `acer螢幕`; app receives `acer螢幕` only after Enter |
 | Literal English | Type `README.md`, press Enter | Preedit and commit stay `README.md` |
-| Single-key tone one | On the default layout, type `a` then Space, `b` then Space, and `u` then Space in fresh preedits | `a ` and `b ` stay literal; `u` + Space becomes `一`, based on actual conversion output rather than a key list |
+| Tone-one result decision | On the default layout, type `a` then Space, `b` then Space, `u` then Space, and an out-of-order body such as `ia` then Space in fresh preedits | `a ` and `b ` stay literal; `u` + Space and valid Han-producing bodies such as `ia` become Chinese, based on actual conversion output rather than a key or word list |
 | URL/version literal | Type `https://ari-ime.test/v1.1.0`, press Enter | Version digits and dots stay literal |
 | Acronym + Chinese | Type `HTTPsu3`, press Enter | Preedit and commit are `HTTP你` |
 | Forced English | Press Ctrl+Space, type `su3`, press Enter | Mode hint shows English; commit is `su3`; mode remains English |

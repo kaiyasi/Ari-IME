@@ -14,10 +14,11 @@ phrasing and per-user learning.
 
 - **Mixed input, no mode switching** — type `acer螢幕` in one go.
 - **Out-of-order tolerant** — `su3` and `s3u` both produce 你.
-- **Result-based tone-one input** — a single key plus Space converts only when
-  libchewing actually produces a Han character. There is no per-key allow/deny
-  list, so `a ` stays literal while `u` + Space produces `一` on the default
-  layout, with the same rule applied to every supported layout.
+- **Result-based tone-one input** — a pending key sequence plus Space converts
+  only when libchewing actually produces a Han character. There is no
+  per-key or per-word allow/deny list, so `a ` stays literal while `u` + Space
+  produces `一` on the default layout; the same rule applies to out-of-order
+  sequences and every supported layout.
 - **English-word friendly** — a tone peels the shortest trailing syllable, so
   brand names stay intact (`aceru/6` → `acer螢`).
 - **Candidate re-selection anywhere** — press ↓/←/→ to open a cursor that walks

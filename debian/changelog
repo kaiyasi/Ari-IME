@@ -1,3 +1,10 @@
+fcitx5-ari-ime (2.1.2) unstable; urgency=medium
+
+  * Apply result-based tone-one conversion consistently to multi-key
+    out-of-order syllables.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Fri, 14 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.1.1) unstable; urgency=medium
 
   * Decide single-key tone-one conversion from actual Han output.

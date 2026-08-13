@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.1.2 - 2026-08-14
+
+- Made Space's tone-one decision consistently result-based for multi-key
+  out-of-order syllables too; valid Han-producing sequences are no longer
+  rejected merely because their raw letters resemble an English token.
+
 ## 2.1.1 - 2026-08-11
 
 - Replaced the single-key tone-one input-category gate with an output-based
