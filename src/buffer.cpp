@@ -895,11 +895,16 @@ int Buffer::literalContextBiasAt(int idx) const {
 }
 
 int Buffer::candidateScore(const SelCand &cand) const {
-    const int literalBias = literalContextBiasAt(selCursor_);
-    const bool hasChineseLeft = selCursor_ > 0 && cells_[selCursor_ - 1].chinese;
-    bool hasChineseRight =
-        selCursor_ + 1 < static_cast<int>(cells_.size()) &&
-        cells_[selCursor_ + 1].chinese;
+    const int candidateStart = selRunStart_ + cand.startOffset;
+    const int literalBias = literalContextBiasAt(candidateStart);
+    const bool hasChineseLeft =
+        candidateStart > 0 && cells_[candidateStart - 1].chinese;
+    const int len = utf8Count(cand.text);
+    const int contextLength = cand.down < 0 ? 1 : len;
+    const int candidateEnd = candidateStart + contextLength;
+    const bool hasChineseRight =
+        candidateEnd < static_cast<int>(cells_.size()) &&
+        cells_[candidateEnd].chinese;
     if (cand.down < 0) {
         // "Raw keys" is a recovery path, not a primary interpretation: keep it
         // available everywhere, but behind real Chinese candidates unless the
@@ -917,7 +922,6 @@ int Buffer::candidateScore(const SelCand &cand) const {
         return score;
     }
 
-    int len = utf8Count(cand.text);
     int score = 0;
     score += len * 16;
     score -= std::max(cand.down, 0) * 7;
@@ -928,8 +932,6 @@ int Buffer::candidateScore(const SelCand &cand) const {
         score -= literalBias * 4;
     }
 
-    hasChineseRight = selCursor_ + len < static_cast<int>(cells_.size()) &&
-                      cells_[selCursor_ + len].chinese;
     if (len > 1 && (hasChineseLeft || hasChineseRight)) {
         score += 8;
     }
@@ -950,9 +952,9 @@ int Buffer::candidateScore(const SelCand &cand) const {
     std::vector<std::string> chars = splitUtf8(cand.text);
     bool exactSpanMatch = true;
     int limit = std::min<int>(chars.size(),
-                              static_cast<int>(cells_.size()) - selCursor_);
+                              static_cast<int>(cells_.size()) - candidateStart);
     for (int i = 0; i < limit; ++i) {
-        const Cell &cell = cells_[selCursor_ + i];
+        const Cell &cell = cells_[candidateStart + i];
         if (chars[i] != cell.text) {
             exactSpanMatch = false;
             if (cell.locked) {
@@ -1363,32 +1365,71 @@ void Buffer::buildSelCands() {
     selCands_.clear();
     selPage_ = 0;
     highlight_ = 0;
-    zhuyin_.closeCandidates();
-    zhuyin_.openCandidates();
-    // Longest phrase interval first, then shorter, down to single characters —
-    // exactly chewing's word-priority order, flattened into one list.
-    for (int down = 0, guard = 0; guard < inputer::kMaxSyllables; ++guard, ++down) {
-        int total = zhuyin_.candidateCount();
-        if (total <= 0) {
-            break;
+    const int targetOffset = selCursor_ - selRunStart_;
+
+    auto parkAt = [this](int offset) {
+        zhuyin_.closeCandidates();
+        zhuyin_.handleHome();
+        for (int i = 0; i < offset; ++i) {
+            zhuyin_.handleRight();
         }
-        int charLen = utf8Count(zhuyin_.candidate(0));
-        for (int i = 0; i < total; ++i) {
-            std::string text = zhuyin_.candidate(i);
-            selCands_.push_back({text, text, down, i,
-                                 static_cast<int>(selCands_.size())});
+    };
+
+    auto alreadyAdded = [this](const std::string &text, int startOffset) {
+        return std::any_of(selCands_.begin(), selCands_.end(),
+                           [&text, startOffset](const SelCand &candidate) {
+                               return candidate.down >= 0 &&
+                                      candidate.startOffset == startOffset &&
+                                      candidate.text == text;
+                           });
+    };
+
+    // Query every phrase interval that can contain the selected character. When
+    // the caret is at the end of a word such as 測試, querying only the last
+    // character would expose 試's homophones and hide the useful word-level
+    // recommendation 測試. The chosen candidate remembers its own start so a
+    // phrase can still be picked while the visual cursor remains on the target
+    // character.
+    for (int startOffset = targetOffset; startOffset >= 0; --startOffset) {
+        parkAt(startOffset);
+        if (!zhuyin_.openCandidates()) {
+            continue;
         }
-        if (charLen <= 1) {
-            break; // reached the single-character interval
+        for (int down = 0, guard = 0;
+             guard < inputer::kMaxSyllables; ++guard, ++down) {
+            int total = zhuyin_.candidateCount();
+            if (total <= 0) {
+                break;
+            }
+            int charLen = utf8Count(zhuyin_.candidate(0));
+            if (startOffset + charLen > targetOffset) {
+                for (int i = 0; i < total; ++i) {
+                    std::string text = zhuyin_.candidate(i);
+                    if (startOffset + utf8Count(text) <= targetOffset ||
+                        alreadyAdded(text, startOffset)) {
+                        continue;
+                    }
+                    selCands_.push_back(
+                        {text, text, down, i, startOffset,
+                         static_cast<int>(selCands_.size())});
+                }
+            }
+            if (charLen <= 1) {
+                break; // reached the single-character interval
+            }
+            zhuyin_.handleDown(); // phrase -> shorter interval -> single
         }
-        zhuyin_.handleDown(); // shorten the interval (phrase -> ... -> single)
+        zhuyin_.closeCandidates();
     }
+    parkAt(targetOffset);
+
     // Last entry: revert this character to its raw 注音 keys (English). down = -1
     // marks it; picking it explodes the cell instead of choosing a homophone.
     std::string raw = readingBody(cells_[selCursor_].reading).first;
     if (!raw.empty()) {
         selCands_.push_back(
-            {raw, "原始鍵 " + raw, -1, -1, static_cast<int>(selCands_.size())});
+            {raw, "原始鍵 " + raw, -1, -1, targetOffset,
+             static_cast<int>(selCands_.size())});
     }
     rankSelCands();
 }
@@ -1596,7 +1637,7 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
     // Reposition the cursor, walk to the candidate's interval, and choose it. A
     // phrase pick rewrites several cells, a single-character pick just one;
     // applyRun copies chewing's buffer back over the run's cells either way.
-    int offset = selCursor_ - selRunStart_;
+    int offset = sc.startOffset;
     zhuyin_.closeCandidates();
     zhuyin_.handleHome();
     for (int i = 0; i < offset; ++i) {
@@ -1612,7 +1653,8 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
     // phrase) so re-opening selection later restores them (see relockRun).
     int picked = utf8Count(sc.text);
     const int selectionGroup = nextSelectionGroup_++;
-    for (int j = selCursor_; j < selCursor_ + picked &&
+    const int pickedStart = selRunStart_ + sc.startOffset;
+    for (int j = pickedStart; j < pickedStart + picked &&
                             j <= selRunEnd_ && j < static_cast<int>(cells_.size());
          ++j) {
         cells_[j].locked = true;
@@ -2020,7 +2062,19 @@ KeyResult Buffer::handlePicking(const fcitx::Key &key) {
         return moveSelCursor(-1);
     }
     if (sym == FcitxKey_Right) {
-        return moveSelCursor(+1);
+        if (selCursor_ + 1 < static_cast<int>(cells_.size())) {
+            return moveSelCursor(+1);
+        }
+        // The caret is allowed to sit just after the final cell. Leaving the
+        // candidate window here makes Right a natural "append at end" action
+        // instead of trapping the user on the last character.
+        candOpen_ = false;
+        caretPos_ = static_cast<int>(cells_.size());
+        selCands_.clear();
+        selPage_ = 0;
+        highlight_ = 0;
+        zhuyin_.closeCandidates();
+        return {true, false, {}, true};
     }
     if (sym == FcitxKey_Home || sym == FcitxKey_Begin) {
         selCursor_ = 0;

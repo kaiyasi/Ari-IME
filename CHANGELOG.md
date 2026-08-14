@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.1.3 - 2026-08-14
+
+- Candidate re-selection now keeps phrase recommendations that contain the
+  focused character, including when opening candidates from the end of a word;
+  Right can also move from the final candidate to the append position.
+
 ## 2.1.2 - 2026-08-14
 
 - Made Space's tone-one decision consistently result-based for multi-key

@@ -728,6 +728,26 @@ void test_phrase_priority() {
           "raw-key fallback stays at the end of the visible candidate page");
 }
 
+void test_trailing_phrase_recommendation() {
+    Sim s;
+    s.type("hk4g4"); // 測試
+    s.key(FcitxKey_Down); // open candidates from the final character 試
+    const auto candidates = s.cand();
+    check(!candidates.empty(), "trailing phrase opens candidates");
+    check_eq(candidates.front(), "測試",
+             "trailing-character candidates recommend the full phrase first");
+
+    Sim pick;
+    pick.type("hk4g4");
+    pick.key(FcitxKey_Down);
+    const int phraseIndex = find_visible_candidate(pick.cand(), "策士");
+    check(phraseIndex >= 0,
+          "trailing-character candidates include alternatives for the full phrase");
+    pick.b.selectCandidate(phraseIndex);
+    check_eq(pick.preedit(), "策士",
+             "trailing-character phrase pick rewrites from the phrase start");
+}
+
 // The selection window keeps libchewing's contextual live result first instead
 // of replacing it with an unrelated static candidate-list order.
 void test_live_matches_top_candidate() {
@@ -1837,6 +1857,22 @@ void test_candidate_control_closes_to_caret() {
              "typing after control-close resumes at focused caret");
 }
 
+void test_candidate_right_reaches_end() {
+    const std::string bu = bu4_default();
+
+    Sim s;
+    s.type("su3cl3"); // 你好
+    s.key(FcitxKey_Down); // candidate window starts on the final 好
+    s.key(FcitxKey_Right); // move past the final cell to the append position
+    check(s.b.selectionChar() == -1,
+          "Right past the final candidate closes the candidate window");
+    check(s.b.caretChar() == 2,
+          "Right past the final candidate places the caret at the end");
+    s.type("1j4");
+    check_eq(s.preedit(), "你好" + bu,
+             "typing after moving past the final candidate appends at the end");
+}
+
 void test_picking_delete_focused_cell() {
     const std::string bu = bu4_default();
 
@@ -2248,6 +2284,7 @@ int main() {
     test_forced_english_caret_editing();
     test_backspace();
     test_phrase_priority();
+    test_trailing_phrase_recommendation();
     test_live_matches_top_candidate();
     test_phrase_pick();
     test_candidate_direct_selection();
@@ -2273,6 +2310,7 @@ int main() {
     test_direct_navigation_enters_editing();
     test_escape_behavior();
     test_candidate_control_closes_to_caret();
+    test_candidate_right_reaches_end();
     test_picking_delete_focused_cell();
     test_fullwidth_punct();
     test_ambiguous_symbol_boundary_literals();

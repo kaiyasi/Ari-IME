@@ -59,6 +59,7 @@ available:
 | Scenario | Steps | Expected |
 |----------|-------|----------|
 | Open candidates | Type `su3`, press Down | Candidate window opens on `你`; selected char is visually clear |
+| Trailing phrase recommendation | Type `hk4g4` (`測試`), press Down at the end | The candidate list recommends `測試` before single-character `試` alternatives |
 | Pick by number | With candidates open, press `2` | Candidate is applied; preedit updates; no premature commit |
 | Pick by click/touch | Open candidates, click a visible candidate | Same result as number-key selection |
 | Continue after pick | Re-pick a character in a long preedit, then type another syllable | Candidate mode closes and new text appends at the end without extra Right/End keys |
@@ -76,6 +77,7 @@ available:
 | Insert in middle | Type `su3cl3`, press Left, type `1j4` | The current default ㄅㄨˋ candidate appears between `你` and `好` |
 | Delete right of caret | Type `su3cl3`, press Left, Delete | Preedit becomes `你` |
 | Close candidates | Type `su3`, Down, Esc, type `1j4` | Candidate window closes; next input inserts at caret |
+| Append after candidate selection | Type `su3cl3`, Down, Right, type `1j4` | Right leaves the final candidate and places the caret after `你好`; new text appends there |
 | Long preedit position | Compose more than 30 characters, then use Home/Left/Right and open candidates | Auxiliary lines show nearby text plus `游標 n/N` or `選字 n/N` |
 | Phrase navigation | Compose a Chinese phrase and mixed English words, then use Ctrl+Left/Ctrl+Right | Caret jumps by libchewing phrase intervals and English word boundaries; Ctrl+Shift+Arrow remains available to the application |
 | Forced-English editing | Toggle forced English, compose literal text, then use arrows, Backspace and mid-string typing | Literal preedit can be edited normally and Up does not reinterpret it as Zhuyin |

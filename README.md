@@ -22,10 +22,12 @@ phrasing and per-user learning.
 - **English-word friendly** — a tone peels the shortest trailing syllable, so
   brand names stay intact (`aceru/6` → `acer螢`).
 - **Candidate re-selection anywhere** — press ↓/←/→ to open a cursor that walks
-  the whole pre-edit and re-pick any character or phrase; earlier picks stay
-  pinned. Candidates can be picked by number key or direct click/touch, and
-  multi-page lists show their current page in the auxiliary line. The labeled
-  `原始鍵 ...` candidate restores a converted character back to its raw keys.
+  the whole pre-edit and re-pick any character or phrase; phrase recommendations
+  that contain the focused character remain available even at the end of a
+  word, and earlier picks stay pinned. Candidates can be picked by number key or
+  direct click/touch, and multi-page lists show their current page in the
+  auxiliary line. The labeled `原始鍵 ...` candidate restores a converted
+  character back to its raw keys.
   `Ctrl+Z` restores recent candidate choices until text is otherwise edited;
   `Shift+Delete` forgets the highlighted personal candidate without removing
   the same word from the built-in dictionary.

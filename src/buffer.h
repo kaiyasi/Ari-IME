@@ -173,14 +173,16 @@ private:
     bool cellLooksLiteralish(const Cell &cell) const;
     int literalContextBiasAt(int idx) const;
 
-    // One re-selection candidate. `down` and `idx` say how to re-pick it from a
-    // freshly-fed run: press Down `down` times to reach its interval (0 = the
-    // longest phrase interval), then choose global index `idx` within it.
+    // One re-selection candidate. `startOffset`, `down` and `idx` say how to
+    // re-pick it from a freshly-fed run: park at the interval start, press Down
+    // `down` times (0 = the longest phrase interval), then choose global index
+    // `idx` within it.
     struct SelCand {
         std::string text;
         std::string display;
         int down = 0;
         int idx = 0;
+        int startOffset = 0; // offset within the loaded run where this starts
         int order = 0;
     };
     int candidateScore(const SelCand &cand) const;
