@@ -20,6 +20,7 @@
 #include <clipboard_public.h>
 
 #include "constants.h"
+#include "unicode.h"
 
 namespace {
 
@@ -45,39 +46,13 @@ private:
     std::function<void(fcitx::InputContext *)> onSelect_;
 };
 
-// Byte length of the UTF-8 character starting at `s[i]`.
-std::size_t utf8CharLen(const std::string &s, std::size_t i) {
-    unsigned char c = static_cast<unsigned char>(s[i]);
-    std::size_t len = 1;
-    if ((c & 0x80) == 0x00) {
-        len = 1;
-    } else if ((c & 0xE0) == 0xC0) {
-        len = 2;
-    } else if ((c & 0xF0) == 0xE0) {
-        len = 3;
-    } else if ((c & 0xF8) == 0xF0) {
-        len = 4;
-    }
-    return std::min(len, s.size() - i);
-}
-
-// Byte offset where the `n`-th character (0-based) starts.
+// Byte offset where the `n`-th grapheme cluster (0-based) starts.
 std::size_t utf8Offset(const std::string &s, int n) {
-    std::size_t i = 0;
-    for (int idx = 0; idx < n && i < s.size(); ++idx) {
-        i += utf8CharLen(s, i);
-    }
-    return i;
+    return inputer::unicode::graphemeOffset(s, n);
 }
 
 std::vector<std::string> utf8Chars(const std::string &s) {
-    std::vector<std::string> out;
-    for (std::size_t i = 0; i < s.size();) {
-        const std::size_t len = utf8CharLen(s, i);
-        out.push_back(s.substr(i, len));
-        i += len;
-    }
-    return out;
+    return inputer::unicode::splitGraphemes(s);
 }
 
 fcitx::Text buildEditingPreview(const std::string &text, int position,
@@ -248,10 +223,13 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
         list->setSelectionKey(selectionKeys);
         int hl = buffer.highlight();
         for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
+            const std::string candidateText = candidates[i];
             list->append(std::make_unique<InputerCandidate>(
-                candidates[i], i == hl, [this, i](fcitx::InputContext *ic) {
+                candidateText, i == hl,
+                [this, i, candidateText](fcitx::InputContext *ic) {
                     auto *state = ic->propertyFor(&factory_);
-                    KeyResult result = state->buffer.selectCandidate(i);
+                    KeyResult result =
+                        state->buffer.selectCandidate(i, candidateText);
                     applyResult(ic, state->buffer, result);
                 }));
         }
@@ -276,7 +254,23 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
             panel.setAuxDown(fcitx::Text(auxDown));
         }
     } else {
+        const auto recommendations = buffer.previewCandidates();
+        if (!recommendations.empty()) {
+            // This is intentionally a display-only list. Showing a native
+            // recommendation must not make the next digit/punctuation key a
+            // candidate-selection command while the user is still composing
+            // mixed 注音/English text. Down enters the interactive picker,
+            // where numbers and mouse selection are enabled.
+            auto list = std::make_unique<fcitx::DisplayOnlyCandidateList>();
+            list->setContent(recommendations);
+            list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
+            list->setCursorIndex(0);
+            panel.setCandidateList(std::move(list));
+        }
         std::vector<std::string> auxParts{positionText};
+        if (!recommendations.empty()) {
+            auxParts.push_back("推薦 · ↓選字");
+        }
         if (!preeditStr.empty() && *config_.showStatusLine) {
             auxParts.push_back(statusText(buffer));
         }
@@ -324,8 +318,9 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
 
     auto *ic = keyEvent.inputContext();
     auto *state = ic->propertyFor(&factory_);
-    state->buffer.setLearningAllowed(!ic->capabilityFlags().test(
-        fcitx::CapabilityFlag::PasswordOrSensitive));
+    state->buffer.setLearningAllowed(
+        *config_.autoLearn &&
+        !ic->capabilityFlags().test(fcitx::CapabilityFlag::PasswordOrSensitive));
 
     // If the 注音 engine failed to initialise, warn once. Typing still works via
     // the buffer's plain-English degrade path, so we do not swallow the event.

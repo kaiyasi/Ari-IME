@@ -10,7 +10,9 @@ Ari IME does not own libchewing's exact candidate ordering. Different libchewing
 versions can rank homophones/phrases differently, so the *first* candidate shown
 may vary between distributions:
 
-- Local/Arch CI verifies against **libchewing 0.12.0**.
+- The Arch release gate uses the current Arch libchewing package and prints its
+  resolved version in the build log; the exact version can change independently
+  of Ari.
 - Ubuntu/Debian build against whatever the distribution ships (for example
   **libchewing 0.8.x** on Ubuntu 24.04).
 
@@ -32,9 +34,10 @@ unwritable user-dictionary directory), Ari IME:
 Set `CHEWING_PATH` if libchewing's system dictionary is in a non-standard
 location.
 
-## Learned-dictionary location (libchewing 0.12)
+## Learned-dictionary location (libchewing 0.12+)
 
-libchewing 0.12 stores learned phrases (`chewing.dat`, `chewing-deleted.dat`) at
+Recent libchewing versions store learned phrases (`chewing.dat`,
+`chewing-deleted.dat`) at
 `CHEWING_USER_PATH`, falling back to `$XDG_DATA_HOME/chewing` — not at the
 `userpath` file passed to `chewing_new2`. Ari pins `CHEWING_USER_PATH` to its own
 data directory (`~/.config/inputer` by default) so learning stays self-contained

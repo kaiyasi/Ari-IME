@@ -21,6 +21,10 @@ phrasing and per-user learning.
   sequences and every supported layout.
 - **English-word friendly** — a tone peels the shortest trailing syllable, so
   brand names stay intact (`aceru/6` → `acer螢`).
+- **Live contextual recommendations** — as soon as a complete Chinese result is
+  available, the native Fcitx5 candidate panel previews the visible result and
+  its alternatives. The preview is display-only, so digits remain available for
+  the next 注音 syllable; press Down to enter normal candidate picking.
 - **Candidate re-selection anywhere** — press ↓/←/→ to open a cursor that walks
   the whole pre-edit and re-pick any character or phrase; phrase recommendations
   that contain the focused character remain available even at the end of a
@@ -31,6 +35,9 @@ phrasing and per-user learning.
   `Ctrl+Z` restores recent candidate choices until text is otherwise edited;
   `Shift+Delete` forgets the highlighted personal candidate without removing
   the same word from the built-in dictionary.
+- **Safe mixed-text editing** — pasted common multi-codepoint Emoji (including
+  variation-selector, flag and ZWJ sequences) behaves as one unit for the caret
+  and Backspace instead of being split into broken fragments.
 - **Consistent phrasing** — the character shown while typing matches the top
   candidate the selection window offers ("以選字候選為準").
 - **Explicit Chinese punctuation** — ordinary punctuation stays literal and
@@ -54,7 +61,8 @@ phrasing and per-user learning.
   one weak positive learning pass. An explicitly selected character or phrase
   receives three extra passes (roughly 4:1), plus one short surrounding-context
   pass, so deliberate choices adapt faster without treating accepted defaults
-  as mistakes.
+  as mistakes. **AutoLearn** can be disabled in the addon's configuration when
+  the personal dictionary should remain unchanged.
   Password and sensitive input fields never write learning data.
 - **Automatic offline context** — libchewing's local phrase model uses
   surrounding words to distinguish homophones such as `我的` and `跑得快`.
@@ -70,6 +78,7 @@ phrasing and per-user learning.
 |-----|--------|
 | letters / digits | 注音 keys in the selected keyboard layout, or literal English |
 | layout tone keys, space (一聲) | complete the pending syllable |
+| live recommendation panel | shows the current result and alternatives; it does not capture digits |
 | ↓ / ← / → | open candidate re-selection over the pre-edit |
 | ↑ | open/reinterpret the current pre-edit cell |
 | Tab / Shift+Tab (in candidates) | move candidate highlight forward / backward |
@@ -156,8 +165,10 @@ instructions below.
 - a C++20 compiler, CMake ≥ 3.16
 
 The automated tests are written to tolerate libchewing dictionary ranking
-changes where Ari IME does not own the exact candidate order. Current local and
-CI verification is exercised with libchewing 0.12.0 on Arch Linux.
+changes where Ari IME does not own the exact candidate order. The release gate
+prints the resolved libchewing version so a distribution update can be correlated
+with candidate-order changes; the exact first candidate is not a cross-distro
+compatibility promise.
 
 For a source build on Arch Linux:
 
@@ -177,8 +188,8 @@ sudo apt install \
 `fcitx5-modules` provides the clipboard module headers (`clipboard_public.h`,
 `Fcitx5ModuleClipboard`) that the Ctrl+V paste path links against. Ubuntu builds
 against whatever libchewing the distribution ships (for example libchewing 0.8.x
-on Ubuntu 24.04), which may differ from the 0.12.0 used in CI; candidate ordering
-can differ slightly as a result — see [ISSUES.md](ISSUES.md). No source changes
+on Ubuntu 24.04); candidate ordering can differ slightly between distributions —
+see [ISSUES.md](ISSUES.md). No source changes
 are needed: the build uses `GNUInstallDirs`, so the module installs to the
 distribution's multiarch fcitx5 directory (e.g.
 `/usr/lib/x86_64-linux-gnu/fcitx5`) which fcitx5 scans automatically. Install with
@@ -188,6 +199,18 @@ If libchewing's system dictionary lives in a non-standard location, set
 `CHEWING_PATH` to point at it; Ari IME otherwise falls back to a read-only chewing
 context when its own user-dictionary directory is not writable, so composition
 keeps working even without per-user learning.
+
+### Debian / Ubuntu binary release
+
+Each GitHub release also includes a tested `.deb` for 64-bit Debian/Ubuntu:
+
+```sh
+sudo apt install ./fcitx5-ari-ime_<version>_amd64.deb
+```
+
+Download the matching `.deb` and `.sha256` files from the
+[GitHub Release](https://github.com/kaiyasi/Ari-IME/releases), then continue
+with the Fcitx5 setup steps below.
 
 ## Build & install
 
@@ -209,6 +232,23 @@ Then restart fcitx5:
 fcitx5 -r
 ```
 
+### Local user-directory install (development)
+
+Installing into `~/.local` is useful for testing without `sudo`, but a normal
+Fcitx5 desktop process does not necessarily search that directory for addons.
+Use the helper below after building; it installs the module, restarts Fcitx5
+with the local addon path, selects Ari IME, and verifies the loaded `.so` path:
+
+```sh
+bash scripts/install-local.sh
+```
+
+The helper uses `build-public-release` by default. For the ordinary `build`
+directory, use `INPUTER_BUILD_DIR=build bash scripts/install-local.sh`. This is
+intended for the current development session. For a persistent desktop install,
+use the AUR package, a GitHub release package, or install under `/usr` as shown
+above so Fcitx5 finds the addon through its normal search path.
+
 Add **Ari IME** in fcitx5-configtool:
 
 1. Run `fcitx5-configtool` from a terminal or your application launcher —
@@ -216,7 +256,7 @@ Add **Ari IME** in fcitx5-configtool:
 2. Go to the **Input Method** tab → click **+** → search **Ari** → select
    **Ari IME** → click **OK**.
 
-Per-addon options (keyboard layout, full-width punctuation) appear under the
+Per-addon options (keyboard layout, full-width punctuation and AutoLearn) appear under the
 addon's config page.
 
 ## Tests
@@ -237,7 +277,8 @@ Development/test safeguards around personalization:
   unit/integration/fuzz runs, and any libchewing-created artifacts stay inside
   the disposable temp directory.
 - Production usage keeps auto-learning enabled by default and writes only to
-  Ari IME's own `userdict.dat`, not libchewing's built-in dictionary resources.
+  Ari IME's own user-data directory (`userdict.dat`, `chewing.dat` and
+  `chewing-deleted.dat`), not libchewing's built-in dictionary resources.
 
 For the full local verification pass:
 

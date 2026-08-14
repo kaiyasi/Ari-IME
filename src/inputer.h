@@ -32,6 +32,10 @@ FCITX_CONFIGURATION(
         this, "FullWidthPunctuation",
         _("Always use full-width Chinese punctuation without a modifier. Off keeps ordinary punctuation literal; Ctrl+Shift plus a punctuation key produces its Chinese form temporarily."),
         false};
+    fcitx::Option<bool> autoLearn{
+        this, "AutoLearn",
+        _("Learn accepted Chinese choices locally. Turn this off to keep the personal dictionary unchanged; sensitive fields never learn regardless of this setting."),
+        true};
     fcitx::Option<bool> showStatusLine{
         this, "ShowStatusLine",
         _("Show composition status text in the auxiliary line (for example 中 · 大千 · 半形標點) while composing."),

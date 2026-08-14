@@ -10,11 +10,16 @@ and display server behavior.
 
   ```sh
   scripts/check.sh
-  sudo cmake --install build
+  INPUTER_BUILD_DIR=build bash scripts/install-local.sh
   ```
 
+  For a system/package install, use the distribution package or
+  `sudo cmake --install build` instead. The local helper is important when
+  testing a `~/.local` build because Fcitx5 may otherwise keep loading the
+  older system addon.
+
 - Restart Fcitx5.
-- Add **知字 (Ari IME)** in `fcitx5-configtool`.
+- Add **Ari IME** in `fcitx5-configtool`.
 - Test with a fresh learned dictionary when validating deterministic behavior:
 
   ```sh
@@ -58,6 +63,8 @@ available:
 
 | Scenario | Steps | Expected |
 |----------|-------|----------|
+| Live recommendation | Type `hk4g4` (`測試`) without pressing Down | Native Fcitx5 panel previews `測試` and alternatives; the first item matches the visible result |
+| Recommendation keeps typing | Type `hk4g4su3` while the preview is visible | Digits still form the next syllable; preedit becomes `測試你`, not a candidate pick |
 | Open candidates | Type `su3`, press Down | Candidate window opens on `你`; selected char is visually clear |
 | Trailing phrase recommendation | Type `hk4g4` (`測試`), press Down at the end | The candidate list recommends `測試` before single-character `試` alternatives |
 | Pick by number | With candidates open, press `2` | Candidate is applied; preedit updates; no premature commit |
@@ -122,6 +129,7 @@ available:
 | Weak versus strong evidence | With fresh data, type and commit `su3cl3` three times unchanged; then choose and commit the phrase `妳好` once; type `su3cl3` again | The one explicit phrase choice outweighs the three accepted defaults and produces `妳好` |
 | Automatic context | With fresh data, type `ji32k7`, then type `ql32k7dj94` in a fresh preedit | The same ㄉㄜ˙ reading follows context: `我的` and `跑得快` |
 | Sensitive field | In a password/sensitive field, choose a non-default candidate and commit; repeat in a normal field | The sensitive choice is not learned; the normal-field choice still is |
+| Auto-learning toggle | Disable `AutoLearn` in addon settings, choose and commit a candidate, then repeat in a normal field | The choice is not learned while disabled; re-enabling restores ordinary learning |
 | Commit boundary | Choose a non-default candidate, then reset the input method before pressing Enter | The uncommitted choice is not learned |
 
 ## Visual Checks

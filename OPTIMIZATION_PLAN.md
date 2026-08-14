@@ -19,13 +19,22 @@ usability first: feature coverage, UX, performance, and engineering quality.
   selection.
 - Kept live preedit text aligned with the first candidate shown in the
   selection window.
+- Added a native display-only live recommendation list for completed Chinese
+  runs; it previews the current phrase without turning the next digit into a
+  candidate-selection command.
 - Unified paging, Tab navigation, PageUp/PageDown, number-key selection, and
   click selection around the same candidate behavior.
+- Rejected delayed candidate clicks whose visible text no longer matches the
+  current page, preventing a stale frontend callback from selecting the wrong
+  homophone.
 - Implemented mid-string insertion, deletion, Home/End, and caret-driven
   editing.
 - Labeled raw-key revert entries as `原始鍵 ...` to make their purpose clear.
 - Normalized pasted control characters and separator-like Unicode codepoints so
   pasted text remains safe and visible inside a one-line preedit.
+- Kept common Unicode grapheme clusters intact during paste, caret movement and
+  deletion, including ZWJ emoji, variation selectors and regional-indicator
+  flags.
 - Added forced-English mode, optional full-width punctuation, and proper
   numeric-keypad behavior.
 - Expanded regression coverage for mixed literals such as email addresses,
@@ -59,6 +68,8 @@ usability first: feature coverage, UX, performance, and engineering quality.
   coverage support, and fuzzing support.
 - Added deterministic stress tests and dedicated user-data reset/learning
   tests.
+- Added an `AutoLearn` switch that leaves candidate selection available while
+  keeping the personal dictionary unchanged.
 - Added CI coverage for release, sanitizer, fuzz, and package simulation flows.
 
 ### Release And Packaging
@@ -69,6 +80,8 @@ usability first: feature coverage, UX, performance, and engineering quality.
   shared module through the standard build.
 - Kept PKGBUILD and `.SRCINFO` aligned with tagged release tarballs.
 - Added version consistency checks across CMake, PKGBUILD, and `.SRCINFO`.
+- Added a local-install helper that restarts Fcitx5 with the user addon path and
+  verifies that the newly built module is actually loaded.
 
 ## Next Priorities
 

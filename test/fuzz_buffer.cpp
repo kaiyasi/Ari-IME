@@ -19,6 +19,7 @@
 #include "constants.h"
 #include "layout.h"
 #include "test_common.h"
+#include "unicode.h"
 
 namespace {
 
@@ -64,20 +65,14 @@ bool validUtf8(const std::string &text) {
 }
 
 int utf8Count(const std::string &text) {
-    int count = 0;
-    for (unsigned char c : text) {
-        if ((c & 0xC0) != 0x80) {
-            ++count;
-        }
-    }
-    return count;
+    return inputer::unicode::graphemeCount(text);
 }
 
 [[noreturn]] void failInvariant() {
     std::abort();
 }
 
-void checkInvariants(const FuzzState &state) {
+void checkInvariants(FuzzState &state) {
     const std::string preedit = state.buffer.preeditText();
     if (!validUtf8(preedit) || !validUtf8(state.committed)) {
         failInvariant();
@@ -100,6 +95,17 @@ void checkInvariants(const FuzzState &state) {
     }
     for (const std::string &candidate : candidates) {
         if (!validUtf8(candidate)) {
+            failInvariant();
+        }
+    }
+
+    const std::vector<std::string> recommendations =
+        state.buffer.previewCandidates();
+    if (recommendations.size() > inputer::kCandPerPage) {
+        failInvariant();
+    }
+    for (const std::string &recommendation : recommendations) {
+        if (!validUtf8(recommendation) || recommendation.empty()) {
             failInvariant();
         }
     }

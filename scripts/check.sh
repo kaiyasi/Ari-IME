@@ -161,7 +161,19 @@ release_checks() {
     run cmake --build "$build_dir"
     run ctest --test-dir "$build_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
     run cmake --install "$build_dir" --prefix "$install_prefix"
+    local installed_module
+    installed_module="$(find "$install_prefix" -type f \
+        -path '*/fcitx5/inputer.so' -print -quit)"
+    run test -n "$installed_module"
+    run test -s "$installed_module"
+    run grep -q '^Configurable=True$' \
+        "$install_prefix/share/fcitx5/inputmethod/inputer.conf"
+    run grep -q '^Configurable=True$' \
+        "$install_prefix/share/fcitx5/addon/inputer.conf"
+    run grep -q '^OnDemand=True$' \
+        "$install_prefix/share/fcitx5/addon/inputer.conf"
     run bash -n PKGBUILD
+    run bash -n scripts/install-local.sh
     check_srcinfo
 }
 

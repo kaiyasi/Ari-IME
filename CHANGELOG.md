@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 2.2.0 - 2026-08-15
+
+- Added an `AutoLearn` addon setting so users can keep the local personal
+  dictionary unchanged without disabling candidate selection.
+- Added the public-launch design and verification specification covering mixed
+  input, candidate editing, privacy, packaging, and desktop compatibility.
+- Made pasted Emoji grapheme clusters safe to move and delete as one unit,
+  including CRLF paste normalization.
+- Fixed the Fcitx5 addon descriptor to expose Ari's input method through its
+  installed `inputer-im.conf` entry (`OnDemand=True`); Fcitx can now load the
+  addon when Ari is selected instead of finding zero input methods.
+- Added a native, display-only candidate preview for completed Chinese results;
+  it shows contextual alternatives without taking numeric keys away from the
+  next mixed 注音/English input.
+- Hardened native candidate click handling so a delayed click from an older
+  candidate page cannot select the same slot on a newer page.
+- Added `scripts/install-local.sh` so a user-directory development install
+  restarts Fcitx5 with the correct local addon path and verifies the loaded
+  module instead of silently continuing to use an older system copy.
+
 ## 2.1.3 - 2026-08-14
 
 - Candidate re-selection now keeps phrase recommendations that contain the

@@ -11,6 +11,7 @@
 
 #include "constants.h"
 #include "layout.h"
+#include "unicode.h"
 
 namespace {
 
@@ -21,13 +22,7 @@ namespace {
 // in our pre-edit (e.g. typing 2~3 on the keypad produced 23~).
 // Number of Unicode characters in a UTF-8 string (counts lead bytes).
 int utf8Count(const std::string &s) {
-    int n = 0;
-    for (unsigned char c : s) {
-        if ((c & 0xC0) != 0x80) {
-            ++n;
-        }
-    }
-    return n;
+    return inputer::unicode::graphemeCount(s);
 }
 
 // Split a UTF-8 string into its individual characters (codepoints).
@@ -55,7 +50,8 @@ bool isAsciiControl(const std::string &ch) {
 }
 
 bool isPasteSeparator(const std::string &ch) {
-    return isAsciiControl(ch) || ch == "\xc2\xa0" || ch == "\xe2\x80\xa8" ||
+    return isAsciiControl(ch) || ch == "\r\n" || ch == "\xc2\xa0" ||
+           ch == "\xe2\x80\xa8" ||
            ch == "\xe2\x80\xa9" || ch == "\xe2\x80\xaf" ||
            ch == "\xe3\x80\x80";
 }
@@ -482,11 +478,69 @@ std::vector<std::string> Buffer::candidates() const {
     return out;
 }
 
+std::vector<std::string> Buffer::previewCandidates() {
+    // A preview is deliberately read-only from the user's point of view. Do
+    // not show it while editing a frozen preedit, while a syllable is still
+    // ambiguous, or while English is the active tail: in all of those states
+    // a candidate panel would make ordinary digits/punctuation look like
+    // selection commands.
+    if (selecting_ || forcedEnglish_ || !englishBuf_.empty() || !syl_.empty() ||
+        !zhuyin_.hasConverted()) {
+        return {};
+    }
+
+    const std::string live = zhuyin_.preedit();
+    if (live.empty()) {
+        return {};
+    }
+
+    std::vector<std::string> out;
+    out.reserve(inputer::kCandPerPage);
+    // The text already visible in the preedit is the recommendation the user
+    // is currently seeing. Keep it first even if a libchewing build exposes a
+    // shorter interval when its cursor is parked at the end of a phrase.
+    out.push_back(live);
+
+    if (zhuyin_.openCandidates()) {
+        const auto page = zhuyin_.pageCandidates();
+        zhuyin_.closeCandidates();
+        for (const auto &candidate : page) {
+            if (candidate.empty() ||
+                std::find(out.begin(), out.end(), candidate) != out.end()) {
+                continue;
+            }
+            out.push_back(candidate);
+            if (static_cast<int>(out.size()) >= inputer::kCandPerPage) {
+                break;
+            }
+        }
+    }
+    return out;
+}
+
 KeyResult Buffer::selectCandidate(int pageIndex) {
     if (!selecting_ || !candOpen_) {
         return {false, false, {}, false};
     }
     if (pageIndex < 0 || pageIndex >= visibleCandidateCount()) {
+        return {true, false, {}, false};
+    }
+    return pickCandidate(pageIndex);
+}
+
+KeyResult Buffer::selectCandidate(int pageIndex,
+                                  const std::string &expectedText) {
+    if (!selecting_ || !candOpen_) {
+        return {false, false, {}, false};
+    }
+    if (pageIndex < 0 || pageIndex >= visibleCandidateCount()) {
+        return {true, false, {}, false};
+    }
+    const int globalIndex = selPage_ * inputer::kCandPerPage + pageIndex;
+    if (globalIndex < 0 || globalIndex >= static_cast<int>(selCands_.size()) ||
+        selCands_[globalIndex].display != expectedText) {
+        // The frontend may deliver a click after a page/navigation update. It
+        // must not reinterpret that old slot against the current page.
         return {true, false, {}, false};
     }
     return pickCandidate(pageIndex);
@@ -543,10 +597,13 @@ int Buffer::caretChar() const {
     if (tail_.empty()) {
         return -1;
     }
-    int before = static_cast<int>(cells_.size()) // one codepoint per cell
-                 + utf8Count(zhuyin_.preedit())
-                 + static_cast<int>(englishBuf_.size())
-                 + static_cast<int>(syl_.size());
+    int before = 0;
+    for (const Cell &cell : cells_) {
+        before += utf8Count(cell.text);
+    }
+    before += utf8Count(zhuyin_.preedit())
+              + static_cast<int>(englishBuf_.size())
+              + static_cast<int>(syl_.size());
     return before;
 }
 
@@ -1748,7 +1805,7 @@ void Buffer::pasteAtCaret(const std::string &text) {
     // text, not something to re-pick. Keep the pre-edit single-line and safe for
     // clients by folding control/newline-like separators into one visible space.
     std::vector<Cell> pasted;
-    for (const std::string &ch : splitUtf8(text)) {
+    for (const std::string &ch : inputer::unicode::splitGraphemes(text)) {
         if (isIgnoredPasteFormat(ch)) {
             continue;
         }

@@ -71,9 +71,18 @@ public:
 
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
+    // Non-interactive recommendation for the live Chinese run. This is shown
+    // by the frontend before the user enters candidate-selection mode; number
+    // keys remain available to the normal 注音 path until Down opens the real
+    // picker.
+    std::vector<std::string> previewCandidates();
     // Select a candidate on the currently visible page. Used by UI candidate
     // activation (mouse/touch) so it shares the same path as number-key picking.
     KeyResult selectCandidate(int pageIndex);
+    // Same as above, but reject a delayed UI activation when the candidate page
+    // has changed since the frontend created the callback. This prevents a stale
+    // click from selecting the same numeric slot on a newer page.
+    KeyResult selectCandidate(int pageIndex, const std::string &expectedText);
     int candidatePage() const;
     int candidatePageCount() const;
     // Index (within the current candidate page) of the highlighted candidate,

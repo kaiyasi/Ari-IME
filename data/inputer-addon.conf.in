@@ -6,7 +6,7 @@ Version=@PROJECT_VERSION@
 Type=SharedLibrary
 Library=inputer
 Configurable=True
-OnDemand=False
+OnDemand=True
 
 [Addon/Dependencies]
 0=core

@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.2.0) unstable; urgency=medium
+
+  * Add native live recommendations without stealing digits from mixed input.
+  * Add safer grapheme editing, controllable learning and Fcitx descriptor fixes.
+  * Harden candidate reselection against delayed stale UI activations.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sat, 15 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.1.3) unstable; urgency=medium
 
   * Keep full phrase recommendations when reselecting from the final

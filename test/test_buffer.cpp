@@ -107,6 +107,7 @@ struct Sim {
     }
     std::string preedit() { return b.preeditText(); }
     std::vector<std::string> cand() { return b.candidates(); }
+    std::vector<std::string> preview() { return b.previewCandidates(); }
 };
 
 std::string bu4_default() {
@@ -341,6 +342,18 @@ void test_tone1_space_uses_conversion_result() {
     singleVowel.type("-4"); // default layout: ㄦˋ
     check_eq(singleVowel.preedit(), "一二",
              "single-key tone-one syllable can precede another numeral");
+
+    // Keep single-key ㄗ result-based rather than hard-coding one homophone.
+    // A clean dictionary may display 姿 first, but 資 must remain available
+    // through the normal candidate window.
+    Sim zi;
+    zi.key('y');
+    zi.key(FcitxKey_space);
+    check(zi.preedit() != "y ",
+          "single-key ㄗ converts from the actual tone-one result");
+    zi.key(FcitxKey_Down);
+    check(find_visible_candidate(zi.cand(), "資") >= 0,
+          "single-key ㄗ keeps 資 in the candidate list");
 
     const inputer::KeyboardLayout layouts[] = {
         inputer::KeyboardLayout::Default,
@@ -748,6 +761,27 @@ void test_trailing_phrase_recommendation() {
              "trailing-character phrase pick rewrites from the phrase start");
 }
 
+void test_live_candidate_preview() {
+    Sim s;
+    s.type("hk4g4"); // 測試
+    const auto recommendations = s.preview();
+    check(!recommendations.empty(), "completed Chinese text has a live preview");
+    check_eq(recommendations.front(), "測試",
+             "live preview starts with the visible contextual result");
+
+    // The preview is display-only: a following digit is still a new 注音 key,
+    // not an accidental candidate selection.
+    s.type("su3");
+    check_eq(s.preedit(), "測試你",
+             "preview does not steal digits from mixed Chinese input");
+    check(s.preview().empty() == false,
+          "preview returns after the next Chinese syllable completes");
+
+    s.key(FcitxKey_Down);
+    check(!s.cand().empty(),
+          "Down turns the live preview into the interactive candidate picker");
+}
+
 // The selection window keeps libchewing's contextual live result first instead
 // of replacing it with an unrelated static candidate-list order.
 void test_live_matches_top_candidate() {
@@ -824,6 +858,31 @@ void test_candidate_direct_selection() {
           "stale direct candidate index keeps candidate window open");
     check_eq(stale.preedit(), "你",
              "stale direct candidate index leaves preedit unchanged");
+}
+
+void test_stale_candidate_activation_is_ignored() {
+    Sim s;
+    s.type("su3");
+    s.key(FcitxKey_Down);
+    const auto firstPage = s.cand();
+    check(!firstPage.empty(), "stale activation setup opens candidates");
+    const std::string oldCandidate = firstPage.front();
+
+    s.key(FcitxKey_Page_Down);
+    const auto secondPage = s.cand();
+    check(!secondPage.empty() && secondPage != firstPage,
+          "stale activation setup moves to another page");
+    KeyResult stale = s.b.selectCandidate(0, oldCandidate);
+    check(stale.handled && !stale.hasCommit,
+          "stale candidate activation is absorbed safely");
+    check_eq(s.preedit(), "你",
+             "stale candidate activation does not rewrite the pre-edit");
+    check(s.b.candidatePage() == 2,
+          "stale candidate activation keeps the current page open");
+
+    const std::string currentCandidate = secondPage.front();
+    KeyResult current = s.b.selectCandidate(0, currentCandidate);
+    check(current.handled, "current candidate activation still selects normally");
 }
 
 void test_pin_earlier_pick() {
@@ -1058,6 +1117,40 @@ void test_paste_caret_with_multi_codepoint_cells() {
              "paste stays at the visible caret after a multi-codepoint cell");
     check(s.b.caretChar() == 5,
           "caret stays right after pasted text in multi-codepoint context");
+}
+
+void test_paste_grapheme_editing() {
+    // Each of these contains multiple Unicode codepoints but must behave as
+    // one editable unit: a ZWJ developer emoji, a variation-selector heart,
+    // and a regional-indicator flag.
+    Sim emoji;
+    emoji.b.pasteAtCaret("A👨‍💻❤️🇹🇼");
+    check_eq(emoji.preedit(), "A👨‍💻❤️🇹🇼",
+             "paste preserves multi-codepoint grapheme clusters");
+    check(emoji.b.caretChar() == 4,
+          "caret counts grapheme clusters rather than UTF-8 codepoints");
+
+    emoji.key(FcitxKey_BackSpace);
+    check_eq(emoji.preedit(), "A👨‍💻❤️",
+             "Backspace removes a whole regional-indicator flag");
+    emoji.key(FcitxKey_BackSpace);
+    check_eq(emoji.preedit(), "A👨‍💻",
+             "Backspace removes a whole variation-selector grapheme");
+    emoji.key(FcitxKey_BackSpace);
+    check_eq(emoji.preedit(), "A",
+             "Backspace removes a whole ZWJ emoji sequence");
+}
+
+void test_normal_caret_counts_graphemes() {
+    Sim s;
+    s.b.setFullWidthPunct(true);
+    s.type("^su3"); // ……你; …… is one cell but two displayed graphemes
+    s.key(FcitxKey_Home);
+    s.key(FcitxKey_Right); // between …… and 你
+    s.type("A");
+    check_eq(s.preedit(), "……A你", "normal typing keeps multi-grapheme cells");
+    check(s.b.caretChar() == 3,
+          "normal caret counts graphemes inside multi-codepoint cells");
 }
 
 void test_midstring_delete_boundaries() {
@@ -2285,9 +2378,11 @@ int main() {
     test_backspace();
     test_phrase_priority();
     test_trailing_phrase_recommendation();
+    test_live_candidate_preview();
     test_live_matches_top_candidate();
     test_phrase_pick();
     test_candidate_direct_selection();
+    test_stale_candidate_activation_is_ignored();
     test_pin_earlier_pick();
     test_candidate_ranking_prefers_current_choice();
     test_candidate_selection_undo();
@@ -2295,6 +2390,8 @@ int main() {
     test_insert_chinese_midstring();
     test_paste_at_caret();
     test_paste_caret_with_multi_codepoint_cells();
+    test_paste_grapheme_editing();
+    test_normal_caret_counts_graphemes();
     test_midstring_delete_boundaries();
     test_up_navigates_not_revert();
     test_revert_entry();
