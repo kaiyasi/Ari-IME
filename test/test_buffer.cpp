@@ -1841,12 +1841,12 @@ void test_phrase_cursor_navigation() {
 
 void test_long_chinese_candidate_window_alignment() {
     Sim s;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 14; ++i) {
         s.type("su3cl31j4");
     }
     const std::string before = s.preedit();
-    check(utf8_count(before) == 30,
-          "long candidate test composes more than chewing's active window");
+    check(utf8_count(before) == 42,
+          "long candidate test crosses the expanded chewing active window");
     const std::string first = utf8_char_at(before, 0);
 
     s.key(FcitxKey_Home);

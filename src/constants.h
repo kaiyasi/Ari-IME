@@ -10,10 +10,12 @@ namespace inputer {
 // selection-mode paging math in Buffer.
 inline constexpr int kCandPerPage = 9;
 
-// libchewing's active composition window. Older characters are auto-committed
-// internally, so every scratch replay must stay within this size or its cursor
-// offsets no longer line up with Buffer cells.
-inline constexpr int kMaxCompositionChars = 20;
+// libchewing's active composition window. Keep a reasonably long sentence in
+// the contextual model before older characters are auto-committed internally;
+// every scratch replay must stay within this size or its cursor offsets no
+// longer line up with Buffer cells. 32 is below libchewing's portable maximum
+// while giving noticeably more context than the historical 20-character value.
+inline constexpr int kMaxCompositionChars = 32;
 
 // Upper bound on the number of syllables in one phrase interval. Used as a loop
 // guard when descending chewing's phrase intervals (longest phrase down to

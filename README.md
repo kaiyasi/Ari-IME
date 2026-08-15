@@ -58,7 +58,7 @@ phrasing and per-user learning.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
   keyboard layout and punctuation mode while composing. This status line is off
   by default and can be re-enabled in the addon config.
-- **Weighted per-user learning** — pressing Enter gives an unchanged conversion
+- **Weighted per-user learning** — committing with Enter gives an unchanged conversion
   one weak positive learning pass. An explicitly selected character or phrase
   receives three extra passes (roughly 4:1), plus one short surrounding-context
   pass, so deliberate choices adapt faster without treating accepted defaults

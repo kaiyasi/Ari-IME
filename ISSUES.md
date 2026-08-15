@@ -58,6 +58,13 @@ need manual validation across toolkits and display servers; the matrix and steps
 live in [docs/manual-qa.md](docs/manual-qa.md). Current status of that matrix is
 tracked there.
 
+## Long pre-edit context has a finite window
+
+Ari keeps the whole mixed string editable, but libchewing's contextual model has
+a finite active window. The public build keeps up to 32 Chinese characters in
+that window; older characters remain editable cells, but phrase ranking across
+that boundary may not use the full sentence context.
+
 ## Pinyin layouts are intentionally unsupported
 
 The state machine is built around one-key-per-Bopomofo-symbol layouts, so

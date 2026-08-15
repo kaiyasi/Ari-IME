@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.2.1 - 2026-08-15
+
+- Extend the live libchewing context window to 32 Chinese characters while
+  preserving whole-preedit editing and long-string candidate re-selection.
+
 ## 2.2.0 - 2026-08-15
 
 - Added an `AutoLearn` addon setting so users can keep the local personal
