@@ -44,6 +44,8 @@ and display server behavior.
 - Candidate ordering comes from libchewing and may change across libchewing
   versions. When a scenario inserts `1j4`, validate caret placement and commit
   behavior using the current default ㄅㄨˋ candidate shown by your system.
+- For a reproducible candidate report, run `ari-ime-dict candidates su3` or
+  `ari-ime-dict candidates hk4g4`; include `ari-ime-dict info` with the report.
 
 ## Environment Matrix
 
@@ -160,6 +162,15 @@ and record any application-specific behavior before publishing it.
 | Sensitive field | In a password/sensitive field, choose a non-default candidate and commit; repeat in a normal field | The sensitive choice is not learned; the normal-field choice still is |
 | Auto-learning toggle | Disable `AutoLearn` in addon settings, choose and commit a candidate, then repeat in a normal field | The choice is not learned while disabled; re-enabling restores ordinary learning |
 | Commit boundary | Choose a non-default candidate, then reset the input method before pressing Enter | The uncommitted choice is not learned |
+
+## Personal Dictionary Command
+
+| Scenario | Steps | Expected |
+|----------|-------|----------|
+| Inspect data | Run `ari-ime-dict info` | The active data directory, libchewing version and entry count are printed |
+| Portable export | Run `ari-ime-dict export /tmp/ari-dictionary.tsv` | The file contains the Ari header and phrase/tab/canonical-Bopomofo entries |
+| Safe import | Run `ari-ime-dict import --dry-run /tmp/ari-dictionary.tsv`, then import it | Dry-run changes nothing; import is idempotent and reports a backup when existing data is changed |
+| Candidate diagnosis | Run `ari-ime-dict candidates su3` | The current preedit and candidate page are printed without changing the Fcitx5 session |
 
 ## Visual Checks
 

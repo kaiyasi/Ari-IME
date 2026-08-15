@@ -12,6 +12,16 @@
 
 struct ChewingContext;
 
+// One portable entry in libchewing's personal phrase dictionary. The reading
+// is libchewing's canonical Unicode Bopomofo sequence (for example ㄋㄧˇ),
+// rather than a layout-specific key sequence; keeping it alongside the phrase
+// lets the command-line dictionary tool move learned mappings without copying
+// a version-specific binary dictionary file.
+struct UserPhrase {
+    std::string phrase;
+    std::string reading;
+};
+
 // Thin RAII wrapper around a libchewing context, configured from the current
 // keyboard layout. The engine feeds raw QWERTY keys; chewing maps them to
 // bopomofo via that layout and performs candidate lookup, intelligent phrasing
@@ -83,6 +93,12 @@ public:
     // Remove every personal-dictionary reading for an exact phrase. Built-in
     // dictionary entries are unaffected. Returns the number removed, or -1.
     int forgetUserPhrase(const std::string &phrase);
+    // Enumerate personal phrase mappings. An empty result means there are no
+    // entries or that the engine could not enumerate them.
+    std::vector<UserPhrase> userPhrases();
+    // Add one personal phrase mapping. Returns the number added, 0 when the
+    // mapping already exists, or -1 on failure.
+    int addUserPhrase(const std::string &phrase, const std::string &reading);
     // Phrase segments recognized in the current pre-edit, as [from, to)
     // character offsets. Used for Ctrl+Arrow navigation.
     std::vector<std::pair<int, int>> phraseIntervals();

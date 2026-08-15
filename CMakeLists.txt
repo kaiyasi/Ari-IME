@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 2.2.3 LANGUAGES CXX)
+project(inputer VERSION 2.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -175,6 +175,28 @@ install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/reset-user-data.sh"
     RENAME ari-ime-reset-data
 )
 
+# Portable personal-dictionary export/import and diagnostics. This is an
+# explicit command-line tool; package installation never mutates the user's
+# Fcitx5 profile or dictionary.
+add_executable(ari-ime-dict
+    src/dict_tool.cpp
+    src/layout.cpp
+    src/user_data.cpp
+    src/zhuyin.cpp
+)
+target_include_directories(ari-ime-dict PRIVATE src)
+target_link_libraries(ari-ime-dict
+    PRIVATE
+        Fcitx5::Utils
+        Fcitx5::Config
+        PkgConfig::Chewing
+)
+inputer_enable_warnings(ari-ime-dict)
+inputer_enable_sanitizers(ari-ime-dict)
+install(TARGETS ari-ime-dict
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
 # --- Tests ---
 include(CTest)
 if(BUILD_TESTING)
@@ -238,6 +260,12 @@ if(BUILD_TESTING)
         NAME profile_helper
         COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/test/test_enable_input_method.sh"
     )
+    add_test(
+        NAME dict_tool
+        COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/test/test_dict_tool.sh"
+                "$<TARGET_FILE:ari-ime-dict>"
+    )
+    inputer_configure_test(dict_tool)
 endif()
 
 if(INPUTER_ENABLE_FUZZING)

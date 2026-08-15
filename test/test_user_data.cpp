@@ -267,6 +267,30 @@ void test_forget_personal_candidate() {
 #endif
 }
 
+void test_userphrase_mapping_can_be_restored() {
+    test::TempConfigHome configHome("inputer-userphrase-import-test", false);
+
+    {
+        Zhuyin engine;
+        check(engine.addUserPhrase("妳", "ㄋㄧˇ") > 0,
+              "portable userphrase mapping can be added");
+        const auto entries = engine.userPhrases();
+        bool found = false;
+        for (const auto &entry : entries) {
+            if (entry.phrase == "妳" && entry.reading == "ㄋㄧˇ") {
+                found = true;
+                break;
+            }
+        }
+        check(found, "portable userphrase mapping can be enumerated");
+    }
+
+    Sim restored;
+    restored.type("su3");
+    check_eq(restored.preedit(), "妳",
+             "imported userphrase mapping becomes the next default");
+}
+
 void test_legacy_dictionary_is_seeded_for_libchewing() {
     test::TempConfigHome configHome("inputer-userdata-migration-test", false);
     std::error_code ec;
@@ -299,6 +323,7 @@ int main() {
     test_explicit_phrase_outweighs_accepted_defaults();
     test_sensitive_field_does_not_learn();
     test_forget_personal_candidate();
+    test_userphrase_mapping_can_be_restored();
     test_legacy_dictionary_is_seeded_for_libchewing();
     return test::finish();
 }

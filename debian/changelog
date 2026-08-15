@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.3.0) unstable; urgency=medium
+
+  * Add the package-installed ari-ime-dict tool for personal phrase
+    diagnostics, portable export/import, idempotent merges, and backups.
+  * Add candidate probing and regression coverage for restoring a personal
+    phrase mapping across a fresh user-data directory.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.2.3) unstable; urgency=medium
 
   * Make the first-run Fcitx5 profile helper preserve and complete GroupOrder.

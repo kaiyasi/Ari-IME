@@ -69,6 +69,12 @@ phrasing and per-user learning.
   surrounding words to distinguish homophones such as `我的` and `跑得快`.
   Personal weights feed the same model automatically; there is no external AI,
   network request, model download or setting to enable.
+- **Portable personal dictionary** — `ari-ime-dict` can inspect the active
+  libchewing version and data directory, list or export personal phrase
+  mappings, validate an import without changing anything, merge an import
+  safely, and create a raw-data backup. The text format stores canonical
+  Unicode Bopomofo readings such as `ㄋㄧˇ`, so it is not tied to one keyboard
+  layout. Package installation never imports or changes user data.
 - **Punctuation-aware boundaries** — a literal symbol can be followed directly
   by Zhuyin (`(hk4g4` -> `(測試`) without trapping the following keys in an
   English token.
@@ -373,7 +379,7 @@ candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
-[docs/release-2.2.3.md](docs/release-2.2.3.md).
+[docs/release-2.3.0.md](docs/release-2.3.0.md).
 
 ## Resetting learned data
 
@@ -404,6 +410,31 @@ ari-ime-reset-data
 
 The same script is available as `scripts/reset-user-data.sh` from a source
 checkout.
+
+## Moving personal dictionary data
+
+The package-installed `ari-ime-dict` command provides a no-UI way to inspect and
+move Ari's personal phrase mappings:
+
+```sh
+ari-ime-dict info
+ari-ime-dict candidates su3
+ari-ime-dict export "$HOME/ari-ime-dictionary.tsv"
+ari-ime-dict import --dry-run "$HOME/ari-ime-dictionary.tsv"
+ari-ime-dict import "$HOME/ari-ime-dictionary.tsv"
+ari-ime-dict backup
+```
+
+Imports are merges, are idempotent, and create a timestamped backup before any
+existing libchewing data is changed. The portable text file contains a phrase
+and libchewing's canonical Unicode Bopomofo reading separated by a tab; use a
+reading such as `ㄋㄧˇ`, not layout-specific keys such as `su3`. The portable
+format transfers personal phrase mappings, while exact frequency state can
+still vary with the installed libchewing version; `backup` preserves the raw
+files for same-engine recovery. `candidates KEYS` prints the current engine
+result and candidate page for a raw 大千 key sequence such as `su3` or `hk4g4`,
+which makes candidate-order reports reproducible without changing the active
+Fcitx5 session.
 
 The script backs up the current `userdict.dat` to a timestamped `.bak.*` file
 and removes the active learned dictionary so Ari IME starts relearning from a

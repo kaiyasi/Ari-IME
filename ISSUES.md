@@ -50,6 +50,11 @@ that shared location; without the flag it only prints a notice, since the
 directory may be shared. Reset the learned dictionary with
 `scripts/reset-user-data.sh`.
 
+`ari-ime-dict export` transfers personal phrase mappings in a portable text
+format. It intentionally does not promise byte-for-byte preservation of
+libchewing frequency or deleted-entry state across different libchewing
+versions; use `ari-ime-dict backup` for same-engine raw recovery.
+
 ## Real-application rendering depends on the desktop session
 
 Pre-edit display, candidate windows, clipboard behavior, and theme rendering are

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 2.3.0 - 2026-08-16
+
+- Add the package-installed `ari-ime-dict` command with `info`, `list`,
+  `candidates`, `export`, `import`, and `backup` operations.
+- Make personal phrase mappings portable as readable UTF-8 text using
+  libchewing's canonical Unicode Bopomofo readings rather than a
+  layout-specific key sequence.
+- Make imports validate before changing data, merge idempotently, and preserve
+  a timestamped backup of existing libchewing files.
+- Add CTest coverage for dictionary export/import, candidate restoration,
+  invalid-input rejection, backups, and installation of the new command.
+
 ## 2.2.3 - 2026-08-16
 
 - Make the first-run Fcitx5 profile helper write the standard `GroupOrder`

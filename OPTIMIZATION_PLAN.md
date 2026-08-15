@@ -42,6 +42,11 @@ usability first: feature coverage, UX, performance, and engineering quality.
   composition.
 - Improved English-tail peeling and reinterpretation logic so technical or
   symbol-heavy text is less likely to be rewritten as unintended Chinese.
+- Added the package-installed `ari-ime-dict` command for personal phrase
+  diagnostics, reproducible candidate inspection, readable export/import, and
+  raw-data backups without adding a GUI.
+- Made portable dictionary imports validate the complete file first, merge
+  idempotently, and preserve existing libchewing data before mutation.
 
 ### UX
 
@@ -85,6 +90,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Added the package-installed `ari-ime-enable` command for an explicit,
   backup-producing first-run profile setup, plus `ari-ime-reset-data` so
   package users can reset learning without a source checkout.
+- Installed `ari-ime-dict` alongside the input method and covered its binary,
+  parser, import/export, candidate restoration, and backup behavior in the
+  release gate.
 - Increased the live libchewing context window from 20 to 32 Chinese characters
   so longer sentences retain useful context before internal replay/chunking.
 
@@ -117,6 +125,11 @@ usability first: feature coverage, UX, performance, and engineering quality.
   rather than hardcoded so application shortcuts remain safe.
 - Continue broadening reinterpretation regressions with more real-world
   developer and document-authoring text samples.
+- Use `ari-ime-dict candidates` plus a small versioned golden corpus when a
+  distribution changes libchewing candidate ordering; do not hardcode a
+  sentence-specific replacement into the engine.
+- Evaluate an optional traditional Space-to-commit compatibility policy in
+  real editors before changing Ari's current whole-preedit Enter contract.
 
 ### P2: UX Refinement
 
@@ -124,6 +137,8 @@ usability first: feature coverage, UX, performance, and engineering quality.
   real editors.
 - Add short release-quality demos or GIFs to the README for mixed input,
   reselection, paste handling, and layout switching.
+- Investigate reconversion of already-committed selected text when the client
+  exposes sufficient Fcitx5 surrounding-text support.
 
 ### P3: Engineering Maintenance
 

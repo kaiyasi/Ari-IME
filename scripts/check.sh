@@ -174,10 +174,12 @@ release_checks() {
         "$install_prefix/share/fcitx5/addon/inputer.conf"
     run test -x "$install_prefix/bin/ari-ime-enable"
     run test -x "$install_prefix/bin/ari-ime-reset-data"
+    run test -x "$install_prefix/bin/ari-ime-dict"
     run bash -n PKGBUILD
     run bash -n scripts/enable-input-method.sh
     run bash -n scripts/install-local.sh
     run bash -n scripts/reset-user-data.sh
+    run bash -n test/test_dict_tool.sh
     check_srcinfo
 }
 

@@ -266,6 +266,36 @@ int Zhuyin::forgetUserPhrase(const std::string &phrase) {
     return removed;
 }
 
+std::vector<UserPhrase> Zhuyin::userPhrases() {
+    std::vector<UserPhrase> out;
+    if (!ctx_ || chewing_userphrase_enumerate(ctx_) != 0) {
+        return out;
+    }
+
+    unsigned int phraseLen = 0;
+    unsigned int bopomofoLen = 0;
+    while (chewing_userphrase_has_next(ctx_, &phraseLen, &bopomofoLen) == 1) {
+        if (phraseLen == 0 || bopomofoLen == 0) {
+            continue;
+        }
+        std::vector<char> phraseBuf(phraseLen);
+        std::vector<char> bopomofoBuf(bopomofoLen);
+        if (chewing_userphrase_get(ctx_, phraseBuf.data(), phraseLen,
+                                   bopomofoBuf.data(), bopomofoLen) == 0) {
+            out.push_back({phraseBuf.data(), bopomofoBuf.data()});
+        }
+    }
+    return out;
+}
+
+int Zhuyin::addUserPhrase(const std::string &phrase,
+                          const std::string &reading) {
+    if (!ctx_ || phrase.empty() || reading.empty()) {
+        return -1;
+    }
+    return chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
+}
+
 std::vector<std::pair<int, int>> Zhuyin::phraseIntervals() {
     std::vector<std::pair<int, int>> out;
     if (!ctx_) {
