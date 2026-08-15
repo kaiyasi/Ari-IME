@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.2.3 - 2026-08-16
+
+- Make the first-run Fcitx5 profile helper write the standard `GroupOrder`
+  section, preserving existing group order and appending new groups without
+  overwriting their indices.
+- Add regression coverage for clean profiles, idempotent setup, backups, and
+  multi-group ordering.
+
 ## 2.2.2 - 2026-08-15
 
 - Added the explicitly invoked `ari-ime-enable` command for first-run Fcitx5

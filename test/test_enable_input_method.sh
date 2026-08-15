@@ -25,6 +25,8 @@ INPUTER_FCITX_PROFILE="$fresh" bash "$helper" \
 assert_count 1 '^Name=inputer$' "$fresh"
 assert_count 1 '^DefaultIM=inputer$' "$fresh"
 grep -q '^\[Groups/0/Items/0\]$' "$fresh"
+grep -q '^\[GroupOrder\]$' "$fresh"
+grep -q '^0=Default$' "$fresh"
 
 # The operation is idempotent and must not append a second Ari entry.
 INPUTER_FCITX_PROFILE="$fresh" bash "$helper" \
@@ -54,6 +56,24 @@ grep -q '^DefaultIM=keyboard-us$' "$existing"
 grep -q '^\[Groups/0/Items/2\]$' "$existing"
 backup="$(find "$test_root" -maxdepth 1 -name 'existing-profile.bak.*' -print -quit)"
 test -n "$backup"
+
+ordered="$test_root/ordered-profile"
+printf '%s\n' \
+    '[Groups/0]' \
+    'Name=Default' \
+    'Default Layout=us' \
+    'DefaultIM=keyboard-us' \
+    '' \
+    '[Groups/0/Items/0]' \
+    'Name=keyboard-us' \
+    'Layout=' \
+    '' \
+    '[GroupOrder]' \
+    '0=Other' >"$ordered"
+INPUTER_FCITX_PROFILE="$ordered" bash "$helper" \
+    --yes --no-restart >/dev/null
+grep -q '^0=Other$' "$ordered"
+grep -q '^1=Default$' "$ordered"
 
 INPUTER_FCITX_PROFILE="$existing" bash "$helper" \
     --yes --no-restart --make-default >/dev/null

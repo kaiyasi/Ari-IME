@@ -88,6 +88,21 @@ if [[ -z "$group_id" ]]; then
     group_id=0
 fi
 group_section="Groups/$group_id"
+group_name="Default"
+if [[ -s "$profile" ]]; then
+    group_name="$(awk -v section="[$group_section]" '
+        $0 == section { in_group = 1; next }
+        in_group && /^\[/ { in_group = 0 }
+        in_group && /^Name=/ {
+            sub(/^Name=/, "")
+            print
+            exit
+        }
+    ' "$profile")"
+    if [[ -z "$group_name" ]]; then
+        group_name="Default"
+    fi
+fi
 
 inputer_present=0
 if [[ -s "$profile" ]] && awk '
@@ -123,8 +138,36 @@ if [[ "$make_default" -eq 1 ]]; then
     fi
 fi
 
+group_order_needed=0
+group_order_index=0
+if [[ -s "$profile" ]] && awk -v group_name="$group_name" '
+    $0 == "[GroupOrder]" { in_order = 1; next }
+    in_order && /^\[/ { in_order = 0 }
+    in_order && index($0, "=") > 0 &&
+        substr($0, index($0, "=") + 1) == group_name { found = 1 }
+    END { exit(found ? 0 : 1) }
+' "$profile"; then
+    group_order_needed=0
+else
+    group_order_needed=1
+fi
+if [[ -s "$profile" ]]; then
+    group_order_index="$(awk '
+        $0 == "[GroupOrder]" { in_order = 1; next }
+        in_order && /^\[/ { in_order = 0 }
+        in_order && index($0, "=") > 0 {
+            key = substr($0, 1, index($0, "=") - 1)
+            if (key ~ /^[0-9]+$/ && key + 1 > next_index) {
+                next_index = key + 1
+            }
+        }
+        END { print next_index + 0 }
+    ' "$profile")"
+fi
+
 changed=0
-if [[ "$inputer_present" -eq 0 || "$set_default_needed" -eq 1 || ! -s "$profile" ]]; then
+if [[ "$inputer_present" -eq 0 || "$set_default_needed" -eq 1 ||
+      "$group_order_needed" -eq 1 || ! -s "$profile" ]]; then
     changed=1
 fi
 
@@ -139,6 +182,9 @@ if [[ "$make_default" -eq 1 ]]; then
     else
         printf '%s\n' 'Ari IME is already the group default.'
     fi
+fi
+if [[ "$group_order_needed" -eq 1 ]]; then
+    printf 'Fcitx5 group order will include %s.\n' "$group_name"
 fi
 printf 'Profile: %s\n' "$profile"
 
@@ -167,8 +213,18 @@ else
     trap 'rm -f -- "$temp_profile"' EXIT
 
     if [[ -s "$profile" ]]; then
-        awk -v section="[$group_section]" -v set_default="$set_default_needed" '
-            BEGIN { in_group = 0; replaced = 0 }
+        awk -v section="[$group_section]" \
+            -v set_default="$set_default_needed" \
+            -v ensure_order="$group_order_needed" \
+            -v order_index="$group_order_index" \
+            -v group_name="$group_name" '
+            BEGIN {
+                in_group = 0
+                replaced = 0
+                in_order = 0
+                saw_order = 0
+                order_found = 0
+            }
             $0 == section {
                 in_group = 1
                 print
@@ -181,6 +237,23 @@ else
                 }
                 in_group = 0
             }
+            $0 == "[GroupOrder]" {
+                in_order = 1
+                saw_order = 1
+                print
+                next
+            }
+            in_order && /^\[/ {
+                if (ensure_order == 1 && order_found == 0) {
+                    print order_index "=" group_name
+                    order_found = 1
+                }
+                in_order = 0
+            }
+            in_order && index($0, "=") > 0 &&
+                substr($0, index($0, "=") + 1) == group_name {
+                order_found = 1
+            }
             in_group && set_default == 1 && /^DefaultIM=/ {
                 if (replaced == 0) {
                     print "DefaultIM=inputer"
@@ -192,6 +265,14 @@ else
             END {
                 if (in_group && set_default == 1 && replaced == 0) {
                     print "DefaultIM=inputer"
+                }
+                if (in_order && ensure_order == 1 && order_found == 0) {
+                    print order_index "=" group_name
+                }
+                if (ensure_order == 1 && saw_order == 0) {
+                    print ""
+                    print "[GroupOrder]"
+                    print order_index "=" group_name
                 }
             }
         ' "$profile" >"$temp_profile"
@@ -213,6 +294,8 @@ else
                 printf '%s\n' 'Name=keyboard-us'
                 printf '%s\n\n' '# Layout'
             fi
+            printf '%s\n' '[GroupOrder]'
+            printf '%s\n' '0=Default'
         } >"$temp_profile"
     fi
 
