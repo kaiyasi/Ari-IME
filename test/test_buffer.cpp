@@ -345,15 +345,28 @@ void test_tone1_space_uses_conversion_result() {
 
     // Keep single-key ㄗ result-based rather than hard-coding one homophone.
     // A clean dictionary may display 姿 first, but 資 must remain available
-    // through the normal candidate window.
+    // through the normal candidate window. The bare key must remain literal
+    // until Space, because y can also begin a longer syllable.
+    Sim bareY;
+    bareY.key('y');
+    check_eq(bareY.preedit(), "y", "bare y remains available for a longer syllable");
+
     Sim zi;
     zi.key('y');
     zi.key(FcitxKey_space);
-    check(zi.preedit() != "y ",
+    check(contains_han_character(zi.preedit()),
           "single-key ㄗ converts from the actual tone-one result");
     zi.key(FcitxKey_Down);
     check(find_visible_candidate(zi.cand(), "資") >= 0,
           "single-key ㄗ keeps 資 in the candidate list");
+
+    // `5` is another one-key tone-one case reported by users. It must follow
+    // the same actual-result rule instead of being treated as English + Space.
+    Sim five;
+    five.key('5');
+    five.key(FcitxKey_space);
+    check(contains_han_character(five.preedit()),
+          "single-key 5 converts from the actual tone-one result");
 
     const inputer::KeyboardLayout layouts[] = {
         inputer::KeyboardLayout::Default,

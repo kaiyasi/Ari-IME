@@ -85,12 +85,23 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Increased the live libchewing context window from 20 to 32 Chinese characters
   so longer sentences retain useful context before internal replay/chunking.
 
+## Current Release Audit
+
+- A real GTK3 `GtkIMContext` smoke path passed under Wayland, including
+  preedit and commit.
+- A real Qt6 `QLineEdit` smoke path passed under X11, including preedit and
+  commit.
+- A VS Code Electron editor smoke path passed under X11.
+- The remaining matrix in [docs/manual-qa.md](docs/manual-qa.md) is still kept
+  as an application/theme checklist; toolkit smoke success does not imply
+  every GTK, Qt, browser, or Fcitx5 theme behaves identically.
+
 ## Next Priorities
 
 ### P0: Real-World Compatibility
 
-- Validate preedit, candidates, and caret behavior in at least one GTK, Qt,
-  and Electron or browser application.
+- Repeat the core scenarios in a named GTK and Qt editor when those applications
+  are available on the target distribution, then record theme-specific issues.
 - Verify auxiliary text, highlight visibility, and page indicators across
   different Fcitx5 themes.
 - Confirm clipboard, click, and keypad behavior under both Wayland and X11.

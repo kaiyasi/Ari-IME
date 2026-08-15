@@ -55,6 +55,20 @@ available:
 | Wayland | [ ] |
 | X11 | [ ] |
 
+The current public-release audit also includes these recorded toolkit
+smoke paths (they validate the Fcitx5 input-context protocol, preedit and
+commit path; they do not replace the named-application and theme checks
+below):
+
+| Toolkit path | Display server | Result |
+|--------------|----------------|--------|
+| GTK3 `GtkIMContext` preedit/commit harness | Wayland | Passed |
+| Qt6 `QLineEdit` preedit/commit harness | X11 | Passed |
+| VS Code Electron editor preedit/commit smoke | X11 | Passed |
+
+If a release is tested on a different desktop session, rerun the matrix above
+and record any application-specific behavior before publishing it.
+
 ## Core Input
 
 | Scenario | Steps | Expected |

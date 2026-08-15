@@ -183,10 +183,10 @@ On Ubuntu / Debian:
 sudo apt install \
   cmake extra-cmake-modules g++ pkg-config \
   fcitx5 libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
-  fcitx5-modules libchewing3-dev hicolor-icon-theme
+  fcitx5-modules-dev libchewing3-dev hicolor-icon-theme
 ```
 
-`fcitx5-modules` provides the clipboard module headers (`clipboard_public.h`,
+`fcitx5-modules-dev` provides the clipboard module headers (`clipboard_public.h`,
 `Fcitx5ModuleClipboard`) that the Ctrl+V paste path links against. Ubuntu builds
 against whatever libchewing the distribution ships (for example libchewing 0.8.x
 on Ubuntu 24.04); candidate ordering can differ slightly between distributions —
