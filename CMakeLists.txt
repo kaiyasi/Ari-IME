@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 2.3.0 LANGUAGES CXX)
+project(inputer VERSION 2.3.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -190,6 +190,9 @@ target_link_libraries(ari-ime-dict
         Fcitx5::Utils
         Fcitx5::Config
         PkgConfig::Chewing
+)
+target_compile_definitions(ari-ime-dict
+    PRIVATE INPUTER_CHEWING_VERSION="${Chewing_VERSION}"
 )
 inputer_enable_warnings(ari-ime-dict)
 inputer_enable_sanitizers(ari-ime-dict)

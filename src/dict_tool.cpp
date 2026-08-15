@@ -14,14 +14,16 @@
 #include <utility>
 #include <vector>
 
-#include <chewing.h>
-
 #include "user_data.h"
 #include "zhuyin.h"
 
 namespace {
 
 constexpr std::string_view kHeader = "# Ari IME user dictionary v1";
+
+#ifndef INPUTER_CHEWING_VERSION
+#define INPUTER_CHEWING_VERSION "unknown"
+#endif
 
 struct Entry {
     std::string phrase;
@@ -222,7 +224,7 @@ int commandInfo() {
     const auto entries = engine.userPhrases();
     std::cout << "format\tAri IME user dictionary v1\n"
               << "data_dir\t" << inputer::userDataDir().string() << '\n'
-              << "libchewing\t" << chewing_version() << '\n'
+              << "libchewing\t" << INPUTER_CHEWING_VERSION << '\n'
               << "entries\t" << entries.size() << '\n';
     return 0;
 }

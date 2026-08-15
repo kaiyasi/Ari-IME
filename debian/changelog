@@ -1,3 +1,10 @@
+fcitx5-ari-ime (2.3.1) unstable; urgency=medium
+
+  * Keep the dictionary diagnostic compatible with Ubuntu's libchewing 0.6 by
+    using the pkg-config version instead of the newer runtime version API.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.3.0) unstable; urgency=medium
 
   * Add the package-installed ari-ime-dict tool for personal phrase

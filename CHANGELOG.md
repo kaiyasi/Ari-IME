@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.3.1 - 2026-08-16
+
+- Keep `ari-ime-dict info` compatible with Ubuntu's libchewing 0.6 by using the
+  CMake/pkg-config dependency version instead of a newer runtime API.
+
 ## 2.3.0 - 2026-08-16
 
 - Add the package-installed `ari-ime-dict` command with `info`, `list`,
