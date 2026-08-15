@@ -256,6 +256,13 @@ Add **Ari IME** in fcitx5-configtool:
 2. Go to the **Input Method** tab → click **+** → search **Ari** → select
    **Ari IME** → click **OK**.
 
+Then select it once and verify the active name:
+
+```sh
+fcitx5-remote -s inputer
+fcitx5-remote -n   # should print: inputer
+```
+
 Per-addon options (keyboard layout, full-width punctuation and AutoLearn) appear under the
 addon's config page.
 

@@ -20,6 +20,13 @@ and display server behavior.
 
 - Restart Fcitx5.
 - Add **Ari IME** in `fcitx5-configtool`.
+- Select it and verify that the running daemon uses it:
+
+  ```sh
+  fcitx5-remote -s inputer
+  test "$(fcitx5-remote -n)" = inputer
+  ```
+
 - Test with a fresh learned dictionary when validating deterministic behavior:
 
   ```sh
