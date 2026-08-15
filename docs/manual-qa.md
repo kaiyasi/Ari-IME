@@ -124,7 +124,7 @@ available:
 | Status line | Compose any non-empty preedit | Aux line shows 中/英, keyboard layout, punctuation mode |
 | Literal punctuation | With full-width punctuation off, type `su3`, then `< > ?`; start a fresh preedit and type `API?` | Punctuation does not depend on language context: results are `你<>?` and `API?` |
 | Full-width punctuation | Enable full-width punctuation; type `< > ? ( ) { } ! : \ ^ ' @ % + =` | Preedit uses Chinese punctuation forms, including `、`, `……`, and full-width symbols |
-| Explicit Chinese punctuation | With full-width punctuation off, use Ctrl+Shift with comma, period, slash and apostrophe | Preedit adds `，。？、`; Ctrl+' and Alt punctuation remain available to the application |
+| Explicit Chinese punctuation | With full-width punctuation off, use Ctrl+Shift with comma, period, slash and the apostrophe key (`'`) | Preedit adds `，。？、`; specifically `Ctrl+Shift+'` produces `、`; Ctrl+' and Alt punctuation remain available to the application |
 | Mid-string Chinese punctuation | Compose `你好`, move the caret between the characters, then press Ctrl+Shift+comma | Preedit becomes `你，好` |
 | Bopomofo punctuation keys | Enable full-width punctuation; type `xu,4` | `,` remains a Bopomofo final key, not `，` |
 

@@ -43,7 +43,8 @@ phrasing and per-user learning.
 - **Explicit Chinese punctuation** — ordinary punctuation stays literal and
   half-width regardless of surrounding Chinese or English. Hold `Ctrl+Shift`
   with a punctuation key to request its Chinese form temporarily: comma → ，,
-  period → 。, slash → ？, apostrophe → 、, `(` → （, `{` → 『, etc.
+  period → 。, slash → ？, apostrophe key (`'`) → 、, `(` → （, `{` → 『,
+  etc. In particular, the Chinese enumeration comma is **Ctrl+Shift+'**.
   **FullWidthPunctuation** remains available for users who explicitly prefer
   full-width symbols without holding a modifier, including `@` → ＠,
   `%` → ％, `_` → ＿, `` ` `` → ｀ and `"` → ＂.
