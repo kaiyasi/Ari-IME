@@ -172,8 +172,12 @@ release_checks() {
         "$install_prefix/share/fcitx5/addon/inputer.conf"
     run grep -q '^OnDemand=True$' \
         "$install_prefix/share/fcitx5/addon/inputer.conf"
+    run test -x "$install_prefix/bin/ari-ime-enable"
+    run test -x "$install_prefix/bin/ari-ime-reset-data"
     run bash -n PKGBUILD
+    run bash -n scripts/enable-input-method.sh
     run bash -n scripts/install-local.sh
+    run bash -n scripts/reset-user-data.sh
     check_srcinfo
 }
 
@@ -268,7 +272,7 @@ package_checks() {
     tmp="$(mktemp -d /tmp/inputer-pkgcheck-XXXXXX)"
     trap 'rm -rf "$tmp"' EXIT
     mkdir -p "$tmp/Ari-IME-$pkgbuild_version"
-    cp -a CMakeLists.txt LICENSE README.md data src test \
+    cp -a CMakeLists.txt LICENSE README.md data scripts src test \
         "$tmp/Ari-IME-$pkgbuild_version/"
     run env srcdir="$tmp" pkgdir="$tmp/pkg" bash -e -o pipefail -lc \
         'source PKGBUILD; build; check; package; find "$pkgdir" -type f | sort'

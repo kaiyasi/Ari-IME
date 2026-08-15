@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 2.2.1 LANGUAGES CXX)
+project(inputer VERSION 2.2.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -163,6 +163,18 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/inputer.svg"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps"
 )
 
+# Explicit post-install helpers. They are commands, not package hooks: users
+# can opt into adding Ari to their Fcitx5 profile, and can reset Ari-owned
+# learning data without needing a source checkout.
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/enable-input-method.sh"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    RENAME ari-ime-enable
+)
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/reset-user-data.sh"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    RENAME ari-ime-reset-data
+)
+
 # --- Tests ---
 include(CTest)
 if(BUILD_TESTING)
@@ -221,6 +233,11 @@ if(BUILD_TESTING)
     inputer_enable_coverage(test_user_data)
     add_test(NAME user_data COMMAND test_user_data)
     inputer_configure_test(user_data)
+
+    add_test(
+        NAME profile_helper
+        COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/test/test_enable_input_method.sh"
+    )
 endif()
 
 if(INPUTER_ENABLE_FUZZING)

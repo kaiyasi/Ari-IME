@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 2.2.2 - 2026-08-15
+
+- Added the explicitly invoked `ari-ime-enable` command for first-run Fcitx5
+  setup. It adds Ari to the user's profile with a backup, preserves unrelated
+  input methods, and can optionally make Ari the group default.
+- Installed `ari-ime-reset-data` with binary packages so learned-data reset does
+  not require a source checkout.
+- Added profile-helper regression coverage to CTest and corrected the Ubuntu /
+  Debian development dependency documentation.
+
 ## 2.2.1 - 2026-08-15
 
 - Extend the live libchewing context window to 32 Chinese characters while

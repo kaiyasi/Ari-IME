@@ -82,6 +82,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Added version consistency checks across CMake, PKGBUILD, and `.SRCINFO`.
 - Added a local-install helper that restarts Fcitx5 with the user addon path and
   verifies that the newly built module is actually loaded.
+- Added the package-installed `ari-ime-enable` command for an explicit,
+  backup-producing first-run profile setup, plus `ari-ime-reset-data` so
+  package users can reset learning without a source checkout.
 - Increased the live libchewing context window from 20 to 32 Chinese characters
   so longer sentences retain useful context before internal replay/chunking.
 

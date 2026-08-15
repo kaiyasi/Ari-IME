@@ -19,7 +19,15 @@ and display server behavior.
   older system addon.
 
 - Restart Fcitx5.
-- Add **Ari IME** in `fcitx5-configtool`.
+- For a clean-profile first-run check, use the installed helper:
+
+  ```sh
+  ari-ime-enable --make-default
+  ```
+
+  It must add Ari once, preserve a backup of an existing profile, and leave
+  unrelated input-method entries intact. The graphical `fcitx5-configtool`
+  path remains a supported alternative.
 - Select it and verify that the running daemon uses it:
 
   ```sh

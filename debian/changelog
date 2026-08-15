@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.2.2) unstable; urgency=medium
+
+  * Add an explicit, backup-producing Fcitx5 profile setup command for first run.
+  * Install the learned-data reset helper with binary packages.
+  * Add profile-helper regression coverage and correct the fcitx5-modules-dev
+    build dependency documentation.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sat, 15 Aug 2026 14:00:00 +0000
+
 fcitx5-ari-ime (2.2.1) unstable; urgency=medium
 
   * Extend the live libchewing context window to 32 Chinese characters while

@@ -233,6 +233,19 @@ Then restart fcitx5:
 fcitx5 -r
 ```
 
+For the shortest first-run setup, add Ari to the current Fcitx5 profile with
+the installed command:
+
+```sh
+ari-ime-enable --make-default
+```
+
+This is an explicit user command, not a package hook. It changes only the first
+Fcitx5 input-method group, creates a timestamped backup before changing an
+existing profile, and makes Ari the default only when `--make-default` is
+given. Omit that option to keep the current default input method. If Fcitx5 is
+not running yet, start it after running the command.
+
 ### Local user-directory install (development)
 
 Installing into `~/.local` is useful for testing without `sudo`, but a normal
@@ -250,7 +263,7 @@ intended for the current development session. For a persistent desktop install,
 use the AUR package, a GitHub release package, or install under `/usr` as shown
 above so Fcitx5 finds the addon through its normal search path.
 
-Add **Ari IME** in fcitx5-configtool:
+The graphical alternative is to add **Ari IME** in `fcitx5-configtool`:
 
 1. Run `fcitx5-configtool` from a terminal or your application launcher —
    not your desktop environment's system input settings.
@@ -360,7 +373,7 @@ candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
-[docs/release-2.0.0.md](docs/release-2.0.0.md).
+[docs/release-2.2.2.md](docs/release-2.2.2.md).
 
 ## Resetting learned data
 
@@ -386,8 +399,11 @@ useful diagnostic if old candidate ordering still feels inconsistent.
 To reset learned data safely for development or local troubleshooting:
 
 ```sh
-scripts/reset-user-data.sh
+ari-ime-reset-data
 ```
+
+The same script is available as `scripts/reset-user-data.sh` from a source
+checkout.
 
 The script backs up the current `userdict.dat` to a timestamped `.bak.*` file
 and removes the active learned dictionary so Ari IME starts relearning from a

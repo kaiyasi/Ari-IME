@@ -91,8 +91,11 @@ Ari 自己不新增工具列、浮動視窗或常駐服務。候選窗、預編�
   不要求使用者手動設定 `FCITX_ADDON_DIRS`。
 - InputMethod descriptor 必須標記為可設定，讓使用者能從既有的 Fcitx5
   設定流程找到鍵盤配置、標點和 AutoLearn，不另造 Ari 設定視窗。
-- 安裝文件只保留一條推薦路徑，清楚列出「安裝 → 重載 Fcitx5 → 在
-  fcitx5-configtool 加入 Ari → 輸入 `su3`」四步。
+- 安裝文件只保留一條推薦路徑，清楚列出「安裝 → 重載 Fcitx5 → 執行
+  `ari-ime-enable --make-default` → 輸入 `su3`」四步；仍保留
+  `fcitx5-configtool` 作為圖形化替代方案。
+- `ari-ime-enable` 必須是明確執行的使用者命令，不得由套件 post-install
+  偷改 profile；修改前備份現有 profile，且不刪除或重排其他輸入法。
 - 發布前在 Arch、Ubuntu 的實際安裝環境驗證，不只驗證 CMake install 目錄。
 - 統一公開名稱為 **Ari IME**；文件、Fcitx5 清單和手動測試不再混用「知字」。
 
