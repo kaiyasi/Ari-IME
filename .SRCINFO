@@ -11,6 +11,6 @@ pkgbase = fcitx5-ari-ime
 	depends = hicolor-icon-theme
 	depends = libchewing
 	source = fcitx5-ari-ime-2.4.0.tar.gz::https://github.com/kaiyasi/Ari-IME/archive/refs/tags/v2.4.0.tar.gz
-	sha256sums = SKIP
+	sha256sums = f334b191db21d710e02df53fa22fd24823f7d30a8621417691021b84ca21eb1a
 
 pkgname = fcitx5-ari-ime
