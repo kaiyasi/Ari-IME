@@ -140,7 +140,7 @@ bool writeEntries(std::ostream &out, std::vector<UserPhrase> entries) {
 std::vector<std::filesystem::path> dictionaryFiles() {
     const auto dir = inputer::userDataDir();
     return {dir / "userdict.dat", dir / "chewing.dat",
-            dir / "chewing-deleted.dat"};
+            dir / "chewing-deleted.dat", dir / "preferences.tsv"};
 }
 
 std::filesystem::path makeBackup(std::error_code &ec) {
@@ -350,7 +350,7 @@ int commandBackup() {
         return 1;
     }
     if (backup.empty()) {
-        std::cout << "no learned dictionary files to back up\n";
+        std::cout << "no learned dictionary files or preference files to back up\n";
     } else {
         std::cout << backup.string() << '\n';
     }

@@ -16,6 +16,12 @@ std::filesystem::path userDataDir();
 // homophone preferences for Ari IME.
 std::filesystem::path userDictionaryPath();
 
+// Path to Ari's small, portable list of phrases the user explicitly imported
+// or added through Ari's dictionary API. This is deliberately separate from
+// libchewing's learned frequency database, whose entries cannot be
+// distinguished from deliberate preferences through the old C API.
+std::filesystem::path userPreferencePath();
+
 // Whether automatic per-user learning is enabled for this process.
 bool autoLearnEnabled();
 
@@ -24,8 +30,9 @@ bool autoLearnEnabled();
 // needed. Returns false only when setup or migration fails.
 bool ensureUserDataDir(std::error_code &ec);
 
-// Remove only Ari IME's learned user dictionary file. Missing files are treated
-// as success. Built-in/system dictionary resources are untouched.
+// Remove Ari IME's learned user dictionary and explicit-preference sidecar.
+// Missing files are treated as success. Built-in/system dictionary resources
+// are untouched.
 bool resetUserDictionary(std::error_code &ec);
 
 } // namespace inputer

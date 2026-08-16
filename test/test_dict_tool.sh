@@ -23,11 +23,13 @@ printf '%s\n' \
 grep -q '^validated 1 entry$' "$test_root/dry-run"
 "$dict_tool" info >"$test_root/info-after-dry-run"
 grep -q $'^entries\t0$' "$test_root/info-after-dry-run"
+test ! -e "$test_root/inputer/preferences.tsv"
 
 "$dict_tool" import "$test_root/import.tsv" >"$test_root/import-result"
 grep -q '^added 1, skipped 0' "$test_root/import-result"
 "$dict_tool" info >"$test_root/info-after-import"
 grep -q $'^entries\t1$' "$test_root/info-after-import"
+test -f "$test_root/inputer/preferences.tsv"
 "$dict_tool" export "$test_root/export.tsv"
 grep -Fq $'妳\tㄋㄧˇ' "$test_root/export.tsv"
 "$dict_tool" candidates su3 >"$test_root/candidates"
@@ -40,11 +42,13 @@ grep -q '^added 0, skipped 1' "$test_root/second-import"
 backup_path="$(sed -n 's/.*backup //p' "$test_root/second-import")"
 test -n "$backup_path"
 test -f "$backup_path/chewing.dat"
+test -f "$backup_path/preferences.tsv"
 
 "$dict_tool" backup >"$test_root/backup"
 backup_path="$(cat "$test_root/backup")"
 test -d "$backup_path"
 test -f "$backup_path/chewing.dat"
+test -f "$backup_path/preferences.tsv"
 
 printf '%s\n' '# Ari IME user dictionary v1' 'not-a-tab-separated-entry' \
     >"$test_root/invalid.tsv"

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.3.6 - 2026-08-16
+
+- Keep Ari's explicit/imported phrase preferences in a separate sidecar instead
+  of treating every libchewing learned entry as an explicit preference.
+- Prevent preference promotion from disturbing long pre-edit candidate windows
+  on older libchewing releases such as 0.6.
+- Include the preference sidecar in dictionary backups and learned-data resets.
+
 ## 2.3.5 - 2026-08-16
 
 - Load personal phrase mappings when a libchewing context is created, before

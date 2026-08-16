@@ -100,10 +100,10 @@ public:
     // Add one personal phrase mapping. Returns the number added, 0 when the
     // mapping already exists, or -1 on failure.
     int addUserPhrase(const std::string &phrase, const std::string &reading);
-    // Promote candidates that are already present in the personal dictionary.
-    // This makes an explicit/imported preference reliable on libchewing builds
-    // whose frequency scorer does not rank user phrases first. Built-in
-    // candidates are never reordered by this method.
+    // Promote candidates recorded as Ari explicit/imported preferences. The
+    // ordinary libchewing learned-frequency database is intentionally not used
+    // here because its old C API cannot distinguish weak learning from a
+    // deliberate choice. Built-in candidates are never statically reordered.
     int promoteUserPhrases();
     // Phrase segments recognized in the current pre-edit, as [from, to)
     // character offsets. Used for Ctrl+Arrow navigation.
@@ -130,10 +130,8 @@ public:
     std::string takeCommit();
 
 private:
-    // Enumerating libchewing's personal dictionary is relatively expensive and
-    // older releases can disturb the active candidate window while doing so.
-    // Keep the phrase text cached for the lifetime of this context; add/remove
-    // operations update it directly.
+    // Load Ari's explicit/imported phrase preferences once per context. The
+    // cache is separate from libchewing's broad learned dictionary.
     bool loadUserPhraseCache();
 
     ChewingContext *ctx_ = nullptr;

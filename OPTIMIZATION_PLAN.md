@@ -47,9 +47,13 @@ usability first: feature coverage, UX, performance, and engineering quality.
   raw-data backups without adding a GUI.
 - Made portable dictionary imports validate the complete file first, merge
   idempotently, and preserve existing libchewing data before mutation.
-- Promote explicit/imported personal phrase mappings in Ari's live result, so
-  older libchewing frequency implementations do not silently demote a user's
-  deliberate preference; built-in contextual candidates remain untouched.
+- Promote explicit/imported personal phrase mappings recorded in Ari's own
+  sidecar, so older libchewing frequency implementations do not silently
+  demote a deliberate imported preference; ordinary learned frequencies and
+  built-in contextual candidates remain untouched.
+- Keep Ari's explicit-preference state separate from libchewing's broad learned
+  dictionary because older libchewing APIs do not identify which entries were
+  deliberate choices.
 
 ### UX
 

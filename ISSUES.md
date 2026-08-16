@@ -17,10 +17,11 @@ may vary between distributions:
   **libchewing 0.8.x** on Ubuntu 24.04).
 
 The automated tests are written to tolerate ranking differences where Ari IME
-does not control the order. Ari promotes a candidate that is already present in
-the user's personal dictionary, so explicit/imported preferences remain the
-live result even when an older libchewing scorer would rank them lower. The
-Ubuntu CI job (`.github/workflows/ubuntu.yml`)
+does not control the order. Ari promotes entries recorded in its own
+explicit-preference sidecar (`preferences.tsv`), so imported mappings remain
+the live result even when an older libchewing scorer would rank them lower.
+Ordinary learned frequencies stay under libchewing's control and are not
+promoted wholesale. The Ubuntu CI job (`.github/workflows/ubuntu.yml`)
 prints the resolved `chewing` version so ordering differences can be correlated
 with dependency drift.
 

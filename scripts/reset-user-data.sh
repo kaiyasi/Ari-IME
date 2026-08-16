@@ -42,9 +42,9 @@ usage() {
     cat <<'EOF'
 Usage: scripts/reset-user-data.sh [--yes] [--no-backup] [--include-shared]
 
-Resets Ari IME's learned data: userdict.dat plus libchewing's learned files
-(chewing.dat, chewing-deleted.dat) in Ari's own data directory. Built-in
-libchewing dictionary resources are not touched.
+Resets Ari IME's learned data: userdict.dat, Ari's explicit preference file,
+plus libchewing's learned files (chewing.dat, chewing-deleted.dat) in Ari's
+own data directory. Built-in libchewing dictionary resources are not touched.
 
 libchewing 0.12 stored learning in a SHARED directory ($XDG_DATA_HOME/chewing)
 before Ari pinned it to its own directory. That shared data may also be used by
@@ -91,6 +91,7 @@ shared_dir="$(resolve_shared_chewing_dir)"
 # Ari-owned files (Ari's own directory).
 targets=(
     "$user_data_dir/userdict.dat"
+    "$user_data_dir/preferences.tsv"
     "$user_data_dir/chewing.dat"
     "$user_data_dir/chewing-deleted.dat"
 )

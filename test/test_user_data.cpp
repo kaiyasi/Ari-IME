@@ -105,6 +105,7 @@ void test_test_isolation_disables_learning() {
     std::error_code ec;
     check(inputer::ensureUserDataDir(ec), "test isolation can create temp user data dir");
     const std::filesystem::path dict = inputer::userDictionaryPath();
+    const std::filesystem::path preferences = inputer::userPreferencePath();
     const std::filesystem::path tempRoot = std::filesystem::temp_directory_path();
     check(!inputer::autoLearnEnabled(),
           "ordinary tests keep auto-learning disabled");
@@ -114,6 +115,8 @@ void test_test_isolation_disables_learning() {
     check(teachSingleChoice("妳"), "isolated test can still complete a commit");
     check(fileExists(dict), "libchewing may still create an isolated user dictionary file");
     check(fileSize(dict) > 0, "isolated user dictionary artifact stays local to the temp dir");
+    check(!fileExists(preferences),
+          "ordinary learning does not create Ari's explicit preference sidecar");
 }
 
 void test_reset_only_clears_user_dictionary() {
@@ -121,16 +124,27 @@ void test_reset_only_clears_user_dictionary() {
     std::error_code ec;
     check(inputer::ensureUserDataDir(ec), "learning test can create temp user data dir");
     const std::filesystem::path dir = inputer::userDataDir();
+    const std::filesystem::path preferences = inputer::userPreferencePath();
     const std::filesystem::path sentinel = dir / "base-resource-sentinel.txt";
     {
         std::ofstream out(sentinel);
         out << "keep";
     }
     check(fileExists(sentinel), "sentinel resource exists before reset");
+    {
+        std::ofstream out(preferences);
+        out << "妳\n";
+    }
+    check(fileExists(preferences), "explicit preference sidecar exists before reset");
 
     inputer::resetUserDictionary(ec);
     check(!ec, "reset handles missing dictionary file");
     check(fileExists(sentinel), "reset keeps unrelated resources intact");
+    check(!fileExists(preferences), "reset removes Ari's explicit preference sidecar");
+    check(!fileExists(dir / "chewing.dat"),
+          "reset removes Ari's standard libchewing dictionary");
+    check(!fileExists(dir / "chewing-deleted.dat"),
+          "reset removes Ari's deleted-entry dictionary");
 
     Sim sim;
     sim.type("su3");
@@ -276,6 +290,8 @@ void test_userphrase_mapping_can_be_restored() {
               "portable userphrase mapping can be added");
         check(engine.addUserPhrase("資", "ㄗ") > 0,
               "portable one-key tone-one mapping can be added");
+        check(fileExists(inputer::userPreferencePath()),
+              "portable mapping creates Ari's explicit preference sidecar");
         const auto entries = engine.userPhrases();
         bool found = false;
         for (const auto &entry : entries) {

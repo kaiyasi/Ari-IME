@@ -2,8 +2,11 @@
 // Copyright (C) 2026 Kaiyasi
 #include "zhuyin.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -15,20 +18,90 @@
 
 namespace {
 
-bool hasUserPhraseStore() {
+constexpr std::string_view kPreferenceHeader =
+    "# Ari IME preferred phrases v1";
+
+bool validPreferencePhrase(std::string_view phrase) {
+    return !phrase.empty() && phrase.find('\t') == std::string_view::npos &&
+           phrase.find('\n') == std::string_view::npos &&
+           phrase.find('\r') == std::string_view::npos;
+}
+
+std::unordered_set<std::string> readPreferredPhrases() {
+    std::unordered_set<std::string> phrases;
+    const auto path = inputer::userPreferencePath();
+    if (path.empty()) {
+        return phrases;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line.empty() || line.front() == '#') {
+            continue;
+        }
+        if (validPreferencePhrase(line)) {
+            phrases.insert(line);
+        }
+    }
+    return phrases;
+}
+
+bool writePreferredPhrases(
+    const std::unordered_set<std::string> &phrases) {
+    const auto path = inputer::userPreferencePath();
     const auto dir = inputer::userDataDir();
-    if (dir.empty()) {
+    if (path.empty() || dir.empty()) {
         return false;
     }
 
     std::error_code ec;
-    if (std::filesystem::is_regular_file(dir / "userdict.dat", ec) &&
-        !ec) {
-        return true;
+    if (phrases.empty()) {
+        std::filesystem::remove(path, ec);
+        return !ec;
     }
-    ec.clear();
-    return std::filesystem::is_regular_file(dir / "chewing.dat", ec) &&
-           !ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        return false;
+    }
+
+    std::vector<std::string> ordered;
+    ordered.reserve(phrases.size());
+    for (const auto &phrase : phrases) {
+        if (validPreferencePhrase(phrase)) {
+            ordered.push_back(phrase);
+        }
+    }
+    std::sort(ordered.begin(), ordered.end());
+
+    std::filesystem::path temporary = path;
+    temporary += ".tmp";
+    {
+        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            return false;
+        }
+        out << kPreferenceHeader << '\n';
+        for (const auto &phrase : ordered) {
+            out << phrase << '\n';
+        }
+        if (!out) {
+            std::error_code cleanupEc;
+            std::filesystem::remove(temporary, cleanupEc);
+            return false;
+        }
+    }
+
+    std::filesystem::rename(temporary, path, ec);
+    if (ec) {
+        std::error_code cleanupEc;
+        std::filesystem::remove(temporary, cleanupEc);
+        return false;
+    }
+    return true;
 }
 
 // libchewing logs an error for a missing user dictionary even though an empty
@@ -286,7 +359,14 @@ int Zhuyin::forgetUserPhrase(const std::string &phrase) {
         removed += count;
     }
     if (userPhraseCacheLoaded_) {
-        userPhraseTexts_.erase(phrase);
+        if (userPhraseTexts_.erase(phrase) > 0 &&
+            !writePreferredPhrases(userPhraseTexts_)) {
+            // Keep this context consistent with the on-disk preference list if
+            // the filesystem is temporarily unwritable. The libchewing entry
+            // has already been removed, but a later context can still recover
+            // the preference rather than silently losing it.
+            userPhraseTexts_.insert(phrase);
+        }
     }
     return removed;
 }
@@ -320,9 +400,22 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
     }
     const int result =
         chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
-    if (result >= 0) {
+    const bool exists =
+        chewing_userphrase_lookup(ctx_, phrase.c_str(), reading.c_str()) == 1;
+    if (result > 0 || exists) {
         userPhraseCacheLoaded_ = true;
+        const bool wasPresent = userPhraseTexts_.find(phrase) !=
+                                userPhraseTexts_.end();
         userPhraseTexts_.insert(phrase);
+        // This sidecar records deliberate/imported preferences only. The
+        // libchewing user dictionary itself also contains ordinary learned
+        // frequencies, which must not all be promoted as explicit choices.
+        if (!writePreferredPhrases(userPhraseTexts_) && !wasPresent) {
+            // Keep a pre-existing marker if the filesystem is temporarily
+            // unwritable; a newly added marker must not look durable in this
+            // context when it could not be persisted.
+            userPhraseTexts_.erase(phrase);
+        }
     }
     return result;
 }
@@ -332,21 +425,11 @@ bool Zhuyin::loadUserPhraseCache() {
         return !userPhraseTexts_.empty();
     }
     userPhraseCacheLoaded_ = true;
-    // A fresh Ari profile normally has only the directory, not a dictionary
-    // file. Avoid calling the user-phrase enumeration API in that state: it is
-    // needlessly expensive and older libchewing releases can perturb a long
-    // candidate window even when the dictionary is empty. A mapping added
-    // through Ari's API still updates the cache directly; mappings imported by
-    // another process take effect when the input context is restarted.
-    if (!hasUserPhraseStore()) {
-        return false;
-    }
-
-    for (const auto &entry : userPhrases()) {
-        if (!entry.phrase.empty()) {
-            userPhraseTexts_.insert(entry.phrase);
-        }
-    }
+    // Do not enumerate libchewing's broad learned dictionary here. Older C
+    // APIs expose ordinary frequency learning and explicit user phrases as the
+    // same entries; promoting all of them both overfits and can disturb a long
+    // active window. Ari's own sidecar is deliberately unambiguous.
+    userPhraseTexts_ = readPreferredPhrases();
     return !userPhraseTexts_.empty();
 }
 

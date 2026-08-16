@@ -34,6 +34,14 @@ std::filesystem::path userDictionaryPath() {
     return dir / "userdict.dat";
 }
 
+std::filesystem::path userPreferencePath() {
+    const std::filesystem::path dir = userDataDir();
+    if (dir.empty()) {
+        return {};
+    }
+    return dir / "preferences.tsv";
+}
+
 bool autoLearnEnabled() {
     return std::getenv("INPUTER_DISABLE_AUTOLEARN") == nullptr;
 }
@@ -68,12 +76,25 @@ bool ensureUserDataDir(std::error_code &ec) {
 }
 
 bool resetUserDictionary(std::error_code &ec) {
-    const std::filesystem::path path = userDictionaryPath();
-    if (path.empty()) {
+    const std::filesystem::path dir = userDataDir();
+    if (dir.empty()) {
         ec = std::make_error_code(std::errc::no_such_file_or_directory);
         return false;
     }
-    std::filesystem::remove(path, ec);
+
+    const std::filesystem::path paths[] = {
+        dir / "userdict.dat",
+        dir / "chewing.dat",
+        dir / "chewing-deleted.dat",
+        dir / "preferences.tsv",
+    };
+    ec.clear();
+    for (const auto &path : paths) {
+        std::filesystem::remove(path, ec);
+        if (ec) {
+            return false;
+        }
+    }
     return !ec;
 }
 
