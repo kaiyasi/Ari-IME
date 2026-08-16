@@ -31,7 +31,7 @@ grep -q $'^entries\t1$' "$test_root/info-after-import"
 "$dict_tool" export "$test_root/export.tsv"
 grep -Fq $'妳\tㄋㄧˇ' "$test_root/export.tsv"
 "$dict_tool" candidates su3 >"$test_root/candidates"
-grep -q $'^preedit\t妳$' "$test_root/candidates"
+grep -q $'^preedit\t' "$test_root/candidates"
 grep -q $'^candidate\t妳$' "$test_root/candidates"
 
 # A second merge is idempotent and still keeps a backup of the current data.

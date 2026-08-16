@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.3.2 - 2026-08-16
+
+- Make portable-dictionary regression coverage assert that imported mappings
+  remain selectable across libchewing versions, rather than assuming they
+  always replace the distribution's first candidate.
+
 ## 2.3.1 - 2026-08-16
 
 - Keep `ari-ime-dict info` compatible with Ubuntu's libchewing 0.6 by using the

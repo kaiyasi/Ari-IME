@@ -379,7 +379,7 @@ candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
-[docs/release-2.3.1.md](docs/release-2.3.1.md).
+[docs/release-2.3.2.md](docs/release-2.3.2.md).
 
 ## Resetting learned data
 

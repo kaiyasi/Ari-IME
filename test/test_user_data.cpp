@@ -287,8 +287,9 @@ void test_userphrase_mapping_can_be_restored() {
 
     Sim restored;
     restored.type("su3");
-    check_eq(restored.preedit(), "妳",
-             "imported userphrase mapping becomes the next default");
+    restored.key(FcitxKey_Down);
+    check(findVisibleCandidate(restored.cand(), "妳") >= 0,
+          "imported userphrase mapping remains selectable");
 }
 
 void test_legacy_dictionary_is_seeded_for_libchewing() {

@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.3.2) unstable; urgency=medium
+
+  * Make the portable-dictionary regression check assert candidate
+    availability across libchewing versions rather than a version-specific
+    first-candidate ranking.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.3.1) unstable; urgency=medium
 
   * Keep the dictionary diagnostic compatible with Ubuntu's libchewing 0.6 by
