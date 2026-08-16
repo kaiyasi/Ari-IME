@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.3.5 - 2026-08-16
+
+- Load personal phrase mappings when a libchewing context is created, before
+  any pre-edit exists, so older libchewing releases cannot disturb long live
+  candidate windows while enumerating them.
+- Keep mappings added through Ari's API immediately available in the current
+  context; mappings changed by another process take effect after restart.
+
 ## 2.3.4 - 2026-08-16
 
 - Cache personal phrase mappings per libchewing context instead of enumerating

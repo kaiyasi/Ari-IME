@@ -122,6 +122,10 @@ Zhuyin::Zhuyin() {
     chewing_set_escCleanAllBuf(ctx_, 1);
     chewing_set_candPerPage(ctx_, inputer::kCandPerPage);
     chewing_set_maxChiSymbolLen(ctx_, inputer::kMaxCompositionChars);
+    // Load personal mappings before the context starts receiving user input.
+    // Older libchewing releases can disturb a live long pre-edit when their
+    // userphrase enumeration API is called mid-composition.
+    loadUserPhraseCache();
 }
 
 Zhuyin::~Zhuyin() {
@@ -327,16 +331,17 @@ bool Zhuyin::loadUserPhraseCache() {
     if (userPhraseCacheLoaded_) {
         return !userPhraseTexts_.empty();
     }
+    userPhraseCacheLoaded_ = true;
     // A fresh Ari profile normally has only the directory, not a dictionary
     // file. Avoid calling the user-phrase enumeration API in that state: it is
     // needlessly expensive and older libchewing releases can perturb a long
-    // candidate window even when the dictionary is empty. Leave the cache
-    // unopened so a file created later by learning is picked up next time.
+    // candidate window even when the dictionary is empty. A mapping added
+    // through Ari's API still updates the cache directly; mappings imported by
+    // another process take effect when the input context is restarted.
     if (!hasUserPhraseStore()) {
         return false;
     }
 
-    userPhraseCacheLoaded_ = true;
     for (const auto &entry : userPhrases()) {
         if (!entry.phrase.empty()) {
             userPhraseTexts_.insert(entry.phrase);
