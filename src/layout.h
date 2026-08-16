@@ -8,6 +8,7 @@
 #include <fcitx-utils/i18n.h>
 
 #include <string>
+#include <vector>
 
 namespace inputer {
 
@@ -43,6 +44,11 @@ enum class ChinesePunctuationShortcut {
 };
 FCITX_CONFIG_ENUM_NAME(ChinesePunctuationShortcut, "ControlShift", "AltShift",
                        "Control", "Alt", "Disabled");
+
+struct SyllableKeySequence {
+    std::string keys;
+    bool toneOne = false;
+};
 
 struct KeyboardLayoutI18NAnnotation {
     bool skipDescription() const { return false; }
@@ -90,6 +96,11 @@ std::string canonicalKeys(const std::string &keys);
 bool isValidSyllable(const std::string &keys, bool allowTone);
 bool hasMedialOrFinal(const std::string &keys);
 bool needsBodyBeforeToneCompletion(KeyboardLayout layout);
+// Enumerate valid raw keyboard sequences for a layout. The result is used only
+// for safe reverse lookup (reconversion); it is deliberately kept separate
+// from the normal typing parser so ordinary keystrokes never pay the
+// enumeration cost.
+std::vector<SyllableKeySequence> syllableKeySequences(KeyboardLayout layout);
 
 } // namespace inputer
 

@@ -43,6 +43,10 @@ FCITX_CONFIGURATION(
         this, "SpaceCandidateMode",
         _("Use Space to open Chinese candidates after a complete syllable. Off keeps Ari's mixed-input Space-as-tone-one and literal-space behavior; Enter remains the commit key."),
         false};
+    fcitx::KeyListOption reconversionKey{
+        this, "ReconversionKey",
+        _("Re-open selected short Chinese text for candidate correction. The default is Control+Alt+R; clear it to avoid reserving a shortcut."),
+        {fcitx::Key("Control+Alt+R")}, fcitx::KeyListConstrain()};
     fcitx::Option<bool> autoLearn{
         this, "AutoLearn",
         _("Learn accepted Chinese choices locally. Turn this off to keep the personal dictionary unchanged; sensitive fields never learn regardless of this setting."),
@@ -64,6 +68,10 @@ public:
     // Set once we have warned the user that the 注音 engine failed to load, so
     // the transient hint is not shown on every keystroke.
     bool engineErrorNotified = false;
+    // The selected text is deleted from the client while reconversion is
+    // active. Escape/focus reset restores it instead of losing user text.
+    bool reconversionActive = false;
+    std::string reconversionText;
 };
 
 class InputerEngine : public fcitx::InputMethodEngineV2 {
@@ -92,6 +100,7 @@ private:
     void updateUI(fcitx::InputContext *ic, Buffer &buffer);
     void applyResult(fcitx::InputContext *ic, Buffer &buffer,
                      const KeyResult &result);
+    bool beginReconversion(fcitx::InputContext *ic, InputerState &state);
     // Current clipboard contents (Ctrl+V), or empty if the clipboard module is
     // unavailable. Loads the clipboard addon on demand.
     std::string clipboardText(fcitx::InputContext *ic);

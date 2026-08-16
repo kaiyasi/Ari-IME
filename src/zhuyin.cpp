@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -220,9 +221,90 @@ void Zhuyin::resetAll() {
 }
 
 void Zhuyin::setKeyboardLayout(inputer::KeyboardLayout layout) {
+    if (layout_ != layout) {
+        reverseReadings_.clear();
+    }
+    layout_ = layout;
     if (ctx_) {
         chewing_set_KBType(ctx_, inputer::chewingKeyboardType(layout));
     }
+}
+
+std::vector<std::string> Zhuyin::readingsForText(const std::string &text) {
+    const auto chars = inputer::unicode::splitGraphemes(text);
+    std::vector<std::string> readings(chars.size());
+    if (!ctx_ || chars.empty()) {
+        return readings;
+    }
+
+    std::unordered_map<std::string, std::vector<std::size_t>> wanted;
+    wanted.reserve(chars.size());
+    for (std::size_t i = 0; i < chars.size(); ++i) {
+        wanted[chars[i]].push_back(i);
+    }
+
+    std::size_t remaining = chars.size();
+    for (const auto &[character, indices] : wanted) {
+        const auto cached = reverseReadings_.find(character);
+        if (cached == reverseReadings_.end()) {
+            continue;
+        }
+        for (const std::size_t index : indices) {
+            readings[index] = cached->second;
+            --remaining;
+        }
+    }
+    if (remaining == 0) {
+        return readings;
+    }
+
+    Zhuyin probe;
+    probe.setKeyboardLayout(layout_);
+    for (const auto &sequence : inputer::syllableKeySequences(layout_)) {
+        if (remaining == 0) {
+            break;
+        }
+        probe.resetAll();
+        for (char key : sequence.keys) {
+            probe.handleDefault(static_cast<int>(key));
+        }
+        if (sequence.toneOne) {
+            probe.handleSpace();
+        }
+        if (!probe.openCandidates()) {
+            continue;
+        }
+        const int total = probe.candidateCount();
+        for (int i = 0; i < total; ++i) {
+            const std::string candidate = probe.candidate(i);
+            if (inputer::unicode::graphemeCount(candidate) != 1) {
+                continue;
+            }
+            const auto wantedIt = wanted.find(candidate);
+            if (wantedIt == wanted.end()) {
+                continue;
+            }
+            std::string reading = sequence.keys;
+            if (sequence.toneOne) {
+                reading.push_back(' ');
+            }
+            reverseReadings_.try_emplace(candidate, reading);
+            for (const std::size_t index : wantedIt->second) {
+                if (!readings[index].empty()) {
+                    continue;
+                }
+                readings[index] = reading;
+                --remaining;
+            }
+        }
+        probe.closeCandidates();
+    }
+    constexpr std::size_t kMaxReverseReadings = 4096;
+    while (reverseReadings_.size() > kMaxReverseReadings) {
+        reverseReadings_.erase(reverseReadings_.begin());
+    }
+    probe.resetAll();
+    return readings;
 }
 
 void Zhuyin::feedKey(char c) {

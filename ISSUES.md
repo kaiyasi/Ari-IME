@@ -68,6 +68,18 @@ need manual validation across toolkits and display servers; the matrix and steps
 live in [docs/manual-qa.md](docs/manual-qa.md). Current status of that matrix is
 tracked there.
 
+## Committed-text reconversion depends on surrounding text
+
+`ReconversionKey` only acts when the client exposes a valid selected range
+through Fcitx5's `SurroundingText` capability. Ari intentionally passes the
+shortcut through unchanged for clients without that capability, mixed or
+non-Han selections, selections longer than 32 Chinese characters, and
+password/sensitive fields. The first external short selection may take a
+moment while Ari finds safe readings through libchewing's candidate tables;
+readings already composed by Ari and repeated reverse lookups are cached in the
+input context. GTK, Qt, and Electron applications still need the manual
+surrounding-text checks in [docs/manual-qa.md](docs/manual-qa.md).
+
 ## Long pre-edit context has a finite window
 
 Ari keeps the whole mixed string editable, but libchewing's contextual model has

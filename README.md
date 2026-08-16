@@ -35,6 +35,12 @@ phrasing and per-user learning.
   `Ctrl+Z` restores recent candidate choices until text is otherwise edited;
   `Shift+Delete` forgets the highlighted personal candidate without removing
   the same word from the built-in dictionary.
+- **Committed-text reconversion** — select a short all-Chinese range that has
+  already been sent to the application and press `Ctrl+Alt+R` to reopen Ari's
+  native candidate editor. The original text stays available, so a phrase can
+  be corrected without deleting and retyping it. This uses Fcitx5's native
+  surrounding-text capability, does nothing in unsupported or sensitive fields,
+  and can be cleared or rebound through the `ReconversionKey` addon setting.
 - **Safe mixed-text editing** — pasted common multi-codepoint Emoji (including
   variation-selector, flag and ZWJ sequences) behaves as one unit for the caret
   and Backspace instead of being split into broken fragments.
@@ -98,6 +104,7 @@ phrasing and per-user learning.
 | layout tone keys, space (一聲) | complete the pending syllable |
 | live recommendation panel | shows the current result and alternatives; it does not capture digits |
 | ↓ / ← / → | open candidate re-selection over the pre-edit |
+| Ctrl+Alt+R | reopen a selected short Chinese range for candidate correction (configurable) |
 | ↑ | open/reinterpret the current pre-edit cell |
 | Tab / Shift+Tab (in candidates) | move candidate highlight forward / backward |
 | Home / End | jump to the beginning / end of the pre-edit |

@@ -4,6 +4,7 @@
 #define INPUTER_ZHUYIN_H
 
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -116,6 +117,11 @@ public:
     // Current edit-cursor position (in characters) within the converted buffer.
     int cursorPos() const;
 
+    // Reverse-lookup one raw reading per grapheme in a short selected text.
+    // Empty entries mean that libchewing has no candidate for that character;
+    // callers must treat the result as an all-or-nothing operation.
+    std::vector<std::string> readingsForText(const std::string &text);
+
     // Pagination info / control for a manually-highlighted candidate cursor.
     int candPerPage() const;
     int candCurrentPage() const;
@@ -139,8 +145,13 @@ private:
     bool loadUserPhraseCache();
 
     ChewingContext *ctx_ = nullptr;
+    inputer::KeyboardLayout layout_ = inputer::currentKeyboardLayout();
     bool userPhraseCacheLoaded_ = false;
     std::unordered_set<std::string> userPhraseTexts_;
+    // External committed text may need a bounded reverse lookup. Cache the
+    // first valid reading per character so repeated reconversion stays quick;
+    // readings learned from Ari's own cells are kept separately in Buffer.
+    std::unordered_map<std::string, std::string> reverseReadings_;
 };
 
 #endif // INPUTER_ZHUYIN_H

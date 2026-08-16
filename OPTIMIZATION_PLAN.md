@@ -78,6 +78,10 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Added an opt-in `SpaceCandidateMode` through the native addon settings, so
   traditional Space-to-candidate users can use the familiar flow without
   changing Ari's mixed-input default.
+- Added safe committed-text reconversion through Fcitx5's native surrounding
+  text: a short all-Chinese selection can be reopened in the normal candidate
+  editor, while unsupported, mixed, long, and sensitive selections pass through
+  unchanged. Ari remembers the original selection for Escape/focus reset.
 - Added `docs/manual-qa.md` to standardize real desktop-session validation.
 
 ### Performance And Stability
@@ -116,6 +120,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
   release gate.
 - Increased the live libchewing context window from 20 to 32 Chinese characters
   so longer sentences retain useful context before internal replay/chunking.
+- Added a bounded per-context reverse-reading cache so the first external
+  reconversion may inspect libchewing's candidate tables, while repeated
+  characters and Ari-composed text are immediate.
 
 ## Current Release Audit
 
@@ -159,8 +166,8 @@ usability first: feature coverage, UX, performance, and engineering quality.
   real editors.
 - Add short release-quality demos or GIFs to the README for mixed input,
   reselection, paste handling, and layout switching.
-- Investigate reconversion of already-committed selected text when the client
-  exposes sufficient Fcitx5 surrounding-text support.
+- Verify committed-text reconversion with real GTK, Qt, and Electron clients;
+  the safe fallback must leave unsupported or sensitive selections untouched.
 
 ### P3: Engineering Maintenance
 

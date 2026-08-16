@@ -487,6 +487,58 @@ std::string Buffer::preeditText() const {
     return out;
 }
 
+KeyResult Buffer::beginReconversion(const std::string &text) {
+    if (text.empty() || inputer::unicode::graphemeCount(text) >
+                            inputer::kMaxCompositionChars ||
+        !preeditText().empty()) {
+        return {false, false, {}, false};
+    }
+
+    const auto chars = inputer::unicode::splitGraphemes(text);
+    if (chars.empty() ||
+        std::any_of(chars.begin(), chars.end(), [](const std::string &character) {
+            return !containsHanCharacter(character);
+        })) {
+        return {false, false, {}, false};
+    }
+    std::vector<std::string> readings(chars.size());
+    std::size_t missing = 0;
+    for (std::size_t i = 0; i < chars.size(); ++i) {
+        const auto known = knownReadings_.find(chars[i]);
+        if (known != knownReadings_.end()) {
+            readings[i] = known->second;
+        } else {
+            ++missing;
+        }
+    }
+    if (missing > 0) {
+        const auto reverse = zhuyin_.readingsForText(text);
+        for (std::size_t i = 0; i < chars.size(); ++i) {
+            if (readings[i].empty() && i < reverse.size()) {
+                readings[i] = reverse[i];
+            }
+        }
+    }
+    if (readings.size() != chars.size() ||
+        std::any_of(readings.begin(), readings.end(),
+                    [](const std::string &reading) { return reading.empty(); })) {
+        return {false, false, {}, false};
+    }
+
+    reset();
+    cells_.reserve(chars.size());
+    for (std::size_t i = 0; i < chars.size(); ++i) {
+        // The reverse lookup already gives the selected text's readings. Leave
+        // the cells unlocked so libchewing can still expose phrase-level
+        // alternatives instead of treating every character as a hard pick.
+        cells_.push_back({true, chars[i], readings[i]});
+    }
+    selecting_ = true;
+    candOpen_ = false;
+    caretPos_ = static_cast<int>(cells_.size());
+    return handleSelecting(fcitx::Key(FcitxKey_Down));
+}
+
 std::vector<std::string> Buffer::candidates() const {
     // The current page (9) of the merged phrase+single candidate list. Empty on
     // an English cell (cursor still visible, just nothing to pick).
@@ -1266,6 +1318,17 @@ void Buffer::learnFromCells() {
         if (!cells_[i].chinese) {
             ++i;
             continue;
+        }
+        for (int j = i; j < static_cast<int>(cells_.size()) &&
+                        cells_[j].chinese;
+             ++j) {
+            if (!cells_[j].reading.empty()) {
+                knownReadings_[cells_[j].text] = cells_[j].reading;
+            }
+        }
+        constexpr std::size_t kMaxKnownReadings = 4096;
+        while (knownReadings_.size() > kMaxKnownReadings) {
+            knownReadings_.erase(knownReadings_.begin());
         }
         int s = i;
         while (i < static_cast<int>(cells_.size()) && cells_[i].chinese) {

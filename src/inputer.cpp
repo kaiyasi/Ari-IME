@@ -292,6 +292,46 @@ std::string InputerEngine::clipboardText(fcitx::InputContext *ic) {
     return clipboard->call<fcitx::IClipboard::clipboard>(ic);
 }
 
+bool InputerEngine::beginReconversion(fcitx::InputContext *ic,
+                                      InputerState &state) {
+    if (state.reconversionActive || state.buffer.isForcedEnglish() ||
+        !state.buffer.preeditText().empty() ||
+        !ic->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText) ||
+        ic->capabilityFlags().test(fcitx::CapabilityFlag::PasswordOrSensitive)) {
+        return false;
+    }
+
+    const auto &surrounding = ic->surroundingText();
+    if (!surrounding.isValid() || surrounding.anchor() == surrounding.cursor()) {
+        return false;
+    }
+    const unsigned int start =
+        std::min(surrounding.anchor(), surrounding.cursor());
+    const unsigned int end =
+        std::max(surrounding.anchor(), surrounding.cursor());
+    const unsigned int size = end - start;
+    const int offset = static_cast<int>(start) -
+                       static_cast<int>(surrounding.cursor());
+    const std::string selected = surrounding.selectedText();
+    if (selected.empty() || size == 0) {
+        return false;
+    }
+
+    const KeyResult result = state.buffer.beginReconversion(selected);
+    if (!result.handled) {
+        return false;
+    }
+
+    // The selection is now represented by Ari's pre-edit. Delete the original
+    // range from the client and update Fcitx's local surrounding-text cache so
+    // Escape/reset can safely restore it at the same collapsed cursor.
+    ic->deleteSurroundingText(offset, size);
+    ic->surroundingText().deleteText(offset, size);
+    state.reconversionActive = true;
+    state.reconversionText = selected;
+    return true;
+}
+
 void InputerEngine::applyResult(fcitx::InputContext *ic, Buffer &buffer,
                                 const KeyResult &result) {
     if (result.hasCommit && !result.commitText.empty()) {
@@ -377,6 +417,18 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
     // buffer. If the clipboard is empty/unavailable, let the application handle
     // the shortcut normally.
     const fcitx::Key &k = keyEvent.key();
+
+    // Reopen a selected, short Chinese range for ordinary Ari candidate
+    // editing. If the client does not expose a safe surrounding selection, the
+    // shortcut is left untouched for the application.
+    if (!config_.reconversionKey->empty() &&
+        k.normalize().checkKeyList(*config_.reconversionKey) &&
+        beginReconversion(ic, *state)) {
+        updateUI(ic, state->buffer);
+        keyEvent.filterAndAccept();
+        return;
+    }
+
     if (isPasteShortcut(k)) {
         std::string pasted = clipboardText(ic);
         if (!pasted.empty()) {
@@ -389,7 +441,22 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
 
     KeyResult result = state->buffer.handleKey(keyEvent.key());
 
+    if (state->reconversionActive && k.sym() == FcitxKey_Escape &&
+        result.handled) {
+        state->buffer.reset();
+        ic->commitString(state->reconversionText);
+        state->reconversionActive = false;
+        state->reconversionText.clear();
+        updateUI(ic, state->buffer);
+        keyEvent.filterAndAccept();
+        return;
+    }
+
     applyResult(ic, state->buffer, result);
+    if (state->reconversionActive && result.hasCommit) {
+        state->reconversionActive = false;
+        state->reconversionText.clear();
+    }
     if (result.handled) {
         keyEvent.filterAndAccept();
     }
@@ -399,6 +466,12 @@ void InputerEngine::reset(const fcitx::InputMethodEntry &,
                           fcitx::InputContextEvent &event) {
     auto *ic = event.inputContext();
     auto *state = ic->propertyFor(&factory_);
+    if (state->reconversionActive) {
+        state->buffer.reset();
+        ic->commitString(state->reconversionText);
+        state->reconversionActive = false;
+        state->reconversionText.clear();
+    }
     state->buffer.reset();
     auto &panel = ic->inputPanel();
     panel.reset();

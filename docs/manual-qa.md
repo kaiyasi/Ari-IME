@@ -106,6 +106,10 @@ and record any application-specific behavior before publishing it.
 | Page candidates | Type `su3`, press Down, PageDown/PageUp | Candidate page changes; aux line shows page count |
 | Raw key revert | Type `su3`, press Down, Shift+Tab or Up to `原始鍵 su3`, press Enter | Preedit becomes `su3` |
 | Stale click resilience | Open candidates, rapidly page then click an old candidate position | Candidate window does not disappear unexpectedly |
+| Committed-text reconversion | Commit `測試`, select the two Chinese characters in the application, press `Ctrl+Alt+R` | The selected text is replaced by an Ari preedit; native candidates include `測試` and a phrase alternative such as `策士` |
+| Reconversion correction | While reconversion is active, choose a phrase candidate and press Enter | The original selected range is replaced by the chosen phrase; no extra Ari window is required |
+| Reconversion cancel | Start reconversion, press Esc or change focus before committing | The original selected text is restored; no selected text is lost |
+| Reconversion safety | Select text containing English, punctuation, more than 32 Chinese characters, or a password field | `Ctrl+Alt+R` is passed through and the application text remains unchanged |
 
 ## Caret Editing
 
@@ -147,6 +151,7 @@ and record any application-specific behavior before publishing it.
 | App shortcut passthrough | Press common app shortcuts such as Ctrl+. in VS Code or browser text fields | The app shortcut still works; Ari IME does not reserve a fixed punctuation toggle shortcut |
 | Status line | Compose any non-empty preedit | Aux line shows 中/英, keyboard layout, punctuation mode |
 | Space candidate compatibility | Enable `SpaceCandidateMode`, type `hk4g4`, press Space | Candidate window opens with `測試`; disable it and confirm the default Space behavior remains unchanged |
+| Reconversion shortcut | In addon settings, clear or rebind `ReconversionKey` | The default `Ctrl+Alt+R` is no longer reserved when cleared; the replacement shortcut performs the same safe reconversion check |
 | Literal punctuation | With full-width punctuation off, type `su3`, then `< > ?`; start a fresh preedit and type `API?` | Punctuation does not depend on language context: results are `你<>?` and `API?` |
 | Full-width punctuation | Enable full-width punctuation; type `< > ? ( ) { } ! : \ ^ ' @ % + =` | Preedit uses Chinese punctuation forms, including `、`, `……`, and full-width symbols |
 | Explicit Chinese punctuation | With full-width punctuation off, use the configured `ChinesePunctuationShortcut` (default Ctrl+Shift) with comma, period, slash and the apostrophe key (`'`) | Preedit adds `，。？、`; specifically the configured shortcut plus `'` produces `、`; set Alt+Shift in configtool and repeat to verify the alternative path |

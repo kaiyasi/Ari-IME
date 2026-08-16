@@ -13,6 +13,7 @@
 #include <fcitx-utils/keysym.h>
 
 #include "buffer.h"
+#include "constants.h"
 #include "layout.h"
 #include "test_common.h"
 
@@ -806,6 +807,45 @@ void test_live_matches_top_candidate() {
     s.key(FcitxKey_Down); // open candidates for 你
     auto c = s.cand();
     check(!c.empty() && c[0] == live, "selection top candidate matches live");
+}
+
+void test_reconversion_core() {
+    Sim s;
+    const KeyResult result = s.b.beginReconversion("測試");
+    check(result.handled, "short Chinese text can enter reconversion");
+    check(s.b.isPicking(), "reconversion opens the native candidate state");
+    check_eq(s.preedit(), "測試", "reconversion preserves the selected text");
+    check(find_visible_candidate(s.cand(), "測試") >= 0,
+          "reconversion keeps the original phrase available");
+
+    const int alternative = find_visible_candidate(s.cand(), "策士");
+    check(alternative >= 0,
+          "reconversion exposes a phrase alternative for the selected text");
+    if (alternative >= 0) {
+        check(s.b.selectCandidate(alternative).handled,
+              "reconversion phrase alternative can be selected");
+        check_eq(s.preedit(), "策士",
+                 "reconversion replaces the selected text with the choice");
+    }
+
+    Sim repeated;
+    check(repeated.b.beginReconversion("你你").handled,
+          "reconversion handles repeated target characters");
+    check_eq(repeated.preedit(), "你你",
+             "reconversion preserves repeated target characters");
+
+    Sim mixed;
+    check(!mixed.b.beginReconversion("測試!").handled,
+          "reconversion rejects mixed text it cannot reverse safely");
+    check_eq(mixed.preedit(), "", "reconversion rejection leaves buffer empty");
+
+    std::string longText;
+    for (int i = 0; i < inputer::kMaxCompositionChars + 1; ++i) {
+        longText += "你";
+    }
+    Sim longSelection;
+    check(!longSelection.b.beginReconversion(longText).handled,
+          "reconversion rejects text beyond the short-selection limit");
 }
 
 void test_phrase_pick() {
@@ -2442,6 +2482,7 @@ int main() {
     test_trailing_phrase_recommendation();
     test_live_candidate_preview();
     test_live_matches_top_candidate();
+    test_reconversion_core();
     test_phrase_pick();
     test_candidate_direct_selection();
     test_stale_candidate_activation_is_ignored();

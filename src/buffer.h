@@ -4,6 +4,7 @@
 #define INPUTER_BUFFER_H
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -68,6 +69,11 @@ public:
     // Insert clipboard / external text at the caret (Ctrl+V): drops in as literal
     // cells and leaves the caret right after them, so editing continues there.
     void pasteAtCaret(const std::string &text);
+
+    // Start candidate editing for an already-committed, short all-Chinese
+    // selection. Returns false without changing the buffer when reverse lookup
+    // cannot produce a reading for every grapheme.
+    KeyResult beginReconversion(const std::string &text);
 
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
@@ -304,6 +310,10 @@ private:
     std::vector<SelCand> selCands_;      // merged phrase+single candidate list
     int selPage_ = 0;                    // page (of 9) within selCands_
     int highlight_ = 0;                  // highlighted candidate within the page
+    // Readings from text Ari has already composed in this input context. They
+    // make the common reconversion path immediate; unknown external text falls
+    // back to the bounded libchewing reverse lookup.
+    std::unordered_map<std::string, std::string> knownReadings_;
     Zhuyin zhuyin_;                      // live Chinese run; scratch while selecting
 };
 

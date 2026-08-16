@@ -6,6 +6,7 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -386,6 +387,87 @@ bool needsBodyBeforeToneCompletion(KeyboardLayout layout) {
         return false;
     }
     return false;
+}
+
+std::vector<SyllableKeySequence>
+syllableKeySequences(KeyboardLayout layout) {
+    struct LayoutGuard {
+        KeyboardLayout previous;
+        explicit LayoutGuard(KeyboardLayout next)
+            : previous(currentKeyboardLayout()) {
+            setCurrentKeyboardLayout(next);
+        }
+        ~LayoutGuard() { setCurrentKeyboardLayout(previous); }
+    } guard(layout);
+
+    std::array<std::vector<char>, 4> keysBySlot;
+    std::vector<char> toneKeys;
+    for (int c = 33; c <= 126; ++c) {
+        const char key = static_cast<char>(c);
+        const int slot = zhuyinSlot(key);
+        if (slot >= 0 && slot < 4) {
+            keysBySlot[slot].push_back(key);
+        }
+        if (isToneKey(key)) {
+            toneKeys.push_back(key);
+        }
+    }
+
+    std::vector<std::string> bodies;
+    // Each slot is optional, but a syllable must contain at least one body
+    // symbol. Keeping the generated order stable makes reverse lookup
+    // deterministic across runs and distributions.
+    for (char initial : keysBySlot[0]) {
+        bodies.emplace_back(1, initial);
+    }
+    for (char medial : keysBySlot[1]) {
+        bodies.emplace_back(1, medial);
+    }
+    for (char final : keysBySlot[2]) {
+        bodies.emplace_back(1, final);
+    }
+    for (char initial : keysBySlot[0]) {
+        for (char medial : keysBySlot[1]) {
+            bodies.push_back(std::string{initial, medial});
+        }
+        for (char final : keysBySlot[2]) {
+            bodies.push_back(std::string{initial, final});
+        }
+    }
+    for (char medial : keysBySlot[1]) {
+        for (char final : keysBySlot[2]) {
+            bodies.push_back(std::string{medial, final});
+        }
+    }
+    for (char initial : keysBySlot[0]) {
+        for (char medial : keysBySlot[1]) {
+            for (char final : keysBySlot[2]) {
+                bodies.push_back(std::string{initial, medial, final});
+            }
+        }
+    }
+
+    std::set<std::pair<std::string, bool>> unique;
+    std::vector<SyllableKeySequence> result;
+    for (const auto &body : bodies) {
+        if (body.empty() || !isValidSyllable(body, /*allowTone=*/false)) {
+            continue;
+        }
+        if (unique.emplace(body, true).second) {
+            result.push_back({body, true});
+        }
+        for (char tone : toneKeys) {
+            const std::string sequence = body + tone;
+            if (!isValidSyllable(sequence, /*allowTone=*/true)) {
+                continue;
+            }
+            const std::string canonical = canonicalKeys(sequence);
+            if (unique.emplace(canonical, false).second) {
+                result.push_back({canonical, false});
+            }
+        }
+    }
+    return result;
 }
 
 } // namespace inputer

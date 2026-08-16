@@ -1,3 +1,13 @@
+fcitx5-ari-ime (2.5.0) unstable; urgency=medium
+
+  * Add safe committed-text reconversion through Fcitx5 surrounding text and
+    the configurable ReconversionKey shortcut.
+  * Preserve selected text on Escape or focus reset and pass unsupported,
+    mixed, long, or sensitive selections through unchanged.
+  * Cache reverse readings for repeated reconversion without adding a custom UI.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Mon, 17 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.4.0) unstable; urgency=medium
 
   * Make the temporary Chinese-punctuation shortcut configurable through the

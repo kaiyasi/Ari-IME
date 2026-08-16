@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 2.5.0 - 2026-08-17
+
+- Add safe committed-text reconversion: select a short all-Chinese range in a
+  compatible Fcitx5 application and press the configurable `ReconversionKey`
+  (default `Ctrl+Alt+R`) to reopen native candidates without retyping.
+- Preserve the selected text on Escape or focus reset, and pass the shortcut
+  through unchanged for mixed, long, unsupported, or sensitive selections.
+- Cache reverse readings per input context so repeated reconversion does not
+  rescan libchewing's candidate table.
+
 ## 2.4.0 - 2026-08-16
 
 - Make the temporary Chinese-punctuation shortcut a native Fcitx5 setting.
