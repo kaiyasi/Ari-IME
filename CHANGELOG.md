@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.3.4 - 2026-08-16
+
+- Cache personal phrase mappings per libchewing context instead of enumerating
+  them on every completed syllable.
+- Skip empty-dictionary enumeration so long candidate windows remain stable on
+  older libchewing releases.
+
 ## 2.3.3 - 2026-08-16
 
 - Promote personal phrase mappings in Ari's live conversion, so explicit or

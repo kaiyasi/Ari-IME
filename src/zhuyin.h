@@ -4,6 +4,7 @@
 #define INPUTER_ZHUYIN_H
 
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -129,7 +130,15 @@ public:
     std::string takeCommit();
 
 private:
+    // Enumerating libchewing's personal dictionary is relatively expensive and
+    // older releases can disturb the active candidate window while doing so.
+    // Keep the phrase text cached for the lifetime of this context; add/remove
+    // operations update it directly.
+    bool loadUserPhraseCache();
+
     ChewingContext *ctx_ = nullptr;
+    bool userPhraseCacheLoaded_ = false;
+    std::unordered_set<std::string> userPhraseTexts_;
 };
 
 #endif // INPUTER_ZHUYIN_H

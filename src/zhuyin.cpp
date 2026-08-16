@@ -15,6 +15,22 @@
 
 namespace {
 
+bool hasUserPhraseStore() {
+    const auto dir = inputer::userDataDir();
+    if (dir.empty()) {
+        return false;
+    }
+
+    std::error_code ec;
+    if (std::filesystem::is_regular_file(dir / "userdict.dat", ec) &&
+        !ec) {
+        return true;
+    }
+    ec.clear();
+    return std::filesystem::is_regular_file(dir / "chewing.dat", ec) &&
+           !ec;
+}
+
 // libchewing logs an error for a missing user dictionary even though an empty
 // dictionary is the normal first-run state and will be created by autoLearn.
 // Ari reports actual context-creation failure through engineReady(), so keep
@@ -265,6 +281,9 @@ int Zhuyin::forgetUserPhrase(const std::string &phrase) {
         }
         removed += count;
     }
+    if (userPhraseCacheLoaded_) {
+        userPhraseTexts_.erase(phrase);
+    }
     return removed;
 }
 
@@ -295,21 +314,39 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
     if (!ctx_ || phrase.empty() || reading.empty()) {
         return -1;
     }
-    return chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
+    const int result =
+        chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
+    if (result >= 0) {
+        userPhraseCacheLoaded_ = true;
+        userPhraseTexts_.insert(phrase);
+    }
+    return result;
+}
+
+bool Zhuyin::loadUserPhraseCache() {
+    if (userPhraseCacheLoaded_) {
+        return !userPhraseTexts_.empty();
+    }
+    // A fresh Ari profile normally has only the directory, not a dictionary
+    // file. Avoid calling the user-phrase enumeration API in that state: it is
+    // needlessly expensive and older libchewing releases can perturb a long
+    // candidate window even when the dictionary is empty. Leave the cache
+    // unopened so a file created later by learning is picked up next time.
+    if (!hasUserPhraseStore()) {
+        return false;
+    }
+
+    userPhraseCacheLoaded_ = true;
+    for (const auto &entry : userPhrases()) {
+        if (!entry.phrase.empty()) {
+            userPhraseTexts_.insert(entry.phrase);
+        }
+    }
+    return !userPhraseTexts_.empty();
 }
 
 int Zhuyin::promoteUserPhrases() {
-    if (!ctx_) {
-        return 0;
-    }
-
-    std::unordered_set<std::string> preferred;
-    for (const auto &entry : userPhrases()) {
-        if (!entry.phrase.empty()) {
-            preferred.insert(entry.phrase);
-        }
-    }
-    if (preferred.empty()) {
+    if (!ctx_ || !loadUserPhraseCache()) {
         return 0;
     }
 
@@ -344,7 +381,7 @@ int Zhuyin::promoteUserPhrases() {
                 const int total = candidateCount();
                 for (int index = 0; index < total; ++index) {
                     const std::string text = candidate(index);
-                    if (preferred.find(text) == preferred.end()) {
+                    if (userPhraseTexts_.find(text) == userPhraseTexts_.end()) {
                         continue;
                     }
                     const auto candidateChars =
