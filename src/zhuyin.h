@@ -99,6 +99,11 @@ public:
     // Add one personal phrase mapping. Returns the number added, 0 when the
     // mapping already exists, or -1 on failure.
     int addUserPhrase(const std::string &phrase, const std::string &reading);
+    // Promote candidates that are already present in the personal dictionary.
+    // This makes an explicit/imported preference reliable on libchewing builds
+    // whose frequency scorer does not rank user phrases first. Built-in
+    // candidates are never reordered by this method.
+    int promoteUserPhrases();
     // Phrase segments recognized in the current pre-edit, as [from, to)
     // character offsets. Used for Ctrl+Arrow navigation.
     std::vector<std::pair<int, int>> phraseIntervals();

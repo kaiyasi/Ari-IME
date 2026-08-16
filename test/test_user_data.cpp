@@ -274,6 +274,8 @@ void test_userphrase_mapping_can_be_restored() {
         Zhuyin engine;
         check(engine.addUserPhrase("妳", "ㄋㄧˇ") > 0,
               "portable userphrase mapping can be added");
+        check(engine.addUserPhrase("資", "ㄗ") > 0,
+              "portable one-key tone-one mapping can be added");
         const auto entries = engine.userPhrases();
         bool found = false;
         for (const auto &entry : entries) {
@@ -287,9 +289,17 @@ void test_userphrase_mapping_can_be_restored() {
 
     Sim restored;
     restored.type("su3");
+    check_eq(restored.preedit(), "妳",
+             "imported userphrase mapping is promoted to the live result");
     restored.key(FcitxKey_Down);
     check(findVisibleCandidate(restored.cand(), "妳") >= 0,
           "imported userphrase mapping remains selectable");
+
+    Sim single;
+    single.key('y');
+    single.key(FcitxKey_space);
+    check_eq(single.preedit(), "資",
+             "imported one-key mapping wins after tone-one completion");
 }
 
 void test_legacy_dictionary_is_seeded_for_libchewing() {

@@ -62,7 +62,10 @@ phrasing and per-user learning.
   one weak positive learning pass. An explicitly selected character or phrase
   receives three extra passes (roughly 4:1), plus one short surrounding-context
   pass, so deliberate choices adapt faster without treating accepted defaults
-  as mistakes. **AutoLearn** can be disabled in the addon's configuration when
+  as mistakes. Ari also promotes mappings already present in the personal
+  dictionary, making explicit/imported preferences reliable on older
+  libchewing builds whose frequency scorer ranks them conservatively.
+  **AutoLearn** can be disabled in the addon's configuration when
   the personal dictionary should remain unchanged.
   Password and sensitive input fields never write learning data.
 - **Automatic offline context** — libchewing's local phrase model uses
@@ -379,7 +382,7 @@ candidate windows, clipboard, and theme rendering depend on the desktop session.
 Use [docs/manual-qa.md](docs/manual-qa.md) before releases.
 
 Release-specific notes are tracked in [CHANGELOG.md](CHANGELOG.md) and
-[docs/release-2.3.2.md](docs/release-2.3.2.md).
+[docs/release-2.3.3.md](docs/release-2.3.3.md).
 
 ## Resetting learned data
 

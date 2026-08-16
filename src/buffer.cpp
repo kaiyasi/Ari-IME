@@ -871,6 +871,7 @@ void Buffer::integrateSyllable(const std::string &body) {
     // Keep libchewing's contextual conversion. Its phrase scorer combines the
     // built-in language model with local learned frequencies; forcing candidate
     // zero here would discard that context before the user even sees it.
+    zhuyin_.promoteUserPhrases();
     moveAutoCommit();
     token_ = Token::Chinese;
 }
@@ -1081,6 +1082,7 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
         }
         zhuyin_.feedSequence(syllable);
         runReadings_ = {syllable};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1116,6 +1118,7 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
         }
         zhuyin_.feedSequence(syllable);
         runReadings_ = {syllable};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1147,6 +1150,7 @@ bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
         zhuyin_.feedSequence(syllable);
         zhuyin_.handleSpace();
         runReadings_ = {syllable + " "};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1180,6 +1184,7 @@ KeyResult Buffer::handleSpace() {
             }
             zhuyin_.handleSpace();             // 一聲
             runReadings_.push_back(body + " "); // ' ' marks a 一聲 reading
+            zhuyin_.promoteUserPhrases();
             moveAutoCommit();
             syl_.clear();
             token_ = Token::Chinese;
@@ -1349,6 +1354,7 @@ int Buffer::feedRun(int start, int end, int offset) {
     }
     // Preserve libchewing's contextual conversion, then restore explicit picks
     // that a fresh feed reverted.
+    zhuyin_.promoteUserPhrases();
     relockRun(start, end, /*onlyLocked=*/true);
     // Park the edit cursor on the character we want candidates for.
     zhuyin_.handleHome();

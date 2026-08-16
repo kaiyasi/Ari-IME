@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 2.3.3 - 2026-08-16
+
+- Promote personal phrase mappings in Ari's live conversion, so explicit or
+  imported choices remain first even on older libchewing builds whose frequency
+  scorer ranks user phrases conservatively.
+- Keep `ari-ime-dict candidates` aligned with the interactive input result.
+- Add regression coverage for imported homophones, one-key tone-one mappings
+  such as `y` → `資`, and the diagnostic tool's promoted preedit.
+
 ## 2.3.2 - 2026-08-16
 
 - Make portable-dictionary regression coverage assert that imported mappings

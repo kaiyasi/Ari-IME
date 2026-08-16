@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.3.3) unstable; urgency=medium
+
+  * Promote explicit and imported personal phrase mappings in the live result,
+    including one-key tone-one mappings, across libchewing versions.
+  * Keep ari-ime-dict candidate diagnostics aligned with interactive behavior.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.3.2) unstable; urgency=medium
 
   * Make the portable-dictionary regression check assert candidate

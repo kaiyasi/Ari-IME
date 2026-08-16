@@ -47,6 +47,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
   raw-data backups without adding a GUI.
 - Made portable dictionary imports validate the complete file first, merge
   idempotently, and preserve existing libchewing data before mutation.
+- Promote explicit/imported personal phrase mappings in Ari's live result, so
+  older libchewing frequency implementations do not silently demote a user's
+  deliberate preference; built-in contextual candidates remain untouched.
 
 ### UX
 
@@ -126,8 +129,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Continue broadening reinterpretation regressions with more real-world
   developer and document-authoring text samples.
 - Use `ari-ime-dict candidates` plus a small versioned golden corpus when a
-  distribution changes libchewing candidate ordering; do not hardcode a
-  sentence-specific replacement into the engine.
+  distribution changes libchewing candidate ordering; keep the golden corpus
+  for built-in results while treating explicit personal mappings as Ari-owned
+  preferences rather than hardcoding sentence-specific replacements.
 - Evaluate an optional traditional Space-to-commit compatibility policy in
   real editors before changing Ari's current whole-preedit Enter contract.
 

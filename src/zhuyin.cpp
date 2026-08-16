@@ -4,12 +4,14 @@
 
 #include <cstdlib>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <chewing.h>
 
 #include "constants.h"
 #include "layout.h"
+#include "unicode.h"
 
 namespace {
 
@@ -294,6 +296,124 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         return -1;
     }
     return chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
+}
+
+int Zhuyin::promoteUserPhrases() {
+    if (!ctx_) {
+        return 0;
+    }
+
+    std::unordered_set<std::string> preferred;
+    for (const auto &entry : userPhrases()) {
+        if (!entry.phrase.empty()) {
+            preferred.insert(entry.phrase);
+        }
+    }
+    if (preferred.empty()) {
+        return 0;
+    }
+
+    struct Choice {
+        int start = 0;
+        int down = 0;
+        int index = 0;
+        int length = 0;
+    };
+
+    int applied = 0;
+    for (int pass = 0; pass < inputer::kMaxCompositionChars; ++pass) {
+        const auto visible = inputer::unicode::splitGraphemes(preedit());
+        if (visible.empty()) {
+            break;
+        }
+
+        Choice best;
+        bool found = false;
+        for (int start = 0; start < static_cast<int>(visible.size()); ++start) {
+            closeCandidates();
+            handleHome();
+            for (int i = 0; i < start; ++i) {
+                handleRight();
+            }
+            if (!openCandidates()) {
+                continue;
+            }
+
+            for (int down = 0, guard = 0;
+                 guard < inputer::kMaxSyllables; ++guard, ++down) {
+                const int total = candidateCount();
+                for (int index = 0; index < total; ++index) {
+                    const std::string text = candidate(index);
+                    if (preferred.find(text) == preferred.end()) {
+                        continue;
+                    }
+                    const auto candidateChars =
+                        inputer::unicode::splitGraphemes(text);
+                    const int length = static_cast<int>(candidateChars.size());
+                    if (length <= 0 || start + length >
+                                           static_cast<int>(visible.size())) {
+                        continue;
+                    }
+                    bool alreadyVisible = true;
+                    for (int i = 0; i < length; ++i) {
+                        if (visible[start + i] != candidateChars[i]) {
+                            alreadyVisible = false;
+                            break;
+                        }
+                    }
+                    if (alreadyVisible) {
+                        continue;
+                    }
+
+                    // Prefer the longest explicit phrase. For equal lengths,
+                    // prefer the newest/rightmost span so a second phrase in a
+                    // sentence is not hidden by an already-correct first one.
+                    if (!found || length > best.length ||
+                        (length == best.length && start > best.start) ||
+                        (length == best.length && start == best.start &&
+                         down < best.down)) {
+                        best = {start, down, index, length};
+                        found = true;
+                    }
+                }
+
+                if (total <= 0 ||
+                    inputer::unicode::graphemeCount(candidate(0)) <= 1) {
+                    break;
+                }
+                handleDown();
+            }
+        }
+
+        if (!found) {
+            closeCandidates();
+            handleEnd();
+            break;
+        }
+
+        closeCandidates();
+        handleHome();
+        for (int i = 0; i < best.start; ++i) {
+            handleRight();
+        }
+        if (!openCandidates()) {
+            break;
+        }
+        for (int i = 0; i < best.down; ++i) {
+            handleDown();
+        }
+        const int perPage = candPerPage();
+        const int targetPage = perPage > 0 ? best.index / perPage : 0;
+        while (candCurrentPage() < targetPage) {
+            nextPage();
+        }
+        chooseCandidate(perPage > 0 ? best.index % perPage : best.index);
+        ++applied;
+    }
+
+    closeCandidates();
+    handleEnd();
+    return applied;
 }
 
 std::vector<std::pair<int, int>> Zhuyin::phraseIntervals() {
