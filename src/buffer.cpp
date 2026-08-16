@@ -159,6 +159,31 @@ bool isShiftedAsciiPunctuation(fcitx::KeySym sym) {
     return shifted.find(static_cast<char>(sym)) != std::string_view::npos;
 }
 
+bool punctuationShortcutActive(
+    const fcitx::Key &key, inputer::ChinesePunctuationShortcut shortcut) {
+    const bool ctrl = key.states().test(fcitx::KeyState::Ctrl);
+    const bool alt = key.states().test(fcitx::KeyState::Alt);
+    const bool super = key.states().test(fcitx::KeyState::Super);
+    const bool shifted = key.states().test(fcitx::KeyState::Shift) ||
+                         isShiftedAsciiPunctuation(key.sym());
+    if (super || (ctrl && alt)) {
+        return false;
+    }
+    switch (shortcut) {
+    case inputer::ChinesePunctuationShortcut::ControlShift:
+        return ctrl && shifted;
+    case inputer::ChinesePunctuationShortcut::AltShift:
+        return alt && shifted;
+    case inputer::ChinesePunctuationShortcut::Control:
+        return ctrl;
+    case inputer::ChinesePunctuationShortcut::Alt:
+        return alt;
+    case inputer::ChinesePunctuationShortcut::Disabled:
+        return false;
+    }
+    return false;
+}
+
 Zhuyin *probeForCurrentLayout(Zhuyin *&probe,
                               inputer::KeyboardLayout &probeLayout) {
     inputer::KeyboardLayout layout = inputer::currentKeyboardLayout();
@@ -648,12 +673,9 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
 
     const bool shiftedApostrophe = sym == FcitxKey_apostrophe ||
                                    sym == FcitxKey_quotedbl;
-    const bool ctrl = key.states().test(fcitx::KeyState::Ctrl);
-    const bool explicitShift = key.states().test(fcitx::KeyState::Shift) ||
-                               isShiftedAsciiPunctuation(sym);
-    const bool ctrlShift = ctrl && explicitShift;
     const bool explicitChinesePunctuation =
-        !forcedEnglish_ && ctrlShift &&
+        !forcedEnglish_ &&
+        punctuationShortcutActive(key, punctuationShortcut_) &&
         (shiftedApostrophe ||
          (sym >= 33 && sym <= 126 &&
           !chinesePunct(static_cast<char>(sym)).empty()));
@@ -673,16 +695,20 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
     }
 
     // Chinese punctuation is an explicit gesture, independent of surrounding
-    // language: Ctrl+Shift plus a punctuation key requests the corresponding
-    // Chinese form. Some frontends encode Shift only in the resulting keysym,
-    // so recognize shifted ASCII symbols even when the Shift state bit is gone.
-    if (!forcedEnglish_ && ctrlShift && shiftedApostrophe) {
+    // language. The modifier policy is configurable through Fcitx5; some
+    // frontends encode Shift only in the resulting keysym, so the shortcut
+    // matcher also recognizes shifted ASCII symbols without the Shift bit.
+    if (!forcedEnglish_ &&
+        punctuationShortcutActive(key, punctuationShortcut_) &&
+        shiftedApostrophe) {
         clearSelectionUndo();
         freezeAll();
         cells_.push_back({false, "、", {}});
         return {true, false, {}, true};
     }
-    if (!forcedEnglish_ && ctrlShift && sym >= 33 && sym <= 126) {
+    if (!forcedEnglish_ &&
+        punctuationShortcutActive(key, punctuationShortcut_) &&
+        sym >= 33 && sym <= 126) {
         std::string punct = chinesePunct(static_cast<char>(sym));
         if (!punct.empty()) {
             clearSelectionUndo();
@@ -1196,6 +1222,14 @@ KeyResult Buffer::handleSpace() {
         if (tryPeelEnglishTone1(peeled)) {
             return peeled;
         }
+    }
+    // Traditional注音/Rime users often expect Space to open candidates after a
+    // complete conversion. Keep that behavior opt-in so Ari's default mixed
+    // contract still treats Space as 一聲 or a literal separator.
+    if (spaceCandidateMode_ && !forcedEnglish_ &&
+        token_ == Token::Chinese && syl_.empty() && englishBuf_.empty() &&
+        zhuyin_.hasConverted()) {
+        return enterSelection(fcitx::Key(FcitxKey_Down));
     }
     // Otherwise space is a literal separator: fold the current token into cells_
     // and append a space. Still no commit — only Enter commits.

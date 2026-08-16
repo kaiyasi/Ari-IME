@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.4.0 - 2026-08-16
+
+- Make the temporary Chinese-punctuation shortcut a native Fcitx5 setting.
+  The default remains `Ctrl+Shift`; users can select `Alt+Shift`, `Ctrl`,
+  `Alt`, or disable the gesture when an application reserves the default.
+- Add opt-in `SpaceCandidateMode` for users who expect Space to open candidates
+  after a complete Chinese conversion; Ari's mixed-input default is unchanged.
+
 ## 2.3.7 - 2026-08-16
 
 - Persist phrases explicitly selected during normal composition in Ari's

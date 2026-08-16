@@ -30,7 +30,18 @@ FCITX_CONFIGURATION(
         this, "KeyboardLayout", _("Keyboard layout"), inputer::KeyboardLayout::Default};
     fcitx::Option<bool> fullWidthPunctuation{
         this, "FullWidthPunctuation",
-        _("Always use full-width Chinese punctuation without a modifier. Off keeps ordinary punctuation literal; Ctrl+Shift plus a punctuation key produces its Chinese form temporarily."),
+        _("Always use full-width Chinese punctuation without a modifier. Off keeps ordinary punctuation literal; the configured ChinesePunctuationShortcut plus a punctuation key produces its Chinese form temporarily."),
+        false};
+    fcitx::OptionWithAnnotation<
+        inputer::ChinesePunctuationShortcut,
+        inputer::ChinesePunctuationShortcutI18NAnnotation>
+        chinesePunctuationShortcut{
+        this, "ChinesePunctuationShortcut",
+        _("Modifier used for temporary Chinese punctuation (default Ctrl+Shift). Choose Alt+Shift or another option if an application uses the default gesture."),
+        inputer::ChinesePunctuationShortcut::ControlShift};
+    fcitx::Option<bool> spaceCandidateMode{
+        this, "SpaceCandidateMode",
+        _("Use Space to open Chinese candidates after a complete syllable. Off keeps Ari's mixed-input Space-as-tone-one and literal-space behavior; Enter remains the commit key."),
         false};
     fcitx::Option<bool> autoLearn{
         this, "AutoLearn",

@@ -1,3 +1,13 @@
+fcitx5-ari-ime (2.4.0) unstable; urgency=medium
+
+  * Make the temporary Chinese-punctuation shortcut configurable through the
+    native Fcitx5 addon settings, with Ctrl+Shift as the default and Alt,
+    Alt+Shift, Ctrl, and disabled alternatives.
+  * Add an opt-in Space candidate compatibility mode without changing the
+    default mixed-input Space and Enter behavior.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.3.7) unstable; urgency=medium
 
   * Persist explicitly selected phrases in Ari's preference sidecar and make

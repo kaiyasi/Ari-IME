@@ -2105,6 +2105,55 @@ void test_fullwidth_punct() {
     check_eq(normalizedCtrlShiftDunhao.preedit(), "你、",
              "normalized Ctrl+Shift+' inserts dunhao");
 
+    Sim altShiftDunhao;
+    check(altShiftDunhao.b.setChinesePunctuationShortcut(
+              inputer::ChinesePunctuationShortcut::AltShift),
+          "punctuation shortcut can switch to Alt+Shift");
+    KeyResult altShiftResult = altShiftDunhao.press(fcitx::Key(
+        FcitxKey_quotedbl,
+        fcitx::KeyStates{fcitx::KeyState::Alt, fcitx::KeyState::Shift}));
+    check(altShiftResult.handled,
+          "configured Alt+Shift punctuation is handled");
+    check_eq(altShiftDunhao.preedit(), "、",
+             "configured Alt+Shift inserts dunhao");
+
+    Sim ctrlDunhao;
+    check(ctrlDunhao.b.setChinesePunctuationShortcut(
+              inputer::ChinesePunctuationShortcut::Control),
+          "punctuation shortcut can switch to Ctrl");
+    KeyResult ctrlOnlyResult = ctrlDunhao.press(
+        fcitx::Key(FcitxKey_apostrophe, fcitx::KeyState::Ctrl));
+    check(ctrlOnlyResult.handled, "configured Ctrl punctuation is handled");
+    check_eq(ctrlDunhao.preedit(), "、", "configured Ctrl inserts dunhao");
+
+    Sim disabledPunctuation;
+    check(disabledPunctuation.b.setChinesePunctuationShortcut(
+              inputer::ChinesePunctuationShortcut::Disabled),
+          "punctuation shortcut can be disabled");
+    KeyResult disabledResult = disabledPunctuation.press(fcitx::Key(
+        FcitxKey_quotedbl,
+        fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Shift}));
+    check(!disabledResult.handled,
+          "disabled punctuation shortcut remains available to applications");
+    check(disabledPunctuation.preedit().empty(),
+          "disabled punctuation shortcut does not insert text");
+
+    Sim spaceCandidates;
+    check(spaceCandidates.b.setSpaceCandidateMode(true),
+          "Space candidate compatibility mode can be enabled");
+    spaceCandidates.type("hk4g4");
+    KeyResult spaceResult = spaceCandidates.press(FcitxKey_space);
+    check(spaceResult.handled && spaceCandidates.b.isPicking(),
+          "Space opens the candidate window in compatibility mode");
+    check(find_visible_candidate(spaceCandidates.cand(), "測試") >= 0,
+          "Space candidate mode keeps the current phrase candidate visible");
+
+    Sim defaultSpace;
+    defaultSpace.type("hk4g4");
+    defaultSpace.key(FcitxKey_space);
+    check(!defaultSpace.b.isPicking(),
+          "default Space behavior remains outside candidate mode");
+
     Sim ctrlPassthrough;
     KeyResult ctrlResult = ctrlPassthrough.press(
         fcitx::Key(FcitxKey_apostrophe, fcitx::KeyState::Ctrl));

@@ -146,9 +146,10 @@ and record any application-specific behavior before publishing it.
 | Full-width punctuation toggle | Toggle full-width punctuation in configtool | Transient `標點 全形` / `標點 半形` hint appears |
 | App shortcut passthrough | Press common app shortcuts such as Ctrl+. in VS Code or browser text fields | The app shortcut still works; Ari IME does not reserve a fixed punctuation toggle shortcut |
 | Status line | Compose any non-empty preedit | Aux line shows 中/英, keyboard layout, punctuation mode |
+| Space candidate compatibility | Enable `SpaceCandidateMode`, type `hk4g4`, press Space | Candidate window opens with `測試`; disable it and confirm the default Space behavior remains unchanged |
 | Literal punctuation | With full-width punctuation off, type `su3`, then `< > ?`; start a fresh preedit and type `API?` | Punctuation does not depend on language context: results are `你<>?` and `API?` |
 | Full-width punctuation | Enable full-width punctuation; type `< > ? ( ) { } ! : \ ^ ' @ % + =` | Preedit uses Chinese punctuation forms, including `、`, `……`, and full-width symbols |
-| Explicit Chinese punctuation | With full-width punctuation off, use Ctrl+Shift with comma, period, slash and the apostrophe key (`'`) | Preedit adds `，。？、`; specifically `Ctrl+Shift+'` produces `、`; Ctrl+' and Alt punctuation remain available to the application |
+| Explicit Chinese punctuation | With full-width punctuation off, use the configured `ChinesePunctuationShortcut` (default Ctrl+Shift) with comma, period, slash and the apostrophe key (`'`) | Preedit adds `，。？、`; specifically the configured shortcut plus `'` produces `、`; set Alt+Shift in configtool and repeat to verify the alternative path |
 | Mid-string Chinese punctuation | Compose `你好`, move the caret between the characters, then press Ctrl+Shift+comma | Preedit becomes `你，好` |
 | Bopomofo punctuation keys | Enable full-width punctuation; type `xu,4` | `,` remains a Bopomofo final key, not `，` |
 

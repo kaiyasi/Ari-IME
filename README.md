@@ -41,10 +41,13 @@ phrasing and per-user learning.
 - **Consistent phrasing** — the character shown while typing matches the top
   candidate the selection window offers ("以選字候選為準").
 - **Explicit Chinese punctuation** — ordinary punctuation stays literal and
-  half-width regardless of surrounding Chinese or English. Hold `Ctrl+Shift`
-  with a punctuation key to request its Chinese form temporarily: comma → ，,
-  period → 。, slash → ？, apostrophe key (`'`) → 、, `(` → （, `{` → 『,
-  etc. In particular, the Chinese enumeration comma is **Ctrl+Shift+'**.
+  half-width regardless of surrounding Chinese or English. Hold the configured
+  `ChinesePunctuationShortcut` (default `Ctrl+Shift`) with a punctuation key to
+  request its Chinese form temporarily: comma → ，, period → 。, slash → ？,
+  apostrophe key (`'`) → 、, `(` → （, `{` → 『, etc. In particular, the
+  default Chinese enumeration comma is **Ctrl+Shift+'**. The native Fcitx5
+  setting can switch the gesture to `Alt+Shift`, `Ctrl`, `Alt`, or disable it
+  when an application reserves the default shortcut.
   **FullWidthPunctuation** remains available for users who explicitly prefer
   full-width symbols without holding a modifier, including `@` → ＠,
   `%` → ％, `_` → ＿, `` ` `` → ｀ and `"` → ＂.
@@ -55,6 +58,10 @@ phrasing and per-user learning.
   `Alt` punctuation remains available to applications instead of being captured.
 - **Forced English mode** — `Ctrl+Space` toggles it; a transient 中/英 hint pops
   up, and the mode persists until toggled again.
+- **Optional traditional Space selection** — enable the native
+  `SpaceCandidateMode` setting if you prefer Space to open candidates after a
+  complete Chinese conversion. It is off by default, so Ari keeps its mixed
+  input Space-as-tone-one/literal-space behavior and Enter-only commit contract.
 - **Visible composition status** — the auxiliary line shows current 中/英 mode,
   keyboard layout and punctuation mode while composing. This status line is off
   by default and can be re-enabled in the addon config.
@@ -289,8 +296,9 @@ fcitx5-remote -s inputer
 fcitx5-remote -n   # should print: inputer
 ```
 
-Per-addon options (keyboard layout, full-width punctuation and AutoLearn) appear under the
-addon's config page.
+Per-addon options (keyboard layout, Chinese-punctuation shortcut, Space
+candidate mode, full-width punctuation and AutoLearn) appear under the addon's
+config page.
 
 ## Tests
 

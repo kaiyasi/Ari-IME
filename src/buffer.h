@@ -108,6 +108,21 @@ public:
         fullWidthPunct_ = on;
         return true;
     }
+    bool setChinesePunctuationShortcut(
+        inputer::ChinesePunctuationShortcut shortcut) {
+        if (punctuationShortcut_ == shortcut) {
+            return false;
+        }
+        punctuationShortcut_ = shortcut;
+        return true;
+    }
+    bool setSpaceCandidateMode(bool on) {
+        if (spaceCandidateMode_ == on) {
+            return false;
+        }
+        spaceCandidateMode_ = on;
+        return true;
+    }
     bool setKeyboardLayout(inputer::KeyboardLayout layout);
     // The frontend disables learning for password and other sensitive fields.
     void setLearningAllowed(bool allowed) { learningAllowed_ = allowed; }
@@ -265,6 +280,9 @@ private:
 
     bool forcedEnglish_ = false;
     bool fullWidthPunct_ = false;
+    inputer::ChinesePunctuationShortcut punctuationShortcut_ =
+        inputer::ChinesePunctuationShortcut::ControlShift;
+    bool spaceCandidateMode_ = false;
     bool learningAllowed_ = true;
     inputer::KeyboardLayout layout_ = inputer::KeyboardLayout::Default;
     Token token_ = Token::Chinese;

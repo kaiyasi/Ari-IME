@@ -337,6 +337,9 @@ void InputerEngine::keyEvent(const fcitx::InputMethodEntry &,
     bool layoutChanged = state->buffer.setKeyboardLayout(layout);
     bool punctChanged =
         state->buffer.setFullWidthPunct(*config_.fullWidthPunctuation);
+    state->buffer.setChinesePunctuationShortcut(
+        *config_.chinesePunctuationShortcut);
+    state->buffer.setSpaceCandidateMode(*config_.spaceCandidateMode);
     if (layoutChanged) {
         std::string message =
             std::string("鍵盤 ") + inputer::keyboardLayoutName(layout);

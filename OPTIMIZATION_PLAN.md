@@ -72,6 +72,12 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Added an SVG icon so the input method no longer appears blank in tooling.
 - Strengthened full-width punctuation fallback coverage across layouts and
   symbol-looking Bopomofo keys.
+- Made the temporary Chinese-punctuation modifier configurable through the
+  native Fcitx5 addon settings (Ctrl+Shift, Alt+Shift, Ctrl, Alt, or disabled),
+  while keeping Ctrl+Shift as the default.
+- Added an opt-in `SpaceCandidateMode` through the native addon settings, so
+  traditional Space-to-candidate users can use the familiar flow without
+  changing Ari's mixed-input default.
 - Added `docs/manual-qa.md` to standardize real desktop-session validation.
 
 ### Performance And Stability
@@ -136,8 +142,8 @@ usability first: feature coverage, UX, performance, and engineering quality.
 
 - Keep extending punctuation regressions, especially for layouts with
   symbol-shaped Bopomofo keys.
-- If a full-width punctuation shortcut is added later, make it configurable
-  rather than hardcoded so application shortcuts remain safe.
+- Validate the configurable punctuation gesture in real browser/editor
+  sessions, especially when the selected modifier is also used by the desktop.
 - Continue broadening reinterpretation regressions with more real-world
   developer and document-authoring text samples.
 - Use `ari-ime-dict candidates` plus a small versioned golden corpus when a

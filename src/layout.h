@@ -31,6 +31,19 @@ FCITX_CONFIG_ENUM_NAME(KeyboardLayout, "Default", "Eten", "Hsu", "Ibm",
                        "GinYieh", "Dvorak", "Carpalx", "ColemakDhAnsi",
                        "ColemakDhOrth", "Workman", "Colemak");
 
+// Modifier policy for the temporary Chinese-punctuation gesture. The
+// punctuation key itself remains the normal physical key, so this setting can
+// avoid an application shortcut without introducing another toolbar or mode.
+enum class ChinesePunctuationShortcut {
+    ControlShift,
+    AltShift,
+    Control,
+    Alt,
+    Disabled,
+};
+FCITX_CONFIG_ENUM_NAME(ChinesePunctuationShortcut, "ControlShift", "AltShift",
+                       "Control", "Alt", "Disabled");
+
 struct KeyboardLayoutI18NAnnotation {
     bool skipDescription() const { return false; }
     bool skipSave() const { return false; }
@@ -46,6 +59,18 @@ struct KeyboardLayoutI18NAnnotation {
         config.setValueByPath("EnumI18n/8", _("Colemak-DH Ortholinear"));
         config.setValueByPath("EnumI18n/9", _("Workman"));
         config.setValueByPath("EnumI18n/10", _("Colemak"));
+    }
+};
+
+struct ChinesePunctuationShortcutI18NAnnotation {
+    bool skipDescription() const { return false; }
+    bool skipSave() const { return false; }
+    void dumpDescription(fcitx::RawConfig &config) const {
+        config.setValueByPath("EnumI18n/0", _("Ctrl+Shift"));
+        config.setValueByPath("EnumI18n/1", _("Alt+Shift"));
+        config.setValueByPath("EnumI18n/2", _("Ctrl"));
+        config.setValueByPath("EnumI18n/3", _("Alt"));
+        config.setValueByPath("EnumI18n/4", _("停用"));
     }
 };
 
