@@ -85,4 +85,47 @@ INPUTER_FCITX_PROFILE="$existing" bash "$helper" \
     --dry-run --make-default >/dev/null
 cmp -- "$before" "$existing"
 
+# Exercise the runtime verification without requiring a desktop Fcitx5 daemon.
+# The helper must reload an existing daemon, start an absent one in a graphical
+# session, and fail when selecting the addon does not actually succeed.
+fake_bin="$test_root/fake-bin"
+fake_state="$test_root/fake-fcitx-state"
+mkdir -p -- "$fake_bin" "$fake_state"
+printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'set -euo pipefail' \
+    'case "${1:-}" in' \
+    '  --check) test -f "$FAKE_FCITX_STATE/ready" ;;' \
+    '  -r) touch "$FAKE_FCITX_STATE/ready" ;;' \
+    '  -s) [[ "${2:-}" == inputer && "${INPUTER_FAKE_SELECT_FAIL:-0}" != 1 ]] && printf "%s\\n" inputer > "$FAKE_FCITX_STATE/active" ;;' \
+    '  -n) test -f "$FAKE_FCITX_STATE/active" && cat "$FAKE_FCITX_STATE/active" ;;' \
+    '  *) exit 1 ;;' \
+    'esac' >"$fake_bin/fcitx5-remote"
+printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'set -euo pipefail' \
+    '[[ "${1:-}" == -d ]] && touch "$FAKE_FCITX_STATE/ready"' \
+    >"$fake_bin/fcitx5"
+chmod +x -- "$fake_bin/fcitx5-remote" "$fake_bin/fcitx5"
+
+touch -- "$fake_state/ready"
+PATH="$fake_bin:$PATH" FAKE_FCITX_STATE="$fake_state" DISPLAY=:99 \
+    INPUTER_FCITX_PROFILE="$existing" bash "$helper" \
+    --yes --make-default >"$test_root/reload.log"
+grep -q '^Ari IME is active (inputer)$' "$test_root/reload.log"
+
+rm -- "$fake_state/ready"
+PATH="$fake_bin:$PATH" FAKE_FCITX_STATE="$fake_state" DISPLAY=:99 \
+    INPUTER_FCITX_PROFILE="$existing" bash "$helper" \
+    --yes --make-default >"$test_root/start.log"
+grep -q '^Starting Fcitx5$' "$test_root/start.log"
+grep -q '^Ari IME is active (inputer)$' "$test_root/start.log"
+
+if PATH="$fake_bin:$PATH" FAKE_FCITX_STATE="$fake_state" DISPLAY=:99 \
+    INPUTER_FAKE_SELECT_FAIL=1 INPUTER_FCITX_PROFILE="$existing" \
+    bash "$helper" --yes --make-default >/dev/null 2>&1; then
+    printf '%s\n' 'Expected selection failure to return non-zero' >&2
+    exit 1
+fi
+
 printf '%s\n' 'enable-input-method profile tests passed'

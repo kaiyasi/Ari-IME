@@ -51,6 +51,11 @@ usability first: feature coverage, UX, performance, and engineering quality.
   sidecar, so older libchewing frequency implementations do not silently
   demote a deliberate imported preference; ordinary learned frequencies and
   built-in contextual candidates remain untouched.
+- Persist ordinary candidate choices selected during composition in the same
+  sidecar, so a deliberate choice survives a fresh input context without
+  promoting every weak learned-frequency entry.
+- Make `Shift+Delete` remove the sidecar marker as well as the matching
+  libchewing entry, keeping the forget action effective after restart.
 - Keep Ari's explicit-preference state separate from libchewing's broad learned
   dictionary because older libchewing APIs do not identify which entries were
   deliberate choices.
@@ -97,6 +102,9 @@ usability first: feature coverage, UX, performance, and engineering quality.
 - Added the package-installed `ari-ime-enable` command for an explicit,
   backup-producing first-run profile setup, plus `ari-ime-reset-data` so
   package users can reset learning without a source checkout.
+- Made `ari-ime-enable` start or reload Fcitx5 in an explicit graphical
+  session and verify that `inputer` is the active input method; failures now
+  return non-zero instead of looking successful.
 - Installed `ari-ime-dict` alongside the input method and covered its binary,
   parser, import/export, candidate restoration, and backup behavior in the
   release gate.

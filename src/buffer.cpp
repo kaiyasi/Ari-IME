@@ -1258,6 +1258,17 @@ void Buffer::learnFromCells() {
     }
 
     for (const auto &span : explicitSpans) {
+        std::string phrase;
+        for (int j = span.start; j <= span.end; ++j) {
+            phrase += cells_[j].text;
+        }
+        // Persist only an explicit candidate pick. Accepted defaults remain
+        // ordinary libchewing learning, so a user's whole learned dictionary
+        // can never become an Ari hard-priority list by accident.
+        zhuyin_.rememberPreferredPhrase(phrase);
+    }
+
+    for (const auto &span : explicitSpans) {
         // The weak pass above plus these three passes gives a deliberate choice
         // roughly four times the evidence of an unchanged conversion.
         learnRange(span.start, span.end, 3);

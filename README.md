@@ -62,10 +62,10 @@ phrasing and per-user learning.
   one weak positive learning pass. An explicitly selected character or phrase
   receives three extra passes (roughly 4:1), plus one short surrounding-context
   pass, so deliberate choices adapt faster without treating accepted defaults
-  as mistakes. Explicit/imported mappings added through Ari's dictionary API
-  are kept in a small Ari-owned preference sidecar and promoted reliably on
-  older libchewing builds; ordinary learned frequencies remain owned by
-  libchewing and are not all forced to the top.
+  as mistakes. Explicitly selected or imported mappings, including entries
+  added through Ari's dictionary API, are kept in a small Ari-owned preference
+  sidecar and promoted reliably on older libchewing builds; ordinary learned
+  frequencies remain owned by libchewing and are not all forced to the top.
   **AutoLearn** can be disabled in the addon's configuration when
   the personal dictionary should remain unchanged.
   Password and sensitive input fields never write learning data.
@@ -253,8 +253,10 @@ ari-ime-enable --make-default
 This is an explicit user command, not a package hook. It changes only the first
 Fcitx5 input-method group, creates a timestamped backup before changing an
 existing profile, and makes Ari the default only when `--make-default` is
-given. Omit that option to keep the current default input method. If Fcitx5 is
-not running yet, start it after running the command.
+given. Omit that option to keep the current default input method. When run in a
+graphical session, it starts Fcitx5 if needed, reloads the profile, selects Ari,
+and verifies that `inputer` is active; in a headless shell it updates the profile
+but asks you to start Fcitx5 and run the command again.
 
 ### Local user-directory install (development)
 
@@ -396,9 +398,9 @@ That directory holds `userdict.dat`, Ari's explicit `preferences.tsv`, plus
 libchewing's learned files (`chewing.dat`, `chewing-deleted.dat`). Ari pins
 `CHEWING_USER_PATH` to this directory so learning does not leak into the shared
 `$XDG_DATA_HOME/chewing` used by other libchewing input methods. The sidecar
-contains only mappings explicitly imported or added through Ari's dictionary
-API; the other files hold learned phrase/homophone frequencies. They are safe
-to reset without affecting libchewing's built-in/base dictionary.
+contains only phrases explicitly selected, imported, or added through Ari's
+dictionary API; the other files hold learned phrase/homophone frequencies.
+They are safe to reset without affecting libchewing's built-in/base dictionary.
 
 Older Ari builds (before this pinning) may have left learned data in
 `~/.local/share/chewing`; pass `--include-shared` to the reset script below to

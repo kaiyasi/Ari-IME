@@ -331,27 +331,61 @@ if [[ "$dry_run" -eq 1 || "$restart" -eq 0 ]]; then
     exit 0
 fi
 
-if ! command -v fcitx5-remote >/dev/null 2>&1 ||
-   ! fcitx5-remote --check >/dev/null 2>&1; then
-    printf '%s\n' 'Profile updated. Fcitx5 is not running; start it to use Ari IME.'
-    exit 0
-fi
-
-printf '%s\n' 'Reloading Fcitx5'
-fcitx5-remote -r
-for _ in {1..50}; do
-    if fcitx5-remote --check >/dev/null 2>&1; then
-        break
-    fi
-    sleep 0.1
-done
-if ! fcitx5-remote --check >/dev/null 2>&1; then
-    printf '%s\n' 'Profile updated, but Fcitx5 did not become ready after reload.' >&2
+if ! command -v fcitx5-remote >/dev/null 2>&1; then
+    printf '%s\n' \
+        'Profile updated, but fcitx5-remote is unavailable; install Fcitx5 and retry.' \
+        >&2
     exit 1
 fi
 
-if fcitx5-remote -s inputer >/dev/null 2>&1; then
-    printf 'Ari IME is active (%s)\n' "$(fcitx5-remote -n)"
+wait_for_fcitx() {
+    for _ in {1..50}; do
+        if fcitx5-remote --check >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+if fcitx5-remote --check >/dev/null 2>&1; then
+    printf '%s\n' 'Reloading Fcitx5'
+    fcitx5-remote -r
 else
-    printf '%s\n' 'Profile updated. Select Ari IME with fcitx5-remote -s inputer.'
+    # This command is an explicit user action, so starting the desktop input
+    # daemon here completes the advertised install -> enable -> type flow. Do
+    # not start a daemon during package installation or in a headless shell.
+    if ! command -v fcitx5 >/dev/null 2>&1 ||
+       [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+        printf '%s\n' \
+            'Profile updated, but Fcitx5 is not running in a graphical session.' \
+            'Start it with "fcitx5 -d", then run "ari-ime-enable --make-default" again.' \
+            >&2
+        exit 1
+    fi
+    printf '%s\n' 'Starting Fcitx5'
+    fcitx5 -d >/dev/null 2>&1 || true
 fi
+
+if ! wait_for_fcitx; then
+    printf '%s\n' \
+        'Profile updated, but Fcitx5 did not become ready; run "fcitx5 -d" and retry.' \
+        >&2
+    exit 1
+fi
+
+if ! fcitx5-remote -s inputer >/dev/null 2>&1; then
+    printf '%s\n' \
+        'Fcitx5 is running, but Ari IME could not be selected.' \
+        'Verify that the package installed inputer.so and retry.' \
+        >&2
+    exit 1
+fi
+
+active_im="$(fcitx5-remote -n 2>/dev/null || true)"
+if [[ "$active_im" != "inputer" ]]; then
+    printf 'Fcitx5 selected an unexpected input method: %s\n' \
+        "${active_im:-<none>}" >&2
+    exit 1
+fi
+printf 'Ari IME is active (%s)\n' "$active_im"

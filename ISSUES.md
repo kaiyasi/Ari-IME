@@ -18,8 +18,9 @@ may vary between distributions:
 
 The automated tests are written to tolerate ranking differences where Ari IME
 does not control the order. Ari promotes entries recorded in its own
-explicit-preference sidecar (`preferences.tsv`), so imported mappings remain
-the live result even when an older libchewing scorer would rank them lower.
+explicit-preference sidecar (`preferences.tsv`), so explicitly selected or
+imported mappings remain the live result even when an older libchewing scorer
+would rank them lower.
 Ordinary learned frequencies stay under libchewing's control and are not
 promoted wholesale. The Ubuntu CI job (`.github/workflows/ubuntu.yml`)
 prints the resolved `chewing` version so ordering differences can be correlated

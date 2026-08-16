@@ -329,7 +329,11 @@ void Zhuyin::handleEnd() {
 }
 
 int Zhuyin::forgetUserPhrase(const std::string &phrase) {
-    if (!ctx_ || phrase.empty() || chewing_userphrase_enumerate(ctx_) != 0) {
+    if (!ctx_ || phrase.empty()) {
+        return -1;
+    }
+    loadUserPhraseCache();
+    if (chewing_userphrase_enumerate(ctx_) != 0) {
         return -1;
     }
 
@@ -358,17 +362,18 @@ int Zhuyin::forgetUserPhrase(const std::string &phrase) {
         }
         removed += count;
     }
-    if (userPhraseCacheLoaded_) {
-        if (userPhraseTexts_.erase(phrase) > 0 &&
-            !writePreferredPhrases(userPhraseTexts_)) {
-            // Keep this context consistent with the on-disk preference list if
-            // the filesystem is temporarily unwritable. The libchewing entry
-            // has already been removed, but a later context can still recover
-            // the preference rather than silently losing it.
-            userPhraseTexts_.insert(phrase);
-        }
+    const bool preferred = userPhraseTexts_.erase(phrase) > 0;
+    if (preferred && !writePreferredPhrases(userPhraseTexts_)) {
+        // Keep this context consistent with the on-disk preference list if the
+        // filesystem is temporarily unwritable. The libchewing entry has
+        // already been removed, but a later context can still recover the
+        // preference rather than silently losing it.
+        userPhraseTexts_.insert(phrase);
+        return -1;
     }
-    return removed;
+    // The Ari sidecar is itself a personal preference. Count its removal even
+    // when an older libchewing dictionary has no matching reading to remove.
+    return removed > 0 ? removed : (preferred ? 1 : 0);
 }
 
 std::vector<UserPhrase> Zhuyin::userPhrases() {
@@ -407,8 +412,8 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         const bool wasPresent = userPhraseTexts_.find(phrase) !=
                                 userPhraseTexts_.end();
         userPhraseTexts_.insert(phrase);
-        // This sidecar records deliberate/imported preferences only. The
-        // libchewing user dictionary itself also contains ordinary learned
+        // This sidecar records deliberate selected/imported preferences only.
+        // The libchewing user dictionary itself also contains ordinary learned
         // frequencies, which must not all be promoted as explicit choices.
         if (!writePreferredPhrases(userPhraseTexts_) && !wasPresent) {
             // Keep a pre-existing marker if the filesystem is temporarily
@@ -418,6 +423,23 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         }
     }
     return result;
+}
+
+bool Zhuyin::rememberPreferredPhrase(const std::string &phrase) {
+    if (!ctx_ || !inputer::autoLearnEnabled() ||
+        !validPreferencePhrase(phrase)) {
+        return false;
+    }
+    loadUserPhraseCache();
+    if (userPhraseTexts_.find(phrase) != userPhraseTexts_.end()) {
+        return true;
+    }
+    userPhraseTexts_.insert(phrase);
+    if (!writePreferredPhrases(userPhraseTexts_)) {
+        userPhraseTexts_.erase(phrase);
+        return false;
+    }
+    return true;
 }
 
 bool Zhuyin::loadUserPhraseCache() {

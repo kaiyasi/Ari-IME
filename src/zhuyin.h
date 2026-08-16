@@ -100,6 +100,10 @@ public:
     // Add one personal phrase mapping. Returns the number added, 0 when the
     // mapping already exists, or -1 on failure.
     int addUserPhrase(const std::string &phrase, const std::string &reading);
+    // Persist a phrase that the user explicitly selected in the current
+    // composition. This records Ari's preference without confusing it with
+    // libchewing's broad learned-frequency dictionary.
+    bool rememberPreferredPhrase(const std::string &phrase);
     // Promote candidates recorded as Ari explicit/imported preferences. The
     // ordinary libchewing learned-frequency database is intentionally not used
     // here because its old C API cannot distinguish weak learning from a

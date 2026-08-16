@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 2.3.7 - 2026-08-16
+
+- Persist phrases explicitly selected during normal composition in Ari's
+  preference sidecar, so deliberate choices survive a fresh input context and
+  are promoted consistently across libchewing versions.
+- Make `Shift+Delete` remove both the libchewing personal entry and Ari's
+  preference marker, including when the marker was loaded only from the
+  sidecar.
+- Make `ari-ime-enable` start Fcitx5 in a graphical session when needed,
+  reload the profile, select Ari, and fail clearly if the active input method
+  cannot be verified.
+
 ## 2.3.6 - 2026-08-16
 
 - Keep Ari's explicit/imported phrase preferences in a separate sidecar instead

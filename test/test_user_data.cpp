@@ -214,12 +214,60 @@ void test_explicit_phrase_outweighs_accepted_defaults() {
     }
     check(teachPhraseChoice("su3cl3", "妳好"),
           "explicit phrase choice commits as strong evidence");
+    check(fileExists(inputer::userPreferencePath()),
+          "explicit phrase choice persists an Ari preference sidecar");
 
     Sim after;
     after.type("su3cl3");
     check_eq(after.preedit(), "妳好",
              "one explicit phrase choice outweighs three accepted defaults");
 #endif
+}
+
+void test_explicit_choice_survives_context_restart() {
+    // Use a clean libchewing dictionary and verify that Ari's sidecar carries
+    // a deliberate candidate choice across contexts.
+    test::TempConfigHome configHome("inputer-userdata-explicit-choice-test", false);
+    check(teachPhraseChoice("su3cl3", "妳好"),
+          "explicit phrase choice commits in a clean learning sandbox");
+    check(fileExists(inputer::userPreferencePath()),
+          "explicit choice creates a durable Ari preference sidecar");
+
+    Sim restored;
+    restored.type("su3cl3");
+    check_eq(restored.preedit(), "妳好",
+             "explicit choice is promoted after a fresh context starts");
+}
+
+void test_explicit_preference_can_be_forgotten() {
+    test::TempConfigHome configHome("inputer-userdata-forget-preference-test",
+                                    false);
+    check(teachSingleChoice("妳"),
+          "explicit candidate can be learned before forgetting");
+    check(fileExists(inputer::userPreferencePath()),
+          "learned candidate has an Ari preference marker");
+
+    Sim forgetting;
+    forgetting.type("su3");
+    forgetting.key(FcitxKey_Down);
+    const int idx = findVisibleCandidate(forgetting.cand(), "妳");
+    check(idx == 0, "learned candidate is highlighted before forgetting");
+    if (idx == 0) {
+        KeyResult forgotten = forgetting.press(fcitx::Key(
+            FcitxKey_Delete,
+            fcitx::KeyStates{fcitx::KeyState::Shift}));
+        check(forgotten.handled,
+              "Shift+Delete removes the explicit preference");
+        check(forgotten.notification.find("已忘記") == 0,
+              "forgetting reports success for an Ari preference");
+    }
+
+    check(!fileExists(inputer::userPreferencePath()),
+          "forgetting removes the Ari preference sidecar when empty");
+    Sim after;
+    after.type("su3");
+    check_eq(after.preedit(), "你",
+             "forgotten explicit preference stays forgotten after restart");
 }
 
 void test_sensitive_field_does_not_learn() {
@@ -348,6 +396,8 @@ int main() {
     test_learning_can_restart_after_reset();
     test_learning_changes_future_conversion();
     test_explicit_phrase_outweighs_accepted_defaults();
+    test_explicit_choice_survives_context_restart();
+    test_explicit_preference_can_be_forgotten();
     test_sensitive_field_does_not_learn();
     test_forget_personal_candidate();
     test_userphrase_mapping_can_be_restored();

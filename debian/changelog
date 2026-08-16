@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.3.7) unstable; urgency=medium
+
+  * Persist explicitly selected phrases in Ari's preference sidecar and make
+    Shift+Delete remove that preference across fresh contexts.
+  * Make ari-ime-enable start or reload Fcitx5 and verify that Ari is active.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sun, 16 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.3.6) unstable; urgency=medium
 
   * Keep explicit and imported phrase preferences in an Ari-owned sidecar
