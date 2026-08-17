@@ -366,10 +366,6 @@ int commandCandidates(const std::string &keys) {
         return 1;
     }
     engine.feedSequence(keys);
-    // Match the interactive Buffer's treatment of explicit personal
-    // preferences, so this diagnostic reports what Ari will actually show
-    // rather than only libchewing's raw cross-version ranking.
-    engine.promoteUserPhrases();
     std::cout << "keys\t" << keys << '\n'
               << "preedit\t" << engine.preedit() << '\n';
     if (!engine.openCandidates()) {

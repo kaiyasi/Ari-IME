@@ -1,0 +1,85 @@
+diff --git a/src/porting_layer/src/plat_mmap_posix.c b/src/porting_layer/src/plat_mmap_posix.c
+index 337611b..da8dc97 100644
+--- a/src/porting_layer/src/plat_mmap_posix.c
++++ b/src/porting_layer/src/plat_mmap_posix.c
+@@ -19,6 +19,7 @@
+ #    include <sys/stat.h>
+ #    include <unistd.h>
+ #    include <fcntl.h>
++#    include <stdlib.h>
+ #    include "plat_mmap.h"
+ 
+ /* set the mmap handle an invalid value */
+@@ -72,6 +73,40 @@ size_t plat_mmap_create(plat_mmap *handle, const char *file, int fileAccessAttr)
+ /* obtain a view of the mapped file, return the adjusted offset & size */
+ void *plat_mmap_set_view(plat_mmap *handle, size_t * offset, size_t * sizet)
+ {
++#ifdef __EMSCRIPTEN__
++    size_t remaining;
++    ssize_t count;
++    void *memory;
++
++    if (!handle || handle->fd == -1 || !offset || !sizet || *sizet == 0)
++        return NULL;
++
++    if (handle->address)
++        free(handle->address);
++
++    memory = malloc(*sizet);
++    if (!memory)
++        return NULL;
++    if (lseek(handle->fd, *offset, SEEK_SET) < 0) {
++        free(memory);
++        return NULL;
++    }
++
++    remaining = *sizet;
++    while (remaining > 0) {
++        count = read(handle->fd, (char *)memory + (*sizet - remaining),
++                     remaining);
++        if (count <= 0) {
++            free(memory);
++            return NULL;
++        }
++        remaining -= (size_t)count;
++    }
++
++    handle->sizet = *sizet;
++    handle->address = memory;
++    return handle->address;
++#else
+     size_t pagesize = getpagesize();
+     size_t edge;
+ 
+@@ -88,6 +123,7 @@ void *plat_mmap_set_view(plat_mmap *handle, size_t * offset, size_t * sizet)
+     handle->address = mmap(0, *sizet, PROT_READ, MAP_SHARED, handle->fd, *offset);
+ 
+     return handle->address;
++#endif
+ }
+ 
+ /* close the mmap */
+@@ -98,7 +134,11 @@ void plat_mmap_close(plat_mmap *handle)
+         return;
+ 
+     if (handle->address) {
++#ifdef __EMSCRIPTEN__
++        free(handle->address);
++#else
+         munmap(handle->address, handle->sizet);
++#endif
+         handle->address = NULL;
+     }
+ 
+@@ -127,7 +167,11 @@ void plat_mmap_unmap(plat_mmap *handle)
+         return;
+ 
+     if (handle->address) {
++#ifdef __EMSCRIPTEN__
++        free(handle->address);
++#else
+         munmap(handle->address, handle->sizet);
++#endif
+         handle->address = NULL;
+     }
+ }

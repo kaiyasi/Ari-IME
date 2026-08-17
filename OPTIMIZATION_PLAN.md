@@ -47,13 +47,12 @@ usability first: feature coverage, UX, performance, and engineering quality.
   raw-data backups without adding a GUI.
 - Made portable dictionary imports validate the complete file first, merge
   idempotently, and preserve existing libchewing data before mutation.
-- Promote explicit/imported personal phrase mappings recorded in Ari's own
-  sidecar, so older libchewing frequency implementations do not silently
-  demote a deliberate imported preference; ordinary learned frequencies and
-  built-in contextual candidates remain untouched.
-- Persist ordinary candidate choices selected during composition in the same
-  sidecar, so a deliberate choice survives a fresh input context without
-  promoting every weak learned-frequency entry.
+- Keep explicit/imported personal phrase metadata in Ari's own sidecar for
+  portable backup and forget bookkeeping; leave live candidate ordering to
+  libchewing's contextual and learned-frequency model.
+- Apply extra libchewing learning passes to deliberate candidate choices so a
+  user's habit adapts without scanning a hidden candidate window on every
+  completed syllable.
 - Make `Shift+Delete` remove the sidecar marker as well as the matching
   libchewing entry, keeping the forget action effective after restart.
 - Keep Ari's explicit-preference state separate from libchewing's broad learned

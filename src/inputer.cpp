@@ -254,23 +254,7 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
             panel.setAuxDown(fcitx::Text(auxDown));
         }
     } else {
-        const auto recommendations = buffer.previewCandidates();
-        if (!recommendations.empty()) {
-            // This is intentionally a display-only list. Showing a native
-            // recommendation must not make the next digit/punctuation key a
-            // candidate-selection command while the user is still composing
-            // mixed 注音/English text. Down enters the interactive picker,
-            // where numbers and mouse selection are enabled.
-            auto list = std::make_unique<fcitx::DisplayOnlyCandidateList>();
-            list->setContent(recommendations);
-            list->setLayoutHint(fcitx::CandidateLayoutHint::Vertical);
-            list->setCursorIndex(0);
-            panel.setCandidateList(std::move(list));
-        }
         std::vector<std::string> auxParts{positionText};
-        if (!recommendations.empty()) {
-            auxParts.push_back("推薦 · ↓選字");
-        }
         if (!preeditStr.empty() && *config_.showStatusLine) {
             auxParts.push_back(statusText(buffer));
         }

@@ -77,10 +77,8 @@ public:
 
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
-    // Non-interactive recommendation for the live Chinese run. This is shown
-    // by the frontend before the user enters candidate-selection mode; number
-    // keys remain available to the normal 注音 path until Down opens the real
-    // picker.
+    // Read-only recommendation data for diagnostics and tests. The frontend
+    // does not display it automatically; Down opens the real picker explicitly.
     std::vector<std::string> previewCandidates();
     // Select a candidate on the currently visible page. Used by UI candidate
     // activation (mouse/touch) so it shares the same path as number-key picking.

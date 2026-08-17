@@ -105,11 +105,6 @@ public:
     // composition. This records Ari's preference without confusing it with
     // libchewing's broad learned-frequency dictionary.
     bool rememberPreferredPhrase(const std::string &phrase);
-    // Promote candidates recorded as Ari explicit/imported preferences. The
-    // ordinary libchewing learned-frequency database is intentionally not used
-    // here because its old C API cannot distinguish weak learning from a
-    // deliberate choice. Built-in candidates are never statically reordered.
-    int promoteUserPhrases();
     // Phrase segments recognized in the current pre-edit, as [from, to)
     // character offsets. Used for Ctrl+Arrow navigation.
     std::vector<std::pair<int, int>> phraseIntervals();

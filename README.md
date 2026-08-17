@@ -21,10 +21,10 @@ phrasing and per-user learning.
   sequences and every supported layout.
 - **English-word friendly** — a tone peels the shortest trailing syllable, so
   brand names stay intact (`aceru/6` → `acer螢`).
-- **Live contextual recommendations** — as soon as a complete Chinese result is
-  available, the native Fcitx5 candidate panel previews the visible result and
-  its alternatives. The preview is display-only, so digits remain available for
-  the next 注音 syllable; press Down to enter normal candidate picking.
+- **Live contextual ranking** — as soon as a complete Chinese result is
+  available, libchewing applies its surrounding-word model and learned habits
+  to the inline result. Ari does not open a candidate panel automatically;
+  press Down to enter normal candidate picking when you want alternatives.
 - **Candidate re-selection anywhere** — press ↓/←/→ to open a cursor that walks
   the whole pre-edit and re-pick any character or phrase; phrase recommendations
   that contain the focused character remain available even at the end of a
@@ -77,8 +77,9 @@ phrasing and per-user learning.
   pass, so deliberate choices adapt faster without treating accepted defaults
   as mistakes. Explicitly selected or imported mappings, including entries
   added through Ari's dictionary API, are kept in a small Ari-owned preference
-  sidecar and promoted reliably on older libchewing builds; ordinary learned
-  frequencies remain owned by libchewing and are not all forced to the top.
+  sidecar for backup and forget bookkeeping. Live candidate order remains under
+  libchewing's contextual scorer; Ari does not open a hidden candidate window on
+  every completed syllable or force a static preference to the top.
   **AutoLearn** can be disabled in the addon's configuration when
   the personal dictionary should remain unchanged.
   Password and sensitive input fields never write learning data.
@@ -95,6 +96,14 @@ phrasing and per-user learning.
 - **Punctuation-aware boundaries** — a literal symbol can be followed directly
   by Zhuyin (`(hk4g4` -> `(測試`) without trapping the following keys in an
   English token.
+- **Reusable WebAssembly core** — [`wasm/`](wasm/) packages the same headless
+  input state machine as `@ari-ime/wasm`. Other applications can import it and
+  own keyboard events, candidate rendering, clipboard handling and persistence;
+  it has no Fcitx5 or UI runtime dependency.
+
+The WebAssembly package ships its generated `.js`, `.wasm` and dictionary data
+artifacts for direct npm use. See [`wasm/README.md`](wasm/README.md) for the
+Emscripten build inputs and the native/API smoke tests.
 
 ## Keys
 
@@ -102,7 +111,6 @@ phrasing and per-user learning.
 |-----|--------|
 | letters / digits | 注音 keys in the selected keyboard layout, or literal English |
 | layout tone keys, space (一聲) | complete the pending syllable |
-| live recommendation panel | shows the current result and alternatives; it does not capture digits |
 | ↓ / ← / → | open candidate re-selection over the pre-edit |
 | Ctrl+Alt+R | reopen a selected short Chinese range for candidate correction (configurable) |
 | ↑ | open/reinterpret the current pre-edit cell |
@@ -414,7 +422,8 @@ libchewing's learned files (`chewing.dat`, `chewing-deleted.dat`). Ari pins
 `CHEWING_USER_PATH` to this directory so learning does not leak into the shared
 `$XDG_DATA_HOME/chewing` used by other libchewing input methods. The sidecar
 contains only phrases explicitly selected, imported, or added through Ari's
-dictionary API; the other files hold learned phrase/homophone frequencies.
+dictionary API for portable bookkeeping; the other files hold the learned
+phrase/homophone frequencies that drive live ranking.
 They are safe to reset without affecting libchewing's built-in/base dictionary.
 
 Older Ari builds (before this pinning) may have left learned data in

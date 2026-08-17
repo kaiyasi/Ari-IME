@@ -94,15 +94,15 @@ and record any application-specific behavior before publishing it.
 
 | Scenario | Steps | Expected |
 |----------|-------|----------|
-| Live recommendation | Type `hk4g4` (`測試`) without pressing Down | Native Fcitx5 panel previews `測試` and alternatives; the first item matches the visible result |
-| Recommendation keeps typing | Type `hk4g4su3` while the preview is visible | Digits still form the next syllable; preedit becomes `測試你`, not a candidate pick |
+| No automatic candidate panel | Type `hk4g4` (`測試`) without pressing Down | Preedit shows `測試` and no candidate panel appears; the result still follows libchewing's contextual ranking |
+| Normal typing stays uncluttered | Type `hk4g4su3` without pressing Down | Preedit becomes `測試你`; digits are never interpreted as candidate picks |
 | Open candidates | Type `su3`, press Down | Candidate window opens on `你`; selected char is visually clear |
 | Trailing phrase recommendation | Type `hk4g4` (`測試`), press Down at the end | The candidate list recommends `測試` before single-character `試` alternatives |
 | Pick by number | With candidates open, press `2` | Candidate is applied; preedit updates; no premature commit |
 | Pick by click/touch | Open candidates, click a visible candidate | Same result as number-key selection |
 | Continue after pick | Re-pick a character in a long preedit, then type another syllable | Candidate mode closes and new text appends at the end without extra Right/End keys |
 | Undo candidate choice | Pick two candidates, press Ctrl+Z twice | Each press restores one choice; after typing or deleting text, Ctrl+Z returns to the application |
-| Forget personal candidate | Highlight a previously learned candidate, press Shift+Delete | A transient success hint appears; a fresh composition no longer promotes that personal choice, while it remains selectable from the base dictionary |
+| Forget personal candidate | Highlight a previously learned candidate, press Shift+Delete | A transient success hint appears; a fresh composition follows libchewing's ranking without that personal entry, while the candidate remains selectable from the base dictionary |
 | Page candidates | Type `su3`, press Down, PageDown/PageUp | Candidate page changes; aux line shows page count |
 | Raw key revert | Type `su3`, press Down, Shift+Tab or Up to `原始鍵 su3`, press Enter | Preedit becomes `su3` |
 | Stale click resilience | Open candidates, rapidly page then click an old candidate position | Candidate window does not disappear unexpectedly |

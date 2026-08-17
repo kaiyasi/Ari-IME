@@ -153,8 +153,18 @@ private:
 Zhuyin::Zhuyin() {
     std::error_code ec;
     const bool haveUserDataDir = inputer::ensureUserDataDir(ec);
+#ifdef INPUTER_WASM
+    // The portable C libchewing used by the WASM build expects a writable
+    // user-dictionary file. Newer native builds use a different explicit path
+    // convention, so keep this compatibility detail local to WASM.
+    const std::string path =
+        haveUserDataDir
+            ? (inputer::userDataDir() / "uhash.dat").string()
+            : std::string{};
+#else
     const std::string path =
         haveUserDataDir ? inputer::userDictionaryPath().string() : std::string{};
+#endif
     // libchewing 0.12 stores its learned user dictionary (chewing.dat /
     // chewing-deleted.dat) at CHEWING_USER_PATH, falling back to
     // $XDG_DATA_HOME/chewing — NOT the `userpath` file below. Left to the
@@ -164,7 +174,17 @@ Zhuyin::Zhuyin() {
     const std::string dataDir =
         haveUserDataDir ? inputer::userDataDir().string() : std::string{};
     ScopedEnv chewingUserPath("CHEWING_USER_PATH", dataDir);
-    ctx_ = chewing_new2(nullptr, path.empty() ? nullptr : path.c_str(),
+#ifdef INPUTER_WASM
+    // The WASM package preloads libchewing's dictionary files into MEMFS at
+    // this stable path. Native Fcitx builds continue using libchewing's normal
+    // compiled-in search path.
+    constexpr const char *kWasmSystemPath = "/usr/share/libchewing";
+    const char *systemPath = kWasmSystemPath;
+#else
+    const char *systemPath = nullptr;
+#endif
+    ctx_ = chewing_new2(systemPath,
+                        path.empty() ? nullptr : path.c_str(),
                         quietChewingLogger, nullptr);
     if (!ctx_ && !path.empty()) {
         // The user-dictionary path was unusable (unwritable directory, corrupt
@@ -494,9 +514,9 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         const bool wasPresent = userPhraseTexts_.find(phrase) !=
                                 userPhraseTexts_.end();
         userPhraseTexts_.insert(phrase);
-        // This sidecar records deliberate selected/imported preferences only.
-        // The libchewing user dictionary itself also contains ordinary learned
-        // frequencies, which must not all be promoted as explicit choices.
+        // This sidecar records deliberate selected/imported preferences only
+        // for Ari's portable bookkeeping. The libchewing user dictionary also
+        // contains ordinary learned frequencies and remains the live scorer.
         if (!writePreferredPhrases(userPhraseTexts_) && !wasPresent) {
             // Keep a pre-existing marker if the filesystem is temporarily
             // unwritable; a newly added marker must not look durable in this
@@ -531,118 +551,10 @@ bool Zhuyin::loadUserPhraseCache() {
     userPhraseCacheLoaded_ = true;
     // Do not enumerate libchewing's broad learned dictionary here. Older C
     // APIs expose ordinary frequency learning and explicit user phrases as the
-    // same entries; promoting all of them both overfits and can disturb a long
-    // active window. Ari's own sidecar is deliberately unambiguous.
+    // same entries; importing that broad set is unnecessary and can disturb a
+    // long active window. Ari's own sidecar is deliberately unambiguous.
     userPhraseTexts_ = readPreferredPhrases();
     return !userPhraseTexts_.empty();
-}
-
-int Zhuyin::promoteUserPhrases() {
-    if (!ctx_ || !loadUserPhraseCache()) {
-        return 0;
-    }
-
-    struct Choice {
-        int start = 0;
-        int down = 0;
-        int index = 0;
-        int length = 0;
-    };
-
-    int applied = 0;
-    for (int pass = 0; pass < inputer::kMaxCompositionChars; ++pass) {
-        const auto visible = inputer::unicode::splitGraphemes(preedit());
-        if (visible.empty()) {
-            break;
-        }
-
-        Choice best;
-        bool found = false;
-        for (int start = 0; start < static_cast<int>(visible.size()); ++start) {
-            closeCandidates();
-            handleHome();
-            for (int i = 0; i < start; ++i) {
-                handleRight();
-            }
-            if (!openCandidates()) {
-                continue;
-            }
-
-            for (int down = 0, guard = 0;
-                 guard < inputer::kMaxSyllables; ++guard, ++down) {
-                const int total = candidateCount();
-                for (int index = 0; index < total; ++index) {
-                    const std::string text = candidate(index);
-                    if (userPhraseTexts_.find(text) == userPhraseTexts_.end()) {
-                        continue;
-                    }
-                    const auto candidateChars =
-                        inputer::unicode::splitGraphemes(text);
-                    const int length = static_cast<int>(candidateChars.size());
-                    if (length <= 0 || start + length >
-                                           static_cast<int>(visible.size())) {
-                        continue;
-                    }
-                    bool alreadyVisible = true;
-                    for (int i = 0; i < length; ++i) {
-                        if (visible[start + i] != candidateChars[i]) {
-                            alreadyVisible = false;
-                            break;
-                        }
-                    }
-                    if (alreadyVisible) {
-                        continue;
-                    }
-
-                    // Prefer the longest explicit phrase. For equal lengths,
-                    // prefer the newest/rightmost span so a second phrase in a
-                    // sentence is not hidden by an already-correct first one.
-                    if (!found || length > best.length ||
-                        (length == best.length && start > best.start) ||
-                        (length == best.length && start == best.start &&
-                         down < best.down)) {
-                        best = {start, down, index, length};
-                        found = true;
-                    }
-                }
-
-                if (total <= 0 ||
-                    inputer::unicode::graphemeCount(candidate(0)) <= 1) {
-                    break;
-                }
-                handleDown();
-            }
-        }
-
-        if (!found) {
-            closeCandidates();
-            handleEnd();
-            break;
-        }
-
-        closeCandidates();
-        handleHome();
-        for (int i = 0; i < best.start; ++i) {
-            handleRight();
-        }
-        if (!openCandidates()) {
-            break;
-        }
-        for (int i = 0; i < best.down; ++i) {
-            handleDown();
-        }
-        const int perPage = candPerPage();
-        const int targetPage = perPage > 0 ? best.index / perPage : 0;
-        while (candCurrentPage() < targetPage) {
-            nextPage();
-        }
-        chooseCandidate(perPage > 0 ? best.index % perPage : best.index);
-        ++applied;
-    }
-
-    closeCandidates();
-    handleEnd();
-    return applied;
 }
 
 std::vector<std::pair<int, int>> Zhuyin::phraseIntervals() {

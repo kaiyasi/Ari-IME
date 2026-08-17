@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Remove the synchronous Ari preference scan from live composition and selection
+  rebuilds. Normal typing now leaves candidate ordering to libchewing's
+  contextual and learned-frequency model; the interactive candidate window is
+  opened only by an explicit user action.
+- Remove the automatic display-only recommendation panel. The pre-edit stays
+  uncluttered until the user explicitly opens candidate selection with Down.
+- Add the headless `@ari-ime/wasm` package under `wasm/`, with a C ABI,
+  TypeScript/ESM wrapper, candidate/reconversion APIs, and host-controlled
+  learning-state snapshots for browser or Node applications.
+
 ## 2.5.0 - 2026-08-17
 
 - Add safe committed-text reconversion: select a short all-Chinese range in a

@@ -65,7 +65,12 @@ std::array<int8_t, 128> buildSlots(KeyboardLayout layout) {
     slots.fill(kNoZhuyinSlot);
 
     ChewingContext *ctx =
+#ifdef INPUTER_WASM
+        chewing_new2("/usr/share/libchewing", nullptr, quietChewingLogger,
+                     nullptr);
+#else
         chewing_new2(nullptr, nullptr, quietChewingLogger, nullptr);
+#endif
     if (!ctx) {
         return slots;
     }

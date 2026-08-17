@@ -59,7 +59,7 @@ public:
         // CHEWING_USER_PATH / XDG_DATA_HOME (and, failing those, $HOME), NOT
         // solely through the path Ari passes to chewing_new2. Redirect all of
         // them into the sandbox so a developer's real day-to-day typing (which
-        // promotes homophones like 妳 over 你) cannot leak into the tests.
+        // may learn homophones like 妳 over 你) cannot leak into the tests.
         setenv("HOME", path_.c_str(), 1);
         setenv("XDG_DATA_HOME", (path_ / "data").c_str(), 1);
         setenv("CHEWING_USER_PATH", (path_ / "chewing").c_str(), 1);

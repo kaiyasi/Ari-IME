@@ -152,6 +152,23 @@ void test_reset_only_clears_user_dictionary() {
           "reset does not break base dictionary conversion");
 }
 
+void test_preference_sidecar_does_not_override_live_ranking() {
+    test::TempConfigHome configHome("inputer-userdata-sidecar-ranking-test",
+                                    false);
+    std::error_code ec;
+    check(inputer::ensureUserDataDir(ec),
+          "sidecar ranking test can create temp user data dir");
+    {
+        std::ofstream out(inputer::userPreferencePath());
+        out << "妳\n";
+    }
+
+    Sim sim;
+    sim.type("su3");
+    check_eq(sim.preedit(), "你",
+             "Ari sidecar metadata does not override libchewing ranking");
+}
+
 void test_learning_can_restart_after_reset() {
     test::TempConfigHome configHome("inputer-userdata-learning-test", false);
     std::error_code ec;
@@ -225,8 +242,8 @@ void test_explicit_phrase_outweighs_accepted_defaults() {
 }
 
 void test_explicit_choice_survives_context_restart() {
-    // Use a clean libchewing dictionary and verify that Ari's sidecar carries
-    // a deliberate candidate choice across contexts.
+    // Use a clean libchewing dictionary and verify that the deliberate choice
+    // is learned across contexts while the sidecar remains durable metadata.
     test::TempConfigHome configHome("inputer-userdata-explicit-choice-test", false);
     check(teachPhraseChoice("su3cl3", "妳好"),
           "explicit phrase choice commits in a clean learning sandbox");
@@ -236,7 +253,7 @@ void test_explicit_choice_survives_context_restart() {
     Sim restored;
     restored.type("su3cl3");
     check_eq(restored.preedit(), "妳好",
-             "explicit choice is promoted after a fresh context starts");
+             "explicit choice is learned after a fresh context starts");
 }
 
 void test_explicit_preference_can_be_forgotten() {
@@ -312,7 +329,7 @@ void test_forget_personal_candidate() {
     {
         Sim learned;
         learned.type("su3");
-        check_eq(learned.preedit(), "妳", "forget setup promotes learned candidate");
+        check_eq(learned.preedit(), "妳", "forget setup learns candidate");
         learned.key(FcitxKey_Down);
         KeyResult forgotten = learned.press(fcitx::Key(
             FcitxKey_Delete,
@@ -354,7 +371,7 @@ void test_userphrase_mapping_can_be_restored() {
     Sim restored;
     restored.type("su3");
     check_eq(restored.preedit(), "妳",
-             "imported userphrase mapping is promoted to the live result");
+             "imported userphrase mapping is learned by the live result");
     restored.key(FcitxKey_Down);
     check(findVisibleCandidate(restored.cand(), "妳") >= 0,
           "imported userphrase mapping remains selectable");
@@ -393,6 +410,7 @@ void test_legacy_dictionary_is_seeded_for_libchewing() {
 int main() {
     test_test_isolation_disables_learning();
     test_reset_only_clears_user_dictionary();
+    test_preference_sidecar_does_not_override_live_ranking();
     test_learning_can_restart_after_reset();
     test_learning_changes_future_conversion();
     test_explicit_phrase_outweighs_accepted_defaults();
