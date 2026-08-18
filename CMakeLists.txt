@@ -42,6 +42,13 @@ if(Chewing_VERSION VERSION_LESS "0.9.0")
     add_compile_definitions(INPUTER_LIBCHEWING_LEGACY_OUTPUT)
 endif()
 
+# libchewing 0.10 made explicit user phrases take precedence. Older releases
+# expose the mapping to the C API but keep it in dictionary order, so Ari must
+# apply its own explicit preference sidecar for those distributions.
+if(Chewing_VERSION VERSION_LESS "0.10.0")
+    add_compile_definitions(INPUTER_LEGACY_PREFERENCE_PROMOTION)
+endif()
+
 include(GNUInstallDirs)
 
 function(inputer_enable_warnings target)

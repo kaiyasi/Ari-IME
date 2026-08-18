@@ -946,11 +946,10 @@ void Buffer::integrateSyllable(const std::string &body) {
         zhuyin_.feedSequence(body);
         runReadings_ = {body};
     }
-    // Keep libchewing's contextual conversion. Its phrase scorer combines the
-    // built-in language model with local learned frequencies. Do not open and
-    // walk a hidden candidate window here: this is the hot path for every
-    // completed syllable, and the user should only see a candidate window when
-    // they explicitly ask for one.
+    // Keep libchewing's contextual conversion. On older libchewing releases
+    // only, also apply Ari's explicit preference sidecar; newer releases rank
+    // those mappings natively and make this call a no-op.
+    zhuyin_.promoteUserPhrases();
     moveAutoCommit();
     token_ = Token::Chinese;
 }
@@ -1161,6 +1160,7 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
         }
         zhuyin_.feedSequence(syllable);
         runReadings_ = {syllable};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1196,6 +1196,7 @@ bool Buffer::tryPeelEnglish(char tone, KeyResult &out) {
         }
         zhuyin_.feedSequence(syllable);
         runReadings_ = {syllable};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1227,6 +1228,7 @@ bool Buffer::tryPeelEnglishTone1(KeyResult &out) {
         zhuyin_.feedSequence(syllable);
         zhuyin_.handleSpace();
         runReadings_ = {syllable + " "};
+        zhuyin_.promoteUserPhrases();
         moveAutoCommit();
         token_ = Token::Chinese;
         englishBuf_.clear();
@@ -1260,6 +1262,7 @@ KeyResult Buffer::handleSpace() {
             }
             zhuyin_.handleSpace();             // 一聲
             runReadings_.push_back(body + " "); // ' ' marks a 一聲 reading
+            zhuyin_.promoteUserPhrases();
             moveAutoCommit();
             syl_.clear();
             token_ = Token::Chinese;
@@ -1457,9 +1460,10 @@ int Buffer::feedRun(int start, int end, int offset) {
             zhuyin_.handleSpace(); // 一聲
         }
     }
-    // Preserve libchewing's contextual conversion, then restore explicitly
-    // locked picks that a fresh feed reverted. Do not run the hidden preference
-    // candidate scan while rebuilding a selection window.
+    // Preserve libchewing's contextual conversion, then apply the explicit
+    // preference sidecar only on older libchewing builds before restoring
+    // explicitly locked picks that a fresh feed reverted.
+    zhuyin_.promoteUserPhrases();
     relockRun(start, end, /*onlyLocked=*/true);
     // Park the edit cursor on the character we want candidates for.
     zhuyin_.handleHome();

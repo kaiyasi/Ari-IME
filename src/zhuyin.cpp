@@ -471,8 +471,10 @@ int Zhuyin::forgetUserPhrase(const std::string &phrase) {
         // already been removed, but a later context can still recover the
         // preference rather than silently losing it.
         userPhraseTexts_.insert(phrase);
+        userPhraseMappings_.insert(phrase);
         return -1;
     }
+    userPhraseMappings_.erase(phrase);
     // The Ari sidecar is itself a personal preference. Count its removal even
     // when an older libchewing dictionary has no matching reading to remove.
     return removed > 0 ? removed : (preferred ? 1 : 0);
@@ -514,6 +516,7 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         const bool wasPresent = userPhraseTexts_.find(phrase) !=
                                 userPhraseTexts_.end();
         userPhraseTexts_.insert(phrase);
+        userPhraseMappings_.insert(phrase);
         // This sidecar records deliberate selected/imported preferences only
         // for Ari's portable bookkeeping. The libchewing user dictionary also
         // contains ordinary learned frequencies and remains the live scorer.
@@ -534,6 +537,7 @@ bool Zhuyin::rememberPreferredPhrase(const std::string &phrase) {
     }
     loadUserPhraseCache();
     if (userPhraseTexts_.find(phrase) != userPhraseTexts_.end()) {
+        userPhraseMappings_.insert(phrase);
         return true;
     }
     userPhraseTexts_.insert(phrase);
@@ -541,6 +545,7 @@ bool Zhuyin::rememberPreferredPhrase(const std::string &phrase) {
         userPhraseTexts_.erase(phrase);
         return false;
     }
+    userPhraseMappings_.insert(phrase);
     return true;
 }
 
@@ -554,7 +559,133 @@ bool Zhuyin::loadUserPhraseCache() {
     // same entries; importing that broad set is unnecessary and can disturb a
     // long active window. Ari's own sidecar is deliberately unambiguous.
     userPhraseTexts_ = readPreferredPhrases();
+#ifdef INPUTER_LEGACY_PREFERENCE_PROMOTION
+    // The sidecar records which phrases were deliberately chosen, while the
+    // libchewing dictionary confirms that the corresponding mapping actually
+    // exists. Intersecting both stores avoids promoting stale sidecar text.
+    if (!userPhraseTexts_.empty()) {
+        for (const auto &entry : userPhrases()) {
+            if (userPhraseTexts_.find(entry.phrase) != userPhraseTexts_.end()) {
+                userPhraseMappings_.insert(entry.phrase);
+            }
+        }
+    }
+#endif
     return !userPhraseTexts_.empty();
+}
+
+int Zhuyin::promoteUserPhrases() {
+#ifndef INPUTER_LEGACY_PREFERENCE_PROMOTION
+    return 0;
+#else
+    if (!ctx_ || !loadUserPhraseCache()) {
+        return 0;
+    }
+
+    struct Choice {
+        int start = 0;
+        int down = 0;
+        int index = 0;
+        int length = 0;
+    };
+
+    int applied = 0;
+    for (int pass = 0; pass < inputer::kMaxCompositionChars; ++pass) {
+        const auto visible = inputer::unicode::splitGraphemes(preedit());
+        if (visible.empty()) {
+            break;
+        }
+
+        Choice best;
+        bool found = false;
+        for (int start = 0; start < static_cast<int>(visible.size()); ++start) {
+            closeCandidates();
+            handleHome();
+            for (int i = 0; i < start; ++i) {
+                handleRight();
+            }
+            if (!openCandidates()) {
+                continue;
+            }
+
+            for (int down = 0, guard = 0;
+                 guard < inputer::kMaxSyllables; ++guard, ++down) {
+                const int total = candidateCount();
+                for (int index = 0; index < total; ++index) {
+                    const std::string text = candidate(index);
+                    if (userPhraseTexts_.find(text) == userPhraseTexts_.end() ||
+                        userPhraseMappings_.find(text) ==
+                            userPhraseMappings_.end()) {
+                        continue;
+                    }
+                    const auto candidateChars =
+                        inputer::unicode::splitGraphemes(text);
+                    const int length = static_cast<int>(candidateChars.size());
+                    if (length <= 0 ||
+                        start + length > static_cast<int>(visible.size())) {
+                        continue;
+                    }
+                    bool alreadyVisible = true;
+                    for (int i = 0; i < length; ++i) {
+                        if (visible[start + i] != candidateChars[i]) {
+                            alreadyVisible = false;
+                            break;
+                        }
+                    }
+                    if (alreadyVisible) {
+                        continue;
+                    }
+
+                    // Prefer the longest explicit phrase. For equal lengths,
+                    // prefer the rightmost span so a second phrase in a
+                    // sentence is not hidden by an already-correct first one.
+                    if (!found || length > best.length ||
+                        (length == best.length && start > best.start) ||
+                        (length == best.length && start == best.start &&
+                         down < best.down)) {
+                        best = {start, down, index, length};
+                        found = true;
+                    }
+                }
+
+                if (total <= 0 ||
+                    inputer::unicode::graphemeCount(candidate(0)) <= 1) {
+                    break;
+                }
+                handleDown();
+            }
+        }
+
+        if (!found) {
+            closeCandidates();
+            handleEnd();
+            break;
+        }
+
+        closeCandidates();
+        handleHome();
+        for (int i = 0; i < best.start; ++i) {
+            handleRight();
+        }
+        if (!openCandidates()) {
+            break;
+        }
+        for (int i = 0; i < best.down; ++i) {
+            handleDown();
+        }
+        const int perPage = candPerPage();
+        const int targetPage = perPage > 0 ? best.index / perPage : 0;
+        while (candCurrentPage() < targetPage) {
+            nextPage();
+        }
+        chooseCandidate(perPage > 0 ? best.index % perPage : best.index);
+        ++applied;
+    }
+
+    closeCandidates();
+    handleEnd();
+    return applied;
+#endif
 }
 
 std::vector<std::pair<int, int>> Zhuyin::phraseIntervals() {

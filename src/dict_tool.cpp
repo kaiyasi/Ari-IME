@@ -366,6 +366,9 @@ int commandCandidates(const std::string &keys) {
         return 1;
     }
     engine.feedSequence(keys);
+    // On libchewing < 0.10, explicit user phrases are not ranked ahead of
+    // built-in candidates by the library itself.
+    engine.promoteUserPhrases();
     std::cout << "keys\t" << keys << '\n'
               << "preedit\t" << engine.preedit() << '\n';
     if (!engine.openCandidates()) {

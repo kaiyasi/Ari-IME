@@ -105,6 +105,10 @@ public:
     // composition. This records Ari's preference without confusing it with
     // libchewing's broad learned-frequency dictionary.
     bool rememberPreferredPhrase(const std::string &phrase);
+    // Apply explicit/imported preferences when an older libchewing build does
+    // not rank user phrases ahead of its built-in dictionary. This is a no-op
+    // on libchewing >= 0.10, which handles that precedence natively.
+    int promoteUserPhrases();
     // Phrase segments recognized in the current pre-edit, as [from, to)
     // character offsets. Used for Ctrl+Arrow navigation.
     std::vector<std::pair<int, int>> phraseIntervals();
@@ -143,6 +147,10 @@ private:
     inputer::KeyboardLayout layout_ = inputer::currentKeyboardLayout();
     bool userPhraseCacheLoaded_ = false;
     std::unordered_set<std::string> userPhraseTexts_;
+    // On legacy libchewing, only sidecar entries that also exist in the
+    // library's personal dictionary may be promoted. This prevents stale or
+    // hand-written sidecar text from overriding the normal language model.
+    std::unordered_set<std::string> userPhraseMappings_;
     // External committed text may need a bounded reverse lookup. Cache the
     // first valid reading per character so repeated reconversion stays quick;
     // readings learned from Ari's own cells are kept separately in Buffer.
