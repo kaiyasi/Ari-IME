@@ -87,5 +87,10 @@ jobs:
           deb="$(find .. -maxdepth 1 -type f -name 'fcitx5-ari-ime_*.deb' -print -quit)"
           test -n "$deb"
           sha256sum "$deb" > "$deb.sha256"
-          gh release upload "$GITHUB_REF_NAME" "$deb" "$deb.sha256" \
+          latest_deb="fcitx5-ari-ime_amd64.deb"
+          cp -- "$deb" "$latest_deb"
+          sha256sum "$latest_deb" > "$latest_deb.sha256"
+          gh release upload "$GITHUB_REF_NAME" \
+            "$deb" "$deb.sha256" \
+            "$latest_deb" "$latest_deb.sha256" \
             --repo "$GITHUB_REPOSITORY" --clobber

@@ -245,6 +245,20 @@ Download the matching `.deb` and `.sha256` files from the
 [GitHub Release](https://github.com/kaiyasi/Ari-IME/releases), then continue
 with the Fcitx5 setup steps below.
 
+For a one-command installation that downloads the latest release, verifies the
+checksum, installs dependencies, adds Ari to the Fcitx5 profile, and selects it
+as the default input method in the current graphical session:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kaiyasi/Ari-IME/main/scripts/install-ubuntu.sh | bash
+```
+
+The command installs the prebuilt release package; the build itself is already
+performed and tested by GitHub Actions. Run it as the normal desktop user so
+`ari-ime-enable` updates that user's Fcitx5 profile. The installer also falls
+back to the existing versioned release assets while older releases do not yet
+have the stable `fcitx5-ari-ime_amd64.deb` alias.
+
 ## Build & install
 
 ```sh
