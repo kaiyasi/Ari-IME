@@ -295,6 +295,19 @@ void test_typing() {
     check_eq(pe("s3u"), "你", "type s3u (out of order)");
     check_eq(pe("su"), "su", "type su (no tone stays raw)");
     check_eq(pe("aceru/6aj4"), "acer螢幕", "type aceru/6aj4 (peel)");
+    const std::pair<const char *, const char *> mixedSuffixes[] = {
+        {"linuxy04", "linux"},   // initial + final + tone
+        {"ubuntuji3", "ubuntu"}, // medial + final + tone
+        {"kernelh04", "kernel"}, // another lowercase initial boundary
+    };
+    for (const auto &[input, englishPrefix] : mixedSuffixes) {
+        const std::string actual = pe(input);
+        check(actual.rfind(englishPrefix, 0) == 0 &&
+                  contains_han_character(actual),
+              (std::string("English prefix peels a valid Chinese suffix: ") +
+               input)
+                  .c_str());
+    }
     check_eq(pe("su3g4"), "你是", "type su3g4 (phrasing)");
     // Bopomofo has no case: uppercase 注音 keys (Shift / Caps Lock) convert the
     // same as lowercase. But uppercase that can't form Chinese stays English,
