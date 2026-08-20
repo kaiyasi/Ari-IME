@@ -336,10 +336,11 @@ bool canPeelEnglishBody(const std::string &prefix, const std::string &body) {
                isAsciiLower(prefix.back()) &&
                isAsciiLower(prefix[prefix.size() - 2]);
     }
-    if (!prefix.empty() && !body.empty() && isAsciiLower(prefix.back()) &&
-        isAsciiLower(body.front()) && inputer::zhuyinSlot(body.front()) == 0) {
-        return false;
-    }
+    // A lowercase initial may legitimately start the Chinese suffix even when
+    // the English prefix also ends in a lowercase letter. The reverse search
+    // already prefers the shortest valid trailing syllable, so rejecting this
+    // boundary would hide valid initial+final syllables without preventing a
+    // meaningful ambiguity.
     return true;
 }
 
