@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(inputer VERSION 2.5.0 LANGUAGES CXX)
+project(inputer VERSION 2.5.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,8 @@ option(INPUTER_ENABLE_FUZZING
     "Build libFuzzer targets for Buffer state-machine fuzzing" OFF)
 option(INPUTER_ENABLE_COVERAGE
     "Build tests with compiler coverage instrumentation" OFF)
+option(BUILD_TESTING
+    "Build maintainer-only local tests" OFF)
 
 find_package(ECM REQUIRED)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
@@ -207,7 +209,26 @@ install(TARGETS ari-ime-dict
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
-# --- Tests ---
+# --- Maintainer-only local tests ---
+set(INPUTER_LOCAL_TESTS_AVAILABLE TRUE)
+foreach(inputer_local_test IN ITEMS
+        test/test_buffer.cpp
+        test/test_layout.cpp
+        test/test_user_data.cpp
+        test/test_enable_input_method.sh
+        test/test_dict_tool.sh)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${inputer_local_test}")
+        set(INPUTER_LOCAL_TESTS_AVAILABLE FALSE)
+    endif()
+endforeach()
+
+if(BUILD_TESTING AND NOT INPUTER_LOCAL_TESTS_AVAILABLE)
+    message(WARNING
+        "BUILD_TESTING=ON was requested, but maintainer-only test sources "
+        "are not present; local tests are disabled")
+    set(BUILD_TESTING OFF)
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     add_executable(test_buffer
@@ -278,7 +299,8 @@ if(BUILD_TESTING)
     inputer_configure_test(dict_tool)
 endif()
 
-if(INPUTER_ENABLE_FUZZING)
+if(INPUTER_ENABLE_FUZZING AND EXISTS
+   "${CMAKE_CURRENT_SOURCE_DIR}/test/fuzz_buffer.cpp")
     add_executable(fuzz_buffer
         test/fuzz_buffer.cpp
         src/layout.cpp
@@ -295,4 +317,8 @@ if(INPUTER_ENABLE_FUZZING)
     )
     inputer_enable_warnings(fuzz_buffer)
     inputer_enable_fuzzer(fuzz_buffer)
+elseif(INPUTER_ENABLE_FUZZING)
+    message(WARNING
+        "INPUTER_ENABLE_FUZZING was requested, but maintainer-only fuzz "
+        "sources are not present; the fuzz target is disabled")
 endif()

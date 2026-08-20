@@ -1,6 +1,6 @@
 {
   "name": "@ari-ime/wasm",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Headless Ari IME input core compiled to WebAssembly",
   "type": "module",
   "exports": {
@@ -21,8 +21,7 @@
   },
   "scripts": {
     "build:libchewing": "bash ./build-libchewing-wasm.sh",
-    "build:wasm": "bash ./build-wasm.sh",
-    "test": "node ./test/node_api.mjs"
+    "build:wasm": "bash ./build-wasm.sh"
   },
   "sideEffects": false,
   "license": "GPL-3.0-or-later"

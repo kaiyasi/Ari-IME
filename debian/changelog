@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.5.1) unstable; urgency=medium
+
+  * Fix mixed English and Bopomofo suffix detection across lowercase word
+    boundaries.
+  * Build the public package in Release mode without publishing maintainer-only
+    test sources.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Thu, 20 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.5.0) unstable; urgency=medium
 
   * Add safe committed-text reconversion through Fcitx5 surrounding text and

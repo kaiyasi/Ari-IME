@@ -18,6 +18,14 @@ run() {
     "$@"
 }
 
+local_tests_available() {
+    [[ -f test/test_buffer.cpp &&
+       -f test/test_layout.cpp &&
+       -f test/test_user_data.cpp &&
+       -f test/test_enable_input_method.sh &&
+       -f test/test_dict_tool.sh ]]
+}
+
 cmake_compiler_args() {
     if [[ -n "${INPUTER_CC:-}" ]]; then
         printf '%s\n' "-DCMAKE_C_COMPILER=$INPUTER_CC"
@@ -48,21 +56,33 @@ extract_debian_version() {
     sed -n '1s/^[^(]*(\([^)]*\)).*/\1/p' debian/changelog
 }
 
+extract_wasm_version() {
+    sed -n 's/^[[:space:]]*"version": "\([^"]*\)",/\1/p' \
+        wasm/package.json | head -n1
+}
+
 check_versions() {
-    local cmake_version pkgbuild_version srcinfo_version debian_version
+    local cmake_version pkgbuild_version srcinfo_version debian_version wasm_version
     cmake_version="$(extract_cmake_version)"
     pkgbuild_version="$(extract_pkgbuild_version)"
     srcinfo_version="$(extract_srcinfo_version)"
     debian_version="$(extract_debian_version)"
+    wasm_version="$(extract_wasm_version)"
 
-    if [[ -z "$cmake_version" || -z "$pkgbuild_version" || -z "$srcinfo_version" ]]; then
-        printf 'Failed to read version from CMakeLists.txt, PKGBUILD, or .SRCINFO\n' >&2
+    if [[ -z "$cmake_version" || -z "$pkgbuild_version" ||
+          -z "$srcinfo_version" || -z "$wasm_version" ]]; then
+        printf 'Failed to read a synchronized project version\n' >&2
         exit 1
     fi
     if [[ "$cmake_version" != "$pkgbuild_version" ||
           "$cmake_version" != "$srcinfo_version" ]]; then
         printf 'Version mismatch: CMake=%s PKGBUILD=%s .SRCINFO=%s\n' \
             "$cmake_version" "$pkgbuild_version" "$srcinfo_version" >&2
+        exit 1
+    fi
+    if [[ "$cmake_version" != "$wasm_version" ]]; then
+        printf 'Version mismatch: CMake=%s wasm/package.json=%s\n' \
+            "$cmake_version" "$wasm_version" >&2
         exit 1
     fi
     # The Debian packaging is optional; only enforce it when present.
@@ -154,12 +174,19 @@ check_srcinfo() {
 release_checks() {
     check_versions
     print_dependency_versions
-    local cmake_args=()
+    local cmake_args=() build_testing=OFF
+    if local_tests_available; then
+        build_testing=ON
+    fi
     mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$build_dir" "${cmake_args[@]}" \
-        -DCMAKE_BUILD_TYPE="$build_type" -DBUILD_TESTING=ON
+        -DCMAKE_BUILD_TYPE="$build_type" -DBUILD_TESTING="$build_testing"
     run cmake --build "$build_dir"
-    run ctest --test-dir "$build_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
+    if [[ "$build_testing" == ON ]]; then
+        run ctest --test-dir "$build_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
+    else
+        printf 'Skipping local tests: maintainer-only test sources are absent\n'
+    fi
     run cmake --install "$build_dir" --prefix "$install_prefix"
     local installed_module
     installed_module="$(find "$install_prefix" -type f \
@@ -180,24 +207,37 @@ release_checks() {
     run bash -n scripts/install-ubuntu.sh
     run bash -n scripts/install-local.sh
     run bash -n scripts/reset-user-data.sh
-    run bash -n test/test_dict_tool.sh
+    if [[ -f test/test_dict_tool.sh ]]; then
+        run bash -n test/test_dict_tool.sh
+    fi
     check_srcinfo
 }
 
 sanitize_checks() {
     print_dependency_versions
-    local cmake_args=()
+    local cmake_args=() build_testing=OFF
+    if local_tests_available; then
+        build_testing=ON
+    fi
     mapfile -t cmake_args < <(cmake_compiler_args)
     run cmake -S . -B "$sanitize_dir" \
         "${cmake_args[@]}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DINPUTER_ENABLE_SANITIZERS=ON \
-        -DBUILD_TESTING=ON
+        -DBUILD_TESTING="$build_testing"
     run cmake --build "$sanitize_dir"
-    run ctest --test-dir "$sanitize_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
+    if [[ "$build_testing" == ON ]]; then
+        run ctest --test-dir "$sanitize_dir" -j"${INPUTER_TEST_JOBS:-2}" --output-on-failure
+    else
+        printf 'Skipping sanitizer tests: maintainer-only test sources are absent\n'
+    fi
 }
 
 fuzz_checks() {
+    if [[ ! -f test/fuzz_buffer.cpp ]]; then
+        printf 'Skipping fuzz checks: maintainer-only fuzz sources are absent\n'
+        return
+    fi
     print_dependency_versions
     if ! command -v clang++ >/dev/null 2>&1; then
         if [[ "${INPUTER_FUZZ_ALLOW_SKIP:-0}" == "1" ]]; then
@@ -236,6 +276,10 @@ fuzz_checks() {
 }
 
 coverage_checks() {
+    if ! local_tests_available; then
+        printf 'Skipping coverage checks: maintainer-only test sources are absent\n'
+        return
+    fi
     print_dependency_versions
     if ! command -v gcov >/dev/null 2>&1; then
         printf 'gcov is required for INPUTER_CHECK_MODE=coverage\n' >&2
@@ -275,8 +319,11 @@ package_checks() {
     tmp="$(mktemp -d /tmp/inputer-pkgcheck-XXXXXX)"
     trap 'rm -rf "$tmp"' EXIT
     mkdir -p "$tmp/Ari-IME-$pkgbuild_version"
-    cp -a CMakeLists.txt LICENSE README.md data scripts src test \
-        "$tmp/Ari-IME-$pkgbuild_version/"
+    local package_sources=(CMakeLists.txt LICENSE README.md data scripts src)
+    if [[ -d test ]]; then
+        package_sources+=(test)
+    fi
+    cp -a "${package_sources[@]}" "$tmp/Ari-IME-$pkgbuild_version/"
     run env srcdir="$tmp" pkgdir="$tmp/pkg" bash -e -o pipefail -lc \
         'source PKGBUILD; build; check; package; find "$pkgdir" -type f | sort'
 }

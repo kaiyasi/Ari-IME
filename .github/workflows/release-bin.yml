@@ -29,16 +29,17 @@ jobs:
           pkgbuild_version="$(sed -n 's/^pkgver=//p' PKGBUILD)"
           srcinfo_version="$(sed -n 's/^[[:space:]]*pkgver = //p' .SRCINFO | head -n 1)"
           debian_version="$(sed -n '1s/^[^(]*(\([^)]*\)).*/\1/p' debian/changelog)"
+          wasm_version="$(sed -n 's/^[[:space:]]*\"version\": \"\([^\"]*\)\",/\1/p' wasm/package.json | head -n 1)"
           test "$version" = "$cmake_version"
           test "$version" = "$pkgbuild_version"
           test "$version" = "$srcinfo_version"
           test "$version" = "$debian_version"
+          test "$version" = "$wasm_version"
 
-      - name: Build and test
+      - name: Build Release package
         run: |
-          cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_INSTALL_PREFIX=/usr
+          cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=/usr
           cmake --build build-release --parallel
-          ctest --test-dir build-release --output-on-failure
 
       - name: Create runtime archive
         run: |

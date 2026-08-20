@@ -58,17 +58,6 @@ npm run build:wasm
 
 The output is `wasm/dist/ari-ime-wasm.js` plus its `.wasm` and dictionary data
 files. Set `ARI_WASM_DIST_DIR` to write artifacts somewhere else while testing.
-The repository's native headless harness can be run without Emscripten:
-
-```sh
-cmake -S wasm -B build-wasm-native \
-  -DARI_WASM_BUILD_NATIVE_TEST=ON \
-  -DCHEWING_INCLUDE_DIR=/usr/include/chewing \
-  -DCHEWING_LIBRARY=/usr/lib/libchewing.so
-cmake --build build-wasm-native
-ctest --test-dir build-wasm-native --output-on-failure
-```
-
 The module keeps learning data in its MEMFS `/ari-ime` directory. Pass
 `learningState` to `createAriIme` to restore a snapshot and call
 `exportLearningState()` to let the host save it in IndexedDB, local storage,

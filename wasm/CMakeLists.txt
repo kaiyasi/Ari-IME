@@ -54,6 +54,11 @@ target_compile_options(ari-ime-headless PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(ari-ime-headless PUBLIC "${CHEWING_LIBRARY}")
 
 if(ARI_WASM_BUILD_NATIVE_TEST)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/test/native_api.cpp")
+        message(FATAL_ERROR
+            "ARI_WASM_BUILD_NATIVE_TEST requires the local maintainer-only "
+            "wasm/test/native_api.cpp source")
+    endif()
     target_compile_definitions(ari-ime-headless
         PRIVATE INPUTER_WASM_NATIVE_TEST)
     add_executable(ari-ime-wasm-native-test

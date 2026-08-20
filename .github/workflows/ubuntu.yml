@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build & Test (Ubuntu)
+    name: Build Release (Ubuntu)
     runs-on: ubuntu-latest
 
     steps:
@@ -36,13 +36,10 @@ jobs:
           pkg-config --modversion chewing || true
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=ON
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF
 
       - name: Build
         run: cmake --build build -j"$(nproc)"
-
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
 
       - name: Install smoke check
         run: DESTDIR="$PWD/dest" cmake --install build

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.5.1 - 2026-08-20
 
 - Remove the synchronous Ari preference scan from live composition and selection
   rebuilds. Normal typing now leaves candidate ordering to libchewing's
@@ -11,6 +11,8 @@
 - Add the headless `@ari-ime/wasm` package under `wasm/`, with a C ABI,
   TypeScript/ESM wrapper, candidate/reconversion APIs, and host-controlled
   learning-state snapshots for browser or Node applications.
+- Fix mixed English/注音 suffix detection when a lowercase English word is
+  immediately followed by a valid toned syllable.
 
 ## 2.5.0 - 2026-08-17
 
