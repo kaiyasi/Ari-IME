@@ -168,9 +168,12 @@ downloads the tested GitHub Release binary. It does not install a compiler,
 CMake or other build tools:
 
 ```sh
-yay -S fcitx5-ari-ime-bin
-# or: paru -S fcitx5-ari-ime-bin
+yay -S fcitx5-ari-ime-bin && ari-ime-enable --yes --make-default
+# or: paru -S fcitx5-ari-ime-bin && ari-ime-enable --yes --make-default
 ```
+
+After a successful package installation, the command adds Ari to the current
+user's Fcitx5 profile and selects it as the default input method.
 
 Binary archives and SHA-256 checksums are also available from
 [GitHub Releases](https://github.com/kaiyasi/Ari-IME/releases).
@@ -181,8 +184,8 @@ Binary archives and SHA-256 checksums are also available from
 the tagged source and builds it locally:
 
 ```sh
-yay -S fcitx5-ari-ime
-# or: paru -S fcitx5-ari-ime
+yay -S fcitx5-ari-ime && ari-ime-enable --yes --make-default
+# or: paru -S fcitx5-ari-ime && ari-ime-enable --yes --make-default
 ```
 
 Developers can instead clone this repository and use the manual source-build
