@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.5.3) unstable; urgency=medium
+
+  * Fix Ctrl and Alt punctuation shortcuts for unshifted punctuation-looking
+    Bopomofo keys while preserving their ordinary input behavior.
+  * Keep the native and WebAssembly input cores aligned.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Fri, 21 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.5.2) unstable; urgency=medium
 
   * Add key-scoped punctuation candidate re-selection for literal punctuation.

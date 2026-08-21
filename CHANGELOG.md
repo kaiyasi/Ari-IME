@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.3 - 2026-08-21
+
+- Fix `Ctrl` and `Alt` punctuation shortcuts for unshifted punctuation-looking
+  注音 keys such as `,`, so 大千 can produce `，` without losing its ordinary
+  注音 behavior.
+- Keep the shortcut correction in the shared native and WebAssembly input core.
+
 ## 2.5.2 - 2026-08-21
 
 - Add candidate re-selection for literal punctuation, limiting the list to

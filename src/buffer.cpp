@@ -404,6 +404,21 @@ std::string chinesePunct(char c) {
     return out;
 }
 
+// The unshifted punctuation-looking keys are also valid 注音 keys in 大千 and
+// several other layouts. Their ordinary full-width path must leave them
+// available for syllables, but an explicit punctuation shortcut deliberately
+// asks for the punctuation associated with that physical key.
+std::string chinesePunctShortcut(char c) {
+    switch (c) {
+    case ',': return "，";
+    case '.': return "。";
+    case '/': return "？";
+    case ';': return "；";
+    case '-': return "－";
+    default: return chinesePunct(c);
+    }
+}
+
 // A Chinese cell's reading stores its canonical 注音 keys, with a trailing ' '
 // marking a 一聲 syllable (which has no tone key). Split it back into the raw key
 // body and whether 一聲 (chewing's space) must be applied after feeding it.
@@ -862,7 +877,7 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
         (!forcedEnglish_ && punctuationShortcutActive(key, punctuationShortcut_) &&
          (shiftedApostrophe ||
           (sym >= 33 && sym <= 126 &&
-           !chinesePunct(static_cast<char>(sym)).empty())));
+           !chinesePunctShortcut(static_cast<char>(sym)).empty())));
 
     if (selecting_) {
         if (explicitChinesePunctuation) {
@@ -901,7 +916,7 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
     if (!forcedEnglish_ &&
         punctuationShortcutActive(key, punctuationShortcut_) &&
         sym >= 33 && sym <= 126) {
-        std::string punct = chinesePunct(static_cast<char>(sym));
+        std::string punct = chinesePunctShortcut(static_cast<char>(sym));
         if (!punct.empty()) {
             clearSelectionUndo();
             freezeAll();
