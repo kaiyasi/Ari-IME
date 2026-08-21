@@ -37,7 +37,7 @@ FCITX_CONFIGURATION(
         inputer::ChinesePunctuationShortcutI18NAnnotation>
         chinesePunctuationShortcut{
         this, "ChinesePunctuationShortcut",
-        _("Modifier used for temporary Chinese punctuation (default Ctrl+Shift). Choose Alt+Shift or another option if an application uses the default gesture."),
+        _("Modifier used for temporary Chinese punctuation (default Ctrl+Shift). Choose Alt+Shift or another option if an application uses the default gesture. Alt+[ and Alt+] are reserved for Chinese corner quotes."),
         inputer::ChinesePunctuationShortcut::ControlShift};
     fcitx::Option<bool> spaceCandidateMode{
         this, "SpaceCandidateMode",

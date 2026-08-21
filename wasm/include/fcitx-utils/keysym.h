@@ -8,6 +8,8 @@
 inline constexpr fcitx::KeySym FcitxKey_space = 0x0020;
 inline constexpr fcitx::KeySym FcitxKey_apostrophe = 0x0027;
 inline constexpr fcitx::KeySym FcitxKey_quotedbl = 0x0022;
+inline constexpr fcitx::KeySym FcitxKey_bracketleft = 0x005b;
+inline constexpr fcitx::KeySym FcitxKey_bracketright = 0x005d;
 inline constexpr fcitx::KeySym FcitxKey_z = 0x007a;
 
 inline constexpr fcitx::KeySym FcitxKey_1 = 0x0031;

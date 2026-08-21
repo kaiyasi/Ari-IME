@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include <fcitx-utils/keysym.h>
 
@@ -14,6 +15,8 @@
 #include "unicode.h"
 
 namespace {
+
+constexpr int kPunctuationCandidateDown = -2;
 
 // Numeric-keypad keys (NumLock on) arrive as KP_* keysyms instead of the ASCII
 // sym of the equivalent main-row key. Map them back to ASCII so they flow
@@ -64,6 +67,118 @@ bool isIgnoredPasteFormat(const std::string &ch) {
 bool isAsciiWhitespace(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
            c == '\v';
+}
+
+// Candidates shown when the user re-opens a literal punctuation cell. Keep the
+// list finite and useful for keyboard input: it covers the ASCII forms Ari can
+// receive, their full-width forms, the common Chinese punctuation variants and
+// the paired brackets/quotation marks users commonly switch between.
+const std::vector<std::string> &punctuationCandidateCatalog() {
+    static const std::vector<std::string> kCandidates{
+        ",",  "，", "、", ".",  "。", "．", "!",  "！", "?",  "？",
+        ";",  "；", ":",  "：", "'",  "‘",  "’",  "＇", "\"", "“",
+        "”",  "＂", "(",  "（", ")",  "）", "[",  "「", "{",  "『",
+        "【",  "〔",  "〈",  "《", "]",  "」", "}",  "』", "】",  "〕",
+        "〉",  "》", "<",  "＜", ">",  "＞", "/",  "／", "\\", "＼",
+        "-",  "－", "–",  "—", "―", "_",  "＿", "^",  "＾", "…",  "……",
+        "@",  "＠", "#",  "＃", "$",  "＄", "%",  "％", "&",  "＆",
+        "*",  "＊", "+",  "＋", "=",  "＝", "|",  "｜", "~",  "～",
+        "`",  "｀", "·",  "・", "•",  "※", "〝", "〞", "〟", "﹁",  "﹂",
+        "﹃",  "﹄", "〜",  "￣"};
+    return kCandidates;
+}
+
+// A punctuation-looking 注音 key can also be a literal symbol. When such a key
+// participates in a syllable, keep the native Chinese candidates first but
+// offer the punctuation forms that users normally expect from the same key.
+std::vector<std::string> punctuationVariantsForKey(char key) {
+    switch (key) {
+    case ',':
+        return {",", "，", "、"};
+    case '.':
+        return {".", "。", "．", "…", "……"};
+    case '!':
+        return {"!", "！"};
+    case '?':
+        return {"?", "？"};
+    case ';':
+        return {";", "；"};
+    case ':':
+        return {":", "："};
+    case '\'':
+        return {"'", "‘", "’", "＇"};
+    case '"':
+        return {"\"", "“", "”", "＂"};
+    case '(':
+    case ')':
+        return {"(", "（", ")", "）"};
+    case '[':
+    case '{':
+    case '<':
+        return {"[", "「", "{", "『", "【", "〔", "〈", "《", "﹁", "﹃"};
+    case ']':
+    case '}':
+    case '>':
+        return {"]", "」", "}", "』", "】", "〕", "〉", "》", "﹂", "﹄"};
+    case '/':
+        return {"/", "／"};
+    case '\\':
+        return {"\\", "＼"};
+    case '-':
+        return {"-", "－", "–", "—", "―"};
+    case '_':
+        return {"_", "＿"};
+    case '^':
+        return {"^", "＾", "…", "……"};
+    case '~':
+        return {"~", "～", "〜", "￣"};
+    case '`':
+        return {"`", "｀"};
+    case '@':
+        return {"@", "＠"};
+    case '#':
+        return {"#", "＃"};
+    case '$':
+        return {"$", "＄"};
+    case '%':
+        return {"%", "％"};
+    case '&':
+        return {"&", "＆"};
+    case '*':
+        return {"*", "＊"};
+    case '+':
+        return {"+", "＋"};
+    case '=':
+        return {"=", "＝"};
+    case '|':
+        return {"|", "｜"};
+    default:
+        return {};
+    }
+}
+
+std::vector<std::string> punctuationVariantsForText(std::string_view text) {
+    // These are the punctuation keys Ari can receive directly. A variant list
+    // is shared by the unshifted/shifted forms where they represent the same
+    // physical key family (for example `[`/`{` and `]`/`}`).
+    constexpr std::string_view kPunctuationKeys =
+        ",.!?;:'\"()[]{}<>/\\-_~`@#$%&*+=|^";
+    for (char key : kPunctuationKeys) {
+        const auto variants = punctuationVariantsForKey(key);
+        if (std::find(variants.begin(), variants.end(), text) != variants.end()) {
+            return variants;
+        }
+    }
+    return {};
+}
+
+bool isPunctuationText(const std::string &text) {
+    if (text.size() == 1 &&
+        std::ispunct(static_cast<unsigned char>(text.front()))) {
+        return true;
+    }
+    const auto &catalog = punctuationCandidateCatalog();
+    return std::find(catalog.begin(), catalog.end(), text) != catalog.end();
 }
 
 bool containsHanCharacter(const std::string &text) {
@@ -182,6 +297,20 @@ bool punctuationShortcutActive(
         return false;
     }
     return false;
+}
+
+// Reserve the two bracket keys as a small, predictable Chinese-typing
+// convenience even though ordinary Alt punctuation remains available to the
+// application.  The unshifted physical keys produce the Chinese corner quote
+// pair: Alt+[ -> 「 and Alt+] -> 」.
+bool isAltCornerQuoteKey(const fcitx::Key &key, fcitx::KeySym sym) {
+    if (!key.states().test(fcitx::KeyState::Alt) ||
+        key.states().testAny(fcitx::KeyStates{fcitx::KeyState::Ctrl,
+                                              fcitx::KeyState::Shift,
+                                              fcitx::KeyState::Super})) {
+        return false;
+    }
+    return sym == FcitxKey_bracketleft || sym == FcitxKey_bracketright;
 }
 
 Zhuyin *probeForCurrentLayout(Zhuyin *&probe,
@@ -541,8 +670,8 @@ KeyResult Buffer::beginReconversion(const std::string &text) {
 }
 
 std::vector<std::string> Buffer::candidates() const {
-    // The current page (9) of the merged phrase+single candidate list. Empty on
-    // an English cell (cursor still visible, just nothing to pick).
+    // The current page (9) of the merged phrase+single or punctuation candidate
+    // list. Ordinary English cells remain cursor-only with nothing to pick.
     std::vector<std::string> out;
     int count = visibleCandidateCount();
     if (count <= 0) {
@@ -726,12 +855,14 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
 
     const bool shiftedApostrophe = sym == FcitxKey_apostrophe ||
                                    sym == FcitxKey_quotedbl;
+    const bool altCornerQuote = !forcedEnglish_ &&
+                                isAltCornerQuoteKey(key, sym);
     const bool explicitChinesePunctuation =
-        !forcedEnglish_ &&
-        punctuationShortcutActive(key, punctuationShortcut_) &&
-        (shiftedApostrophe ||
-         (sym >= 33 && sym <= 126 &&
-          !chinesePunct(static_cast<char>(sym)).empty()));
+        altCornerQuote ||
+        (!forcedEnglish_ && punctuationShortcutActive(key, punctuationShortcut_) &&
+         (shiftedApostrophe ||
+          (sym >= 33 && sym <= 126 &&
+           !chinesePunct(static_cast<char>(sym)).empty())));
 
     if (selecting_) {
         if (explicitChinesePunctuation) {
@@ -745,6 +876,14 @@ KeyResult Buffer::handleAuto(const fcitx::Key &key) {
 
     if (ctrlNavigation) {
         return enterSelection(key);
+    }
+
+    if (altCornerQuote) {
+        clearSelectionUndo();
+        freezeAll();
+        cells_.push_back(
+            {false, sym == FcitxKey_bracketleft ? "「" : "」", {}});
+        return {true, false, {}, true};
     }
 
     // Chinese punctuation is an explicit gesture, independent of surrounding
@@ -1605,6 +1744,94 @@ void Buffer::buildSelCands() {
              static_cast<int>(selCands_.size())});
     }
     rankSelCands();
+    appendSymbolKeyPunctuationCandidates();
+}
+
+void Buffer::appendSymbolKeyPunctuationCandidates() {
+    if (selCursor_ < 0 || selCursor_ >= static_cast<int>(cells_.size()) ||
+        !cells_[selCursor_].chinese) {
+        return;
+    }
+
+    const std::string reading = readingBody(cells_[selCursor_].reading).first;
+    if (reading.empty()) {
+        return;
+    }
+
+    std::vector<std::string> punctuation;
+    for (char key : reading) {
+        if (!inputer::isSymbolLikeZhuyinKey(key)) {
+            continue;
+        }
+        for (std::string candidate : punctuationVariantsForKey(key)) {
+            if (std::find(punctuation.begin(), punctuation.end(), candidate) ==
+                punctuation.end()) {
+                punctuation.push_back(std::move(candidate));
+            }
+        }
+    }
+    if (punctuation.empty()) {
+        return;
+    }
+
+    const int targetOffset = selCursor_ - selRunStart_;
+    std::vector<SelCand> additions;
+    int order = static_cast<int>(selCands_.size());
+    for (const std::string &candidate : punctuation) {
+        const bool alreadyPresent = std::any_of(
+            selCands_.begin(), selCands_.end(), [&candidate](const SelCand &existing) {
+                return existing.text == candidate;
+            });
+        if (alreadyPresent) {
+            continue;
+        }
+        additions.push_back({candidate, candidate, kPunctuationCandidateDown, 0,
+                             targetOffset, order++});
+    }
+    if (additions.empty()) {
+        return;
+    }
+
+    // Preserve the complete native candidate ordering first. Punctuation
+    // alternatives belong after every Chinese candidate but before the final
+    // raw-key recovery entry.
+    int insertAt = static_cast<int>(selCands_.size());
+    for (int i = 0; i < static_cast<int>(selCands_.size()); ++i) {
+        if (selCands_[i].down == -1) {
+            insertAt = i;
+            break;
+        }
+    }
+    selCands_.insert(selCands_.begin() + insertAt, additions.begin(),
+                     additions.end());
+}
+
+void Buffer::buildPunctuationCandidates() {
+    selCands_.clear();
+    selPage_ = 0;
+    highlight_ = 0;
+
+    const std::string current = cells_[selCursor_].text;
+    int order = 0;
+    selCands_.push_back(
+        {current, current, kPunctuationCandidateDown, 0, 0, order++});
+
+    auto add = [this, &current, &order](std::string candidate) {
+        if (candidate == current ||
+            std::any_of(selCands_.begin(), selCands_.end(),
+                        [&candidate](const SelCand &existing) {
+                            return existing.text == candidate;
+                        })) {
+            return;
+        }
+        selCands_.push_back(
+            {candidate, candidate, kPunctuationCandidateDown, 0, 0, order++});
+    };
+    // Only expose forms associated with the focused key. Do not append the
+    // global punctuation catalog here: `[` should not suddenly offer `!`.
+    for (const std::string &candidate : punctuationVariantsForText(current)) {
+        add(candidate);
+    }
 }
 
 int Buffer::visibleCandidateCount() const {
@@ -1634,8 +1861,11 @@ void Buffer::loadCellCandidates() {
     selPage_ = 0;
     highlight_ = 0;
     if (!cells_[selCursor_].chinese) {
-        // English cell: no candidates. Keep any loaded run intact (with its
-        // locks) so returning to it preserves earlier picks.
+        if (isPunctuationText(cells_[selCursor_].text)) {
+            buildPunctuationCandidates();
+        }
+        // Ordinary English cell: no candidates. Punctuation cells were loaded
+        // above from Ari's standalone symbol catalog.
         return;
     }
     int s, e;
@@ -1803,6 +2033,21 @@ KeyResult Buffer::pickCandidate(int pageIndex) {
     }
     SelCand sc = selCands_[gi];
     rememberSelectionUndo();
+    if (sc.down == kPunctuationCandidateDown) {
+        // Standalone punctuation candidates target the literal cell itself.
+        // Candidates merged into a Chinese run carry the selected cell's offset
+        // so choosing one replaces only that Chinese character and leaves the
+        // surrounding run intact.
+        int target = selCursor_;
+        if (cells_[selCursor_].chinese) {
+            target = selRunStart_ + sc.startOffset;
+        }
+        if (target >= 0 && target < static_cast<int>(cells_.size())) {
+            cells_[target] = {false, sc.text, {}};
+        }
+        exitSelection();
+        return {true, false, {}, true};
+    }
     if (sc.down < 0) {
         return revertCellToEnglish(); // the "raw keys" entry
     }
@@ -2195,7 +2440,12 @@ KeyResult Buffer::openCandidatesAt(int cell, bool reinterpret) {
     }
     selCursor_ = cell;
     runLoaded_ = false;
-    if (cells_[cell].chinese) {
+    const bool punctuation = isPunctuationText(cells_[cell].text);
+    const bool symbolLikeZhuyin =
+        punctuation && cells_[cell].text.size() == 1 &&
+        inputer::isSymbolLikeZhuyinKey(cells_[cell].text.front());
+    if (cells_[cell].chinese ||
+        (punctuation && (!reinterpret || !symbolLikeZhuyin))) {
         candOpen_ = true;
         loadCellCandidates();
         return {true, false, {}, true};

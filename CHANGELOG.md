@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.2 - 2026-08-21
+
+- Add candidate re-selection for literal punctuation, limiting the list to
+  forms associated with the focused key instead of mixing unrelated symbols.
+- Merge punctuation alternatives from punctuation-looking 注音 keys into the
+  same Chinese candidate window, while keeping the native Chinese result first.
+- Add `Alt+[` and `Alt+]` shortcuts for Chinese corner quotes, and keep the
+  shared behavior available to the native and WebAssembly cores.
+
 ## 2.5.1 - 2026-08-20
 
 - Remove the synchronous Ari preference scan from live composition and selection

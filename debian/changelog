@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.5.2) unstable; urgency=medium
+
+  * Add key-scoped punctuation candidate re-selection for literal punctuation.
+  * Merge punctuation alternatives from punctuation-looking Bopomofo keys into
+    the same Chinese candidate window.
+  * Add Alt+[ and Alt+] shortcuts for Chinese corner quotes.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Fri, 21 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.5.1) unstable; urgency=medium
 
   * Fix mixed English and Bopomofo suffix detection across lowercase word

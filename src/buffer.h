@@ -146,7 +146,8 @@ private:
     // One display unit of the pre-edit. Chinese cells remember the 注音 reading
     // that produced them, so any character — wherever it sits in the string and
     // whatever English surrounds it — can later be re-opened for candidate
-    // re-selection. English cells hold one literal character (reading unused).
+    // re-selection. English cells hold one literal character (reading unused),
+    // while punctuation cells can use Ari's dedicated symbol candidate list.
     struct Cell {
         bool chinese = false;
         std::string text;    // the displayed character (one codepoint)
@@ -201,10 +202,12 @@ private:
     bool cellLooksLiteralish(const Cell &cell) const;
     int literalContextBiasAt(int idx) const;
 
-    // One re-selection candidate. `startOffset`, `down` and `idx` say how to
-    // re-pick it from a freshly-fed run: park at the interval start, press Down
-    // `down` times (0 = the longest phrase interval), then choose global index
-    // `idx` within it.
+    // One re-selection candidate. For a Chinese candidate, `startOffset`,
+    // `down` and `idx` say how to re-pick it from a freshly-fed run: park at the
+    // interval start, press Down `down` times (0 = the longest phrase interval),
+    // then choose global index `idx` within it. `down == -2` is an Ari punctuation
+    // candidate and is applied directly to the focused cell; `down == -1` remains
+    // the raw-key recovery entry.
     struct SelCand {
         std::string text;
         std::string display;
@@ -231,6 +234,8 @@ private:
     // cell on ↑, reinterpret it back into 注音). Enters picking mode.
     KeyResult openCandidatesAt(int cell, bool reinterpret);
     void loadCellCandidates();              // build phrase+single candidates here
+    void buildPunctuationCandidates();      // build Ari's symbol candidates here
+    void appendSymbolKeyPunctuationCandidates();
     // Feed the contiguous Chinese run [start..end] into chewing and park the
     // cursor on character `offset`. Returns the run length.
     int feedRun(int start, int end, int offset);
