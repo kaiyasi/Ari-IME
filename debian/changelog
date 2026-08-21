@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.5.4) unstable; urgency=medium
+
+  * Build punctuation candidates from the same physical key, including its
+    unshifted, Shift, Ctrl/Shift and Alt shortcut outputs.
+  * Keep unrelated punctuation out of literal and Bopomofo candidate windows.
+  * Keep the native and WebAssembly input cores aligned.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Fri, 21 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.5.3) unstable; urgency=medium
 
   * Fix Ctrl and Alt punctuation shortcuts for unshifted punctuation-looking

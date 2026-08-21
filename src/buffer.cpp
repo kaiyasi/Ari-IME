@@ -3,6 +3,7 @@
 #include "buffer.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -69,10 +70,11 @@ bool isAsciiWhitespace(char c) {
            c == '\v';
 }
 
-// Candidates shown when the user re-opens a literal punctuation cell. Keep the
-// list finite and useful for keyboard input: it covers the ASCII forms Ari can
-// receive, their full-width forms, the common Chinese punctuation variants and
-// the paired brackets/quotation marks users commonly switch between.
+// Candidates shown when the user re-opens a literal punctuation cell. This is
+// a recognition catalog, not the list displayed in the candidate window. It
+// deliberately stays broad so punctuation inserted by an older version can
+// still be re-opened; the displayed candidates are derived from the physical
+// key below.
 const std::vector<std::string> &punctuationCandidateCatalog() {
     static const std::vector<std::string> kCandidates{
         ",",  "，", "、", ".",  "。", "．", "!",  "！", "?",  "？",
@@ -88,88 +90,30 @@ const std::vector<std::string> &punctuationCandidateCatalog() {
     return kCandidates;
 }
 
-// A punctuation-looking 注音 key can also be a literal symbol. When such a key
-// participates in a syllable, keep the native Chinese candidates first but
-// offer the punctuation forms that users normally expect from the same key.
-std::vector<std::string> punctuationVariantsForKey(char key) {
-    switch (key) {
-    case ',':
-        return {",", "，", "、"};
-    case '.':
-        return {".", "。", "．", "…", "……"};
-    case '!':
-        return {"!", "！"};
-    case '?':
-        return {"?", "？"};
-    case ';':
-        return {";", "；"};
-    case ':':
-        return {":", "："};
-    case '\'':
-        return {"'", "‘", "’", "＇"};
-    case '"':
-        return {"\"", "“", "”", "＂"};
-    case '(':
-    case ')':
-        return {"(", "（", ")", "）"};
-    case '[':
-    case '{':
-    case '<':
-        return {"[", "「", "{", "『", "【", "〔", "〈", "《", "﹁", "﹃"};
-    case ']':
-    case '}':
-    case '>':
-        return {"]", "」", "}", "』", "】", "〕", "〉", "》", "﹂", "﹄"};
-    case '/':
-        return {"/", "／"};
-    case '\\':
-        return {"\\", "＼"};
-    case '-':
-        return {"-", "－", "–", "—", "―"};
-    case '_':
-        return {"_", "＿"};
-    case '^':
-        return {"^", "＾", "…", "……"};
-    case '~':
-        return {"~", "～", "〜", "￣"};
-    case '`':
-        return {"`", "｀"};
-    case '@':
-        return {"@", "＠"};
-    case '#':
-        return {"#", "＃"};
-    case '$':
-        return {"$", "＄"};
-    case '%':
-        return {"%", "％"};
-    case '&':
-        return {"&", "＆"};
-    case '*':
-        return {"*", "＊"};
-    case '+':
-        return {"+", "＋"};
-    case '=':
-        return {"=", "＝"};
-    case '|':
-        return {"|", "｜"};
-    default:
-        return {};
-    }
-}
+// The candidate list follows the physical key, rather than grouping symbols
+// by visual similarity. For example `<` belongs to the comma key and `>` to
+// the period key; `[` must never inherit the candidates of `<` or `!`.
+struct PhysicalPunctuationKey {
+    char base;
+    char shifted;
+};
 
-std::vector<std::string> punctuationVariantsForText(std::string_view text) {
-    // These are the punctuation keys Ari can receive directly. A variant list
-    // is shared by the unshifted/shifted forms where they represent the same
-    // physical key family (for example `[`/`{` and `]`/`}`).
-    constexpr std::string_view kPunctuationKeys =
-        ",.!?;:'\"()[]{}<>/\\-_~`@#$%&*+=|^";
-    for (char key : kPunctuationKeys) {
-        const auto variants = punctuationVariantsForKey(key);
-        if (std::find(variants.begin(), variants.end(), text) != variants.end()) {
-            return variants;
+constexpr std::array<PhysicalPunctuationKey, 21> kPhysicalPunctuationKeys{{
+    {'1', '!'},  {'2', '@'},  {'3', '#'},  {'4', '$'},  {'5', '%'},
+    {'6', '^'},  {'7', '&'},  {'8', '*'},  {'9', '('},  {'0', ')'},
+    {'-', '_'},  {'=', '+'},  {'`', '~'},  {'[', '{'},  {']', '}'},
+    {';', ':'}, {'\'', '"'}, {'\\', '|'}, {',', '<'}, {'.', '>'},
+    {'/', '?'},
+}};
+
+bool physicalPunctuationKeyForChar(char c, PhysicalPunctuationKey &result) {
+    for (const auto &key : kPhysicalPunctuationKeys) {
+        if (key.base == c || key.shifted == c) {
+            result = key;
+            return true;
         }
     }
-    return {};
+    return false;
 }
 
 bool isPunctuationText(const std::string &text) {
@@ -417,6 +361,112 @@ std::string chinesePunctShortcut(char c) {
     case '-': return "－";
     default: return chinesePunct(c);
     }
+}
+
+std::string punctuationForShortcutEvent(
+    char sym, fcitx::KeyStates states,
+    inputer::ChinesePunctuationShortcut shortcut) {
+    const auto keySym = static_cast<fcitx::KeySym>(sym);
+    const fcitx::Key key(keySym, states);
+    if (isAltCornerQuoteKey(key, keySym)) {
+        return sym == FcitxKey_bracketleft ? "「" : "」";
+    }
+    if (!punctuationShortcutActive(key, shortcut)) {
+        return {};
+    }
+    if (sym == FcitxKey_apostrophe || sym == FcitxKey_quotedbl) {
+        return "、";
+    }
+    return chinesePunctShortcut(sym);
+}
+
+void appendUniquePunctuation(std::vector<std::string> &candidates,
+                             std::string candidate) {
+    if (candidate.empty() ||
+        std::find(candidates.begin(), candidates.end(), candidate) !=
+            candidates.end()) {
+        return;
+    }
+    candidates.push_back(std::move(candidate));
+}
+
+// Enumerate the outputs that Ari can associate with one physical key. Raw
+// base/Shift symbols are always present. The Chinese forms come from the
+// same paths as handleAuto: full-width mode, Ctrl/Shift, Alt/Shift and the
+// reserved Alt corner quotes. We probe every supported shortcut policy here
+// because the candidate window is also the direct way to choose a form when
+// the user's current shortcut binding is different.
+std::vector<std::string> punctuationCandidatesForPhysicalKey(
+    const PhysicalPunctuationKey &key, bool fullWidthPunctuation) {
+    std::vector<std::string> candidates;
+    appendUniquePunctuation(candidates, std::string(1, key.base));
+    appendUniquePunctuation(candidates, std::string(1, key.shifted));
+
+    if (fullWidthPunctuation) {
+        for (char sym : {key.base, key.shifted}) {
+            if (inputer::zhuyinSlot(sym) < 0) {
+                appendUniquePunctuation(candidates, chinesePunct(sym));
+            }
+        }
+    }
+
+    const fcitx::KeyStates ctrl{fcitx::KeyState::Ctrl};
+    const fcitx::KeyStates ctrlShift{fcitx::KeyState::Ctrl,
+                                     fcitx::KeyState::Shift};
+    const fcitx::KeyStates alt{fcitx::KeyState::Alt};
+    const fcitx::KeyStates altShift{fcitx::KeyState::Alt,
+                                    fcitx::KeyState::Shift};
+
+    // These are the four user-selectable shortcut shapes. The bracket
+    // convenience is added with Disabled as well, because it is reserved
+    // independently of ChinesePunctuationShortcut.
+    appendUniquePunctuation(
+        candidates,
+        punctuationForShortcutEvent(
+            key.base, ctrl, inputer::ChinesePunctuationShortcut::Control));
+    appendUniquePunctuation(
+        candidates,
+        punctuationForShortcutEvent(
+            key.shifted, ctrlShift,
+            inputer::ChinesePunctuationShortcut::ControlShift));
+    appendUniquePunctuation(
+        candidates,
+        punctuationForShortcutEvent(
+            key.base, alt, inputer::ChinesePunctuationShortcut::Disabled));
+    appendUniquePunctuation(
+        candidates,
+        punctuationForShortcutEvent(
+            key.base, alt, inputer::ChinesePunctuationShortcut::Alt));
+    appendUniquePunctuation(
+        candidates,
+        punctuationForShortcutEvent(
+            key.shifted, altShift,
+            inputer::ChinesePunctuationShortcut::AltShift));
+
+    return candidates;
+}
+
+bool physicalPunctuationKeyForText(std::string_view text,
+                                   PhysicalPunctuationKey &result) {
+    if (text.size() == 1 &&
+        physicalPunctuationKeyForChar(text.front(), result)) {
+        return true;
+    }
+
+    // A Chinese punctuation character no longer carries the physical key it
+    // came from in Cell. Reconstruct the most specific family from the same
+    // reachable-output table so reopening `「` still shows `[`, `{`, `「` and
+    // `『`, while a bracket never gains unrelated symbols.
+    for (const auto &key : kPhysicalPunctuationKeys) {
+        const auto candidates =
+            punctuationCandidatesForPhysicalKey(key, /*fullWidth=*/true);
+        if (std::find(candidates.begin(), candidates.end(), text) !=
+            candidates.end()) {
+            result = key;
+            return true;
+        }
+    }
+    return false;
 }
 
 // A Chinese cell's reading stores its canonical 注音 keys, with a trailing ' '
@@ -1778,11 +1828,13 @@ void Buffer::appendSymbolKeyPunctuationCandidates() {
         if (!inputer::isSymbolLikeZhuyinKey(key)) {
             continue;
         }
-        for (std::string candidate : punctuationVariantsForKey(key)) {
-            if (std::find(punctuation.begin(), punctuation.end(), candidate) ==
-                punctuation.end()) {
-                punctuation.push_back(std::move(candidate));
-            }
+        PhysicalPunctuationKey physicalKey{};
+        if (!physicalPunctuationKeyForChar(key, physicalKey)) {
+            continue;
+        }
+        for (std::string candidate : punctuationCandidatesForPhysicalKey(
+                 physicalKey, fullWidthPunct_)) {
+            appendUniquePunctuation(punctuation, std::move(candidate));
         }
     }
     if (punctuation.empty()) {
@@ -1842,10 +1894,12 @@ void Buffer::buildPunctuationCandidates() {
         selCands_.push_back(
             {candidate, candidate, kPunctuationCandidateDown, 0, 0, order++});
     };
-    // Only expose forms associated with the focused key. Do not append the
-    // global punctuation catalog here: `[` should not suddenly offer `!`.
-    for (const std::string &candidate : punctuationVariantsForText(current)) {
-        add(candidate);
+    PhysicalPunctuationKey physicalKey{};
+    if (physicalPunctuationKeyForText(current, physicalKey)) {
+        for (const std::string &candidate :
+             punctuationCandidatesForPhysicalKey(physicalKey, fullWidthPunct_)) {
+            add(candidate);
+        }
     }
 }
 

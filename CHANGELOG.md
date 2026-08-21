@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.5.4 - 2026-08-21
+
+- Build punctuation candidates from the same physical key, including its
+  unshifted, Shift, Ctrl/Shift and Alt shortcut outputs.
+- Keep unrelated punctuation out of literal and punctuation-looking 注音
+  candidate windows while preserving native candidates first and raw-key
+  recovery last.
+- Keep the physical-key candidate mapping shared by the native and WebAssembly
+  input cores.
+
 ## 2.5.3 - 2026-08-21
 
 - Fix `Ctrl` and `Alt` punctuation shortcuts for unshifted punctuation-looking
