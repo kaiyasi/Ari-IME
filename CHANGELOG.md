@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.5.6 - 2026-08-22
 
 - Offer the full Chinese bracket family from the bracket keys: the `[` key
   candidate window now also lists 【 〔 《 〈 and the `]` key lists 】 〕 》 〉
