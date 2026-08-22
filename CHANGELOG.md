@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.5.5 - 2026-08-22
 
 - Add a Nix flake exposing `packages`, `overlays.default`, `nixosModules.default`
   and `homeManagerModules.default`. The modules append Ari to
