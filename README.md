@@ -202,6 +202,58 @@ yay -S fcitx5-ari-ime && ari-ime-enable --yes --make-default
 Developers can instead clone this repository and use the manual source-build
 instructions below.
 
+## Install on NixOS
+
+The repository ships a Nix flake. Its module registers Ari as a Fcitx5 addon
+automatically whenever Fcitx5 is the configured input method framework, so
+installation is declarative — there is no install script to run.
+
+1. Add the flake input and import the module:
+
+   ```nix
+   # flake.nix
+   inputs.ari-ime.url = "github:kaiyasi/Ari-IME";
+   ```
+
+   ```nix
+   # configuration.nix
+   { inputs, ... }: {
+     imports = [ inputs.ari-ime.nixosModules.default ];
+
+     i18n.inputMethod = {
+       type = "fcitx5";
+       fcitx5.addons = [ ]; # Ari is appended by the imported module
+     };
+   }
+   ```
+
+2. Rebuild and log out and back in:
+
+   ```sh
+   sudo nixos-rebuild switch --flake .#your-host
+   ```
+
+3. Add **Ari IME** (`inputer`) through `fcitx5-configtool`, or run
+   `ari-ime-enable --yes --make-default` if you prefer the same helper used on
+   other distributions.
+
+Home Manager users who manage only their home directory can import
+`homeManagerModules.default` with the same `i18n.inputMethod` options.
+To wire the package manually without any module:
+
+```nix
+i18n.inputMethod.fcitx5.addons =
+  [ inputs.ari-ime.packages.${pkgs.system}.default ];
+```
+
+The flake also provides `overlays.default` (adds
+`pkgs.fcitx5-ari-ime`) and a development shell via `nix develop`. The package
+version is read from `CMakeLists.txt`, so it always matches the source tree.
+
+Learned personal data lives under `~/.config/inputer/` exactly like on other
+distributions; `nixos-rebuild` never removes it. Resetting it stays available
+through `ari-ime-reset-data`.
+
 ## Source-build dependencies
 
 - fcitx5 (and `Fcitx5Core` / `Fcitx5Config` / `Fcitx5Utils` /

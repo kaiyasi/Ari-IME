@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Add a Nix flake exposing `packages`, `overlays.default`, `nixosModules.default`
+  and `homeManagerModules.default`. The modules append Ari to
+  `i18n.inputMethod.fcitx5.addons` whenever Fcitx5 is the selected input method
+  framework, so NixOS users install through declarative configuration instead of
+  an install script. The package version is read from `CMakeLists.txt` at
+  evaluation time so it cannot drift from the source tree.
+- Add a GitHub Actions job that runs `nix flake check` on pushes and pull
+  requests.
+
 ## 2.5.4 - 2026-08-21
 
 - Build punctuation candidates from the same physical key, including its
