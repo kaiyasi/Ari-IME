@@ -77,8 +77,9 @@ public:
 
     std::string preeditText() const;
     std::vector<std::string> candidates() const;
-    // Bopomofo symbols of the live pending (incomplete) syllable
-    // empty when nothing is pending or the engine is down. Tone keys are
+    // Bopomofo symbols of the live pending (incomplete) syllable; empty when
+    // nothing is pending or the engine is down. Tone keys are stripped, so
+    // the hint shows the untoned body only.
     std::string pendingSyllableHint() const;
     // Read-only recommendation data for diagnostics and tests. The frontend
     // does not display it automatically; Down opens the real picker explicitly.

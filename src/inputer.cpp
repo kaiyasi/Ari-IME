@@ -198,7 +198,8 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
         panel.setAuxUp(
             buildEditingPreview(preeditStr, position, buffer.isPicking()));
     } else if (*config_.showPendingZhuyin) {
-        // While an incomplete bopomofo syllable is pending,show these in fcitx5's own panel under the caret.
+        // While an incomplete bopomofo syllable is pending, show its symbols
+        // in Fcitx5's own auxiliary panel above the caret.
         const std::string hint = buffer.pendingSyllableHint();
         if (!hint.empty()) {
             panel.setAuxUp(fcitx::Text(hint));
