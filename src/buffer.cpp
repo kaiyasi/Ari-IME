@@ -443,6 +443,19 @@ std::vector<std::string> punctuationCandidatesForPhysicalKey(
             key.shifted, altShift,
             inputer::ChinesePunctuationShortcut::AltShift));
 
+    // The Chinese bracket family belongs to the two bracket keys, the same
+    // grouping the recognition catalog uses. Nested title marks 《》 and
+    // tortoise-shell 【】 stay reachable without borrowing unrelated symbols
+    // from non-bracket keys.
+    if (key.base == '[' || key.base == ']') {
+        const std::array<const char *, 4> &marks =
+            key.base == '[' ? std::array<const char *, 4>{"【", "〔", "《", "〈"}
+                            : std::array<const char *, 4>{"】", "〕", "》", "〉"};
+        for (const char *mark : marks) {
+            appendUniquePunctuation(candidates, mark);
+        }
+    }
+
     return candidates;
 }
 

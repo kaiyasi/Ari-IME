@@ -33,8 +33,9 @@ phrasing and per-user learning.
   auxiliary line. The labeled `原始鍵 ...` candidate restores a converted
   character back to its raw keys. Literal punctuation cells use the same picker:
   ↓ exposes only the half-width, full-width, Chinese and paired variants
-  associated with that key, with the current form first; for example, `[` can
-  be changed to `「`, `『`, `【`, etc., without unrelated `!` candidates.
+  associated with that key, with the current form first; for example, `[`
+  can be changed to `「`, `『`, `【`, `《` and other nested brackets, without
+  unrelated `!` candidates.
   If a punctuation-looking key such as `.` or `,` is also used in a 注音
   syllable, its punctuation variants are added to that Chinese character's
   candidate list as well; the complete Chinese candidate list stays first,

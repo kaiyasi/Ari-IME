@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Offer the full Chinese bracket family from the bracket keys: the `[` key
+  candidate window now also lists 【 〔 《 〈 and the `]` key lists 】 〕 》 〉
+  alongside 「 『 and their half/full-width forms, so title marks such as 《》
+  are reachable without switching tools.
+
 ## 2.5.5 - 2026-08-22
 
 - Add a Nix flake exposing `packages`, `overlays.default`, `nixosModules.default`
