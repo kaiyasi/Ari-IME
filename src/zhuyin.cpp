@@ -369,6 +369,16 @@ std::string Zhuyin::preedit() const {
     return out;
 }
 
+std::string Zhuyin::bopomofoString() const {
+    if (!ctx_ || chewing_bopomofo_Check(ctx_) != 1) {
+        return {};
+    }
+    if (const char *s = chewing_bopomofo_String_static(ctx_)) {
+        return s;
+    }
+    return {};
+}
+
 void Zhuyin::handleDefault(int key) {
     if (ctx_) {
         chewing_handle_Default(ctx_, key);

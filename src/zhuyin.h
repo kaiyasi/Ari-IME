@@ -63,6 +63,10 @@ public:
     // display (e.g. "你" or "ㄋㄧ").
     std::string preedit() const;
 
+    // Pending (not yet converted) bopomofo symbols only.
+    // Empty when nothing is pending; never includes converted text.
+    std::string bopomofoString() const;
+
     // --- Key forwarding (中文模式 / 注音優先): drive chewing directly. ---
     void handleDefault(int key); // printable ASCII -> bopomofo / selection
     void handleSpace();

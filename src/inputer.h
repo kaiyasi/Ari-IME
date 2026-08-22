@@ -55,6 +55,10 @@ FCITX_CONFIGURATION(
         this, "ShowStatusLine",
         _("Show composition status text in the auxiliary line (for example 中 · 大千 · 半形標點) while composing."),
         false};
+    fcitx::Option<bool> showPendingZhuyin{
+        this, "ShowPendingZhuyin",
+        _("Show the Bopomofo symbols of the pending syllable in a small box near the cursor while typing."),
+        false};
     fcitx::KeyListOption fullWidthPunctuationToggle{
         this, "FullWidthPunctuationToggle",
         _("Optional shortcut to toggle full-width punctuation on/off. Empty by default so no application shortcut is reserved; set for example Control+period. A modifier is required."),
