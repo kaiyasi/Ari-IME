@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.7 - 2026-08-22
+
+- Add an opt-in `ShowPendingZhuyin` setting (off by default). While an
+  incomplete 注音 syllable is pending, its Bopomofo symbols are shown in the
+  auxiliary line above the caret; the hint disappears once the syllable
+  converts, the input turns literal English, or candidate selection opens.
+  Contributed by @HongyiHank.
+- Clean up and complete the comments added with the pending-zhuyin hint.
+
 ## 2.5.6 - 2026-08-22
 
 - Offer the full Chinese bracket family from the bracket keys: the `[` key

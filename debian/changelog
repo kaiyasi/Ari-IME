@@ -1,3 +1,11 @@
+fcitx5-ari-ime (2.5.7) unstable; urgency=medium
+
+  * Add an opt-in ShowPendingZhuyin setting (off by default) that shows the
+    pending syllable's Bopomofo symbols in the auxiliary line while typing.
+  * Clean up the pending-hint comments contributed with the feature.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Sat, 22 Aug 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.5.6) unstable; urgency=medium
 
   * Offer the full Chinese bracket family from the bracket keys: the [ key

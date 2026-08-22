@@ -1,6 +1,6 @@
 {
   "name": "@ari-ime/wasm",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "description": "Headless Ari IME input core compiled to WebAssembly",
   "type": "module",
   "exports": {
