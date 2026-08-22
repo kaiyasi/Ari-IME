@@ -197,6 +197,12 @@ void InputerEngine::updateUI(fcitx::InputContext *ic, Buffer &buffer) {
         const int position = buffer.isPicking() ? selChar : caretChar;
         panel.setAuxUp(
             buildEditingPreview(preeditStr, position, buffer.isPicking()));
+    } else if (*config_.showPendingZhuyin) {
+        // While an incomplete bopomofo syllable is pending,show these in fcitx5's own panel under the caret.
+        const std::string hint = buffer.pendingSyllableHint();
+        if (!hint.empty()) {
+            panel.setAuxUp(fcitx::Text(hint));
+        }
     }
 
     const int totalChars = utf8Count(preeditStr);

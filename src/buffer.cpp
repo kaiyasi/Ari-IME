@@ -574,6 +574,30 @@ bool hasAsciiDigit(const std::string &s) {
 
 } // namespace
 
+std::string Buffer::pendingSyllableHint() const {
+    if (syl_.empty() || !zhuyin_.ok()) {
+        return {};
+    }
+    // Tone keys are stripped: chewing drops a lone initial + tone outright,
+    // so only the body can be probed while the syllable is incomplete.
+    std::string body;
+    for (char c : syl_) {
+        if (!inputer::isToneKey(c)) {
+            body.push_back(c);
+        }
+    }
+    if (body.empty()) {
+        return {};
+    }
+    // Intentionally leaked at process exit, same rationale as
+    // syllableConverts above: rebuilt only on explicit layout changes.
+    static Zhuyin *probe = nullptr;
+    static inputer::KeyboardLayout probeLayout = inputer::KeyboardLayout::Default;
+    Zhuyin *ctx = probeForCurrentLayout(probe, probeLayout);
+    ctx->feedSequence(inputer::canonicalKeys(body));
+    return ctx->bopomofoString();
+}
+
 void Buffer::reset() {
     token_ = Token::Chinese;
     cells_.clear();
