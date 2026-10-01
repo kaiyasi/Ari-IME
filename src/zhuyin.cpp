@@ -22,10 +22,15 @@ namespace {
 constexpr std::string_view kPreferenceHeader =
     "# Ari IME preferred phrases v1";
 
-bool validPreferencePhrase(std::string_view phrase) {
-    return !phrase.empty() && phrase.find('\t') == std::string_view::npos &&
-           phrase.find('\n') == std::string_view::npos &&
-           phrase.find('\r') == std::string_view::npos;
+constexpr int kMinPreferenceChars = 2;
+
+// A single character carries no context: preferring it would override
+// libchewing's contextual conversion everywhere that reading appears.
+bool validPreferencePhrase(const std::string &phrase) {
+    return !phrase.empty() && phrase.find('\t') == std::string::npos &&
+           phrase.find('\n') == std::string::npos &&
+           phrase.find('\r') == std::string::npos &&
+           ari_ime::unicode::graphemeCount(phrase) >= kMinPreferenceChars;
 }
 
 std::unordered_set<std::string> readPreferredPhrases() {
@@ -528,7 +533,7 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
     const bool exists =
         chewing_userphrase_lookup(ctx_, phrase.c_str(), reading.c_str()) == 1;
-    if (result > 0 || exists) {
+    if ((result > 0 || exists) && validPreferencePhrase(phrase)) {
         userPhraseCacheLoaded_ = true;
         const bool wasPresent = userPhraseTexts_.find(phrase) !=
                                 userPhraseTexts_.end();

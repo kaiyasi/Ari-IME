@@ -5,6 +5,8 @@
 //   cmake --build build
 //   ctest --test-dir build --output-on-failure
 
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,6 +17,8 @@
 #include "buffer.h"
 #include "constants.h"
 #include "layout.h"
+#include "user_data.h"
+#include "zhuyin.h"
 #include "test_common.h"
 
 namespace {
@@ -3015,6 +3019,99 @@ void test_deterministic_key_stress() {
     }
 }
 
+// Seed through a throwaway Zhuyin sharing the sandbox, so the Buffer under
+// test loads the preferences cold.
+void seed_preferences(
+    const std::vector<std::pair<std::string, std::string>> &entries) {
+    Zhuyin seeder;
+    check(seeder.ok(), "preference seeder engine is ready");
+    for (const auto &entry : entries) {
+        check(seeder.addUserPhrase(entry.first, entry.second) > 0,
+              "seed preference accepted");
+    }
+}
+
+std::string preference_file_text() {
+    std::ifstream in(ari_ime::userPreferencePath());
+    return std::string(std::istreambuf_iterator<char>(in), {});
+}
+
+// A single character must not override contextual conversion of the same
+// reading elsewhere.
+void test_single_char_preference_keeps_context() {
+    {
+        test::TempConfigHome home("ari-single-char-pref", false);
+        seed_preferences(
+            {{"智慧", "ㄓˋ ㄏㄨㄟˋ"}, {"會", "ㄏㄨㄟˋ"}, {"值", "ㄓˊ"}});
+        Sim s;
+        s.type("54cjo4");
+        check_eq(s.preedit(), "智慧", "single-char prefs keep 智慧");
+    }
+    {
+        // Without the phrase preference the single characters alone used to
+        // hijack both syllables.
+        test::TempConfigHome home("ari-single-char-pref-only", false);
+        seed_preferences({{"會", "ㄏㄨㄟˋ"}, {"值", "ㄓˊ"}});
+        Sim s;
+        s.type("54cjo4");
+        check_eq(s.preedit(), "智慧", "single-char prefs alone keep 智慧");
+    }
+    {
+        // Promotion must also converge.
+        test::TempConfigHome home("ari-single-char-pref-settles", false);
+        seed_preferences(
+            {{"智慧", "ㄓˋ ㄏㄨㄟˋ"}, {"會", "ㄏㄨㄟˋ"}, {"值", "ㄓˊ"}});
+        Zhuyin zhuyin;
+        check(zhuyin.ok(), "convergence engine is ready");
+        zhuyin.feedSequence("54cjo4");
+        zhuyin.promoteUserPhrases();
+        // The pre-edit alone cannot tell convergence from an even number of
+        // flip-flops, so assert the applied count too.
+        check(zhuyin.promoteUserPhrases() == 0,
+              "promotion converges once preferences are satisfied");
+        for (int call = 0; call < 2; ++call) {
+            zhuyin.promoteUserPhrases();
+            check_eq(zhuyin.preedit(), "智慧",
+                     "repeated promotion keeps the preferred phrase");
+        }
+    }
+}
+
+void test_remember_preferred_phrase_rejects_single_char() {
+    test::TempConfigHome home("ari-remember-pref", false);
+    Zhuyin z;
+    check(z.ok(), "remember-preference engine is ready");
+    check(!z.rememberPreferredPhrase("值"),
+          "single-character pick is not remembered");
+    check(z.rememberPreferredPhrase("智慧"), "two-character pick is remembered");
+    // An import reaches libchewing either way; the sidecar records only what
+    // promotion can act on.
+    check(z.addUserPhrase("值", "ㄓˊ") > 0,
+          "single-character import still reaches libchewing");
+    const std::string file = preference_file_text();
+    check(file.find("智慧") != std::string::npos,
+          "sidecar gains the multi-character phrase");
+    check(file.find("值") == std::string::npos,
+          "sidecar does not gain the single character");
+}
+
+void test_contextual_conversion_regression_locks() {
+    test::TempConfigHome home("ari-context-locks");
+    {
+        Sim s;
+        s.type("ru832k7");
+        check_eq(s.preedit(), std::string("假的"), "ru832k7 stays 假的");
+    }
+    {
+        // ㄓㄣ (first tone is Space on the Dachen layout) + ㄉㄜ˙.
+        Sim s;
+        s.type("5p");
+        s.key(FcitxKey_space);
+        s.type("2k7");
+        check_eq(s.preedit(), std::string("真的"), "真的 sequence stays 真的");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -3082,5 +3179,8 @@ int main() {
     test_ambiguous_symbol_boundary_literals();
     test_deterministic_key_stress();
 
+    test_single_char_preference_keeps_context();
+    test_remember_preferred_phrase_rejects_single_char();
+    test_contextual_conversion_regression_locks();
     return test::finish();
 }
