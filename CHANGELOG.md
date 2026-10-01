@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.7.0 - 2026-10-02
+
+- Apply the AutoLearn setting and sensitive-field policy to libchewing's
+  internal learner, including candidate selection before Enter.
+- Check that a learning replay reconstructs the exact committed text before
+  training; persist explicit preferences only after a successful replay.
+- Lock and reload the preference sidecar before each update so separate input
+  contexts and the dictionary tool do not overwrite each other's choices.
+- Preserve the typed order of out-of-order Bopomofo keys when reverting to
+  raw input (for example, `240` remains `240`).
+
 ## 2.6.4 - 2026-09-28
 
 - Keep the pre-edit caret where the correction happened: after picking a

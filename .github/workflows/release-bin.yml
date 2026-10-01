@@ -29,12 +29,10 @@ jobs:
           pkgbuild_version="$(sed -n 's/^pkgver=//p' PKGBUILD)"
           srcinfo_version="$(sed -n 's/^[[:space:]]*pkgver = //p' .SRCINFO | head -n 1)"
           debian_version="$(sed -n '1s/^[^(]*(\([^)]*\)).*/\1/p' debian/changelog)"
-          wasm_version="$(sed -n 's/^[[:space:]]*\"version\": \"\([^\"]*\)\",/\1/p' wasm/package.json | head -n 1)"
           test "$version" = "$cmake_version"
           test "$version" = "$pkgbuild_version"
           test "$version" = "$srcinfo_version"
           test "$version" = "$debian_version"
-          test "$version" = "$wasm_version"
 
       - name: Build Release package
         run: |
@@ -60,32 +58,6 @@ jobs:
           --repo "$GITHUB_REPOSITORY"
           --title "Ari IME $GITHUB_REF_NAME"
           --generate-notes
-
-  wasm-package:
-    name: WebAssembly package
-    runs-on: ubuntu-latest
-    needs: arch-x86_64
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create WASM package
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          archive="$RUNNER_TEMP/ari-ime-wasm-${version}.tgz"
-          npm pack ./wasm --ignore-scripts --pack-destination "$RUNNER_TEMP"
-          test -f "$archive"
-          sha256sum "$archive" > "$archive.sha256"
-          printf 'WASM_ARCHIVE=%s\n' "$archive" >> "$GITHUB_ENV"
-          printf 'WASM_CHECKSUM=%s\n' "$archive.sha256" >> "$GITHUB_ENV"
-
-      - name: Upload WASM package to GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload "$GITHUB_REF_NAME"
-          "$WASM_ARCHIVE" "$WASM_CHECKSUM"
-          --repo "$GITHUB_REPOSITORY" --clobber
 
   debian-amd64:
     name: Debian/Ubuntu .deb

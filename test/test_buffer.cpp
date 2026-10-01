@@ -5,6 +5,9 @@
 //   cmake --build build
 //   ctest --test-dir build --output-on-failure
 
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -925,6 +928,25 @@ void test_backspace() {
     outOfOrder.key(FcitxKey_BackSpace);
     check_eq(outOfOrder.preedit(), "140",
              "backspace restores out-of-order keys in their typed order");
+
+    Sim toneBeforeFinal;
+    toneBeforeFinal.type("240");
+    check(contains_han_character(toneBeforeFinal.preedit()),
+          "240 converts before backspace");
+    toneBeforeFinal.key(FcitxKey_BackSpace);
+    check_eq(toneBeforeFinal.preedit(), "240",
+             "backspace restores tone-before-final keys in typed order");
+
+    Sim toneBeforeFinalCandidate;
+    toneBeforeFinalCandidate.type("240");
+    toneBeforeFinalCandidate.key(FcitxKey_Down);
+    toneBeforeFinalCandidate.key(FcitxKey_Up);
+    check(!toneBeforeFinalCandidate.cand().empty() &&
+              toneBeforeFinalCandidate.cand().back() == "原始鍵 240",
+          "raw-key candidate keeps 240 in typed order");
+    toneBeforeFinalCandidate.key(FcitxKey_Return);
+    check_eq(toneBeforeFinalCandidate.preedit(), "240",
+             "raw-key revert restores 240 in typed order");
 }
 
 // Caret model: ←/→ move a caret between characters; ↓ opens the candidate window
@@ -3081,6 +3103,31 @@ int main() {
     test_fullwidth_punct();
     test_ambiguous_symbol_boundary_literals();
     test_deterministic_key_stress();
+
+    {
+        test::TempConfigHome learningHome("inputer-preference-update", false);
+        Zhuyin first;
+        Zhuyin second;
+        check(first.ok() && second.ok(), "two learning contexts can open");
+        check(first.rememberPreferredPhrase("妳"),
+              "first context records its deliberate choice");
+        check(second.rememberPreferredPhrase("您好"),
+              "second context records its deliberate choice");
+        std::ifstream before(ari_ime::userPreferencePath());
+        const std::string both((std::istreambuf_iterator<char>(before)),
+                               std::istreambuf_iterator<char>());
+        check(both.find("妳\n") != std::string::npos &&
+                  both.find("您好\n") != std::string::npos,
+              "stale context preserves another context's preference");
+        check(first.forgetUserPhrase("妳") > 0,
+              "first context forgets its own preference");
+        std::ifstream after(ari_ime::userPreferencePath());
+        const std::string remaining((std::istreambuf_iterator<char>(after)),
+                                    std::istreambuf_iterator<char>());
+        check(remaining.find("妳\n") == std::string::npos &&
+                  remaining.find("您好\n") != std::string::npos,
+              "forgetting preserves another context's preference");
+    }
 
     return test::finish();
 }

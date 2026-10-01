@@ -80,11 +80,8 @@ check_versions() {
             "$cmake_version" "$pkgbuild_version" "$srcinfo_version" >&2
         exit 1
     fi
-    if [[ "$cmake_version" != "$wasm_version" ]]; then
-        printf 'Version mismatch: CMake=%s wasm/package.json=%s\n' \
-            "$cmake_version" "$wasm_version" >&2
-        exit 1
-    fi
+    # WASM has a separately built runtime. Do not advance its package version
+    # until the checked-in binary has been rebuilt from this source revision.
     # The Debian packaging is optional; only enforce it when present.
     if [[ -n "$debian_version" && "$cmake_version" != "$debian_version" ]]; then
         printf 'Version mismatch: CMake=%s debian/changelog=%s\n' \

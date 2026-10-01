@@ -1851,20 +1851,17 @@ void Buffer::learnFromCells() {
     }
 
     for (const auto &span : explicitSpans) {
+        // The weak pass above plus these three passes gives a deliberate choice
+        // roughly four times the evidence of an unchanged conversion.
+        if (!learnRange(span.start, span.end, 3)) {
+            continue;
+        }
         std::string phrase;
         for (int j = span.start; j <= span.end; ++j) {
             phrase += cells_[j].text;
         }
-        // Persist only an explicit candidate pick. Accepted defaults remain
-        // ordinary libchewing learning, so a user's whole learned dictionary
-        // can never become an Ari hard-priority list by accident.
+        // Only persist a deliberate choice after its exact text was replayed.
         zhuyin_.rememberPreferredPhrase(phrase);
-    }
-
-    for (const auto &span : explicitSpans) {
-        // The weak pass above plus these three passes gives a deliberate choice
-        // roughly four times the evidence of an unchanged conversion.
-        learnRange(span.start, span.end, 3);
 
         // One short context pass teaches where this choice was made without
         // turning an entire sentence into a high-weight personal phrase.
@@ -1877,19 +1874,32 @@ void Buffer::learnFromCells() {
     zhuyin_.resetAll();
 }
 
-void Buffer::learnRange(int start, int end, int passes) {
+bool Buffer::learnRange(int start, int end, int passes) {
+    bool allReplayed = true;
     for (int chunkStart = start; chunkStart <= end;
          chunkStart += ari_ime::kMaxCompositionChars) {
         const int chunkEnd =
             std::min(end, chunkStart + ari_ime::kMaxCompositionChars - 1);
+        std::string expected;
+        for (int j = chunkStart; j <= chunkEnd; ++j) {
+            expected += cells_[j].text;
+        }
         for (int pass = 0; pass < passes; ++pass) {
             feedRun(chunkStart, chunkEnd, 0);
             relockRun(chunkStart, chunkEnd, /*onlyLocked=*/false);
+            if (zhuyin_.preedit() != expected) {
+                // A reading may no longer resolve to the displayed choice.
+                // Never train a different phrase under that reading.
+                zhuyin_.resetAll();
+                allReplayed = false;
+                break;
+            }
             // Enter commits and updates libchewing's local model.
             zhuyin_.handleEnter();
             zhuyin_.takeCommit(); // Output already comes from cells_; discard replay.
         }
     }
+    return allReplayed;
 }
 
 KeyResult Buffer::handleBackspace() {

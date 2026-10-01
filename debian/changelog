@@ -1,3 +1,12 @@
+fcitx5-ari-ime (2.7.0) unstable; urgency=medium
+
+  * Apply AutoLearn and sensitive-field policy to libchewing's own learner.
+  * Train only when a replay exactly matches the committed candidate.
+  * Preserve preference updates across concurrent input contexts.
+  * Keep original key order when reverting out-of-order Bopomofo input.
+
+ -- Kaiyasi <zengcode0315@gmail.com>  Fri, 02 Oct 2026 00:00:00 +0000
+
 fcitx5-ari-ime (2.6.4) unstable; urgency=medium
 
   * Keep the caret after a corrected candidate, with an option to return to

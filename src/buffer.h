@@ -162,7 +162,10 @@ public:
     }
     bool setKeyboardLayout(ari_ime::KeyboardLayout layout);
     // The frontend disables learning for password and other sensitive fields.
-    void setLearningAllowed(bool allowed) { learningAllowed_ = allowed; }
+    void setLearningAllowed(bool allowed) {
+        learningAllowed_ = allowed && ari_ime::autoLearnEnabled();
+        zhuyin_.setLearningAllowed(learningAllowed_);
+    }
 
     // Forced pure-English mode (toggled by Ctrl+Space); lets the engine show the
     // current 中/英 mode hint.
@@ -227,7 +230,7 @@ private:
     // This keeps unchanged text as weak positive evidence while deliberate
     // corrections adapt substantially faster.
     void learnFromCells();
-    void learnRange(int start, int end, int passes);
+    bool learnRange(int start, int end, int passes);
 
     // --- Freezing the live tail (run / English / syllable) into cells_ ---
     void freezeRun();        // live chewing run -> Chinese cells (with readings)

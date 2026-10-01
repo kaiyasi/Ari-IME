@@ -45,6 +45,8 @@ public:
     // Clear all internal buffers but keep settings + learned user dictionary.
     void resetAll();
     void setKeyboardLayout(ari_ime::KeyboardLayout layout);
+    // Apply the current field/settings policy to libchewing's own learner.
+    void setLearningAllowed(bool allowed);
 
     // Feed a single raw key (a printable ASCII character, e.g. 's', 'u', '3').
     void feedKey(char c);
@@ -149,6 +151,7 @@ private:
     bool loadUserPhraseCache();
 
     ChewingContext *ctx_ = nullptr;
+    bool learningAllowed_ = true;
     ari_ime::KeyboardLayout layout_ = ari_ime::currentKeyboardLayout();
     bool userPhraseCacheLoaded_ = false;
     std::unordered_set<std::string> userPhraseTexts_;

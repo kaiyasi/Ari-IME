@@ -102,8 +102,11 @@ phrasing and per-user learning.
   libchewing's contextual scorer; Ari does not open a hidden candidate window on
   every completed syllable or force a static preference to the top.
   **AutoLearn** can be disabled in the addon's configuration when
-  the personal dictionary should remain unchanged.
-  Password and sensitive input fields never write learning data.
+  the personal dictionary should remain unchanged. The setting also controls
+  libchewing's internal learner during candidate selection. Learning replays
+  only train text that exactly matches the committed choice, and concurrent
+  input contexts preserve each other's preference updates. Password and
+  sensitive input fields never write learning data.
 - **Automatic offline context** — libchewing's local phrase model uses
   surrounding words to distinguish homophones such as `我的` and `跑得快`.
   Personal weights feed the same model automatically; there is no external AI,

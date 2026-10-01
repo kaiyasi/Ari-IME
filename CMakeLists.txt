@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ari-ime VERSION 2.6.4 LANGUAGES CXX)
+project(ari-ime VERSION 2.7.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
