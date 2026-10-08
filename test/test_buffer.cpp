@@ -18,6 +18,8 @@
 #include "buffer.h"
 #include "constants.h"
 #include "layout.h"
+#include "user_data.h"
+#include "zhuyin.h"
 #include "test_common.h"
 
 namespace {
@@ -2592,6 +2594,8 @@ void test_candidate_modifier_keeps_window() {
         FcitxKey_Delete, fcitx::KeyStates{fcitx::KeyState::Shift}));
     check(forgotten.handled,
           "Shift+Delete after bare Shift is still handled in picking");
+    check(!forgotten.notification.empty(),
+          "Shift+Delete after bare Shift reaches candidate forgetting");
     check_eq(s.preedit(), before,
              "Shift+Delete after bare Shift does not delete the focused cell");
     check(s.b.selectionChar() == 0,
@@ -3071,6 +3075,45 @@ void test_deterministic_key_stress() {
     }
 }
 
+void test_single_char_preference_keeps_context() {
+    test::TempConfigHome home("ari-single-char-preference", false);
+    Zhuyin seeder;
+    check(seeder.ok(), "preference seeder engine is ready");
+    check(seeder.addUserPhrase("值", "ㄓˊ") > 0,
+          "single-character import still reaches libchewing");
+    check(seeder.addUserPhrase("會", "ㄏㄨㄟˋ") > 0,
+          "second single-character import reaches libchewing");
+    check(!seeder.rememberPreferredPhrase("值"),
+          "single-character pick is not remembered as a preference");
+
+    std::ifstream in(ari_ime::userPreferencePath());
+    const std::string sidecar((std::istreambuf_iterator<char>(in)),
+                              std::istreambuf_iterator<char>());
+    check(sidecar.find("值\n") == std::string::npos &&
+              sidecar.find("會\n") == std::string::npos,
+          "single-character imports do not enter preference sidecar");
+
+    Sim s;
+    s.type("54cjo4");
+    check_eq(s.preedit(), "智慧", "single-character imports keep 智慧");
+}
+
+void test_multi_char_preference_survives() {
+    test::TempConfigHome home("ari-multi-char-preference", false);
+    Zhuyin seeder;
+    check(seeder.ok(), "multi-character preference seeder is ready");
+    check(seeder.rememberPreferredPhrase("智慧"),
+          "multi-character pick is remembered");
+    std::ifstream in(ari_ime::userPreferencePath());
+    const std::string sidecar((std::istreambuf_iterator<char>(in)),
+                              std::istreambuf_iterator<char>());
+    check(sidecar.find("智慧\n") != std::string::npos,
+          "multi-character preference enters sidecar");
+    Sim s;
+    s.type("54cjo4");
+    check_eq(s.preedit(), "智慧", "multi-character preference keeps 智慧");
+}
+
 } // namespace
 
 int main() {
@@ -3137,28 +3180,30 @@ int main() {
     test_fullwidth_punct();
     test_ambiguous_symbol_boundary_literals();
     test_deterministic_key_stress();
+    test_single_char_preference_keeps_context();
+    test_multi_char_preference_survives();
 
     {
         test::TempConfigHome learningHome("inputer-preference-update", false);
         Zhuyin first;
         Zhuyin second;
         check(first.ok() && second.ok(), "two learning contexts can open");
-        check(first.rememberPreferredPhrase("妳"),
+        check(first.rememberPreferredPhrase("你好"),
               "first context records its deliberate choice");
         check(second.rememberPreferredPhrase("您好"),
               "second context records its deliberate choice");
         std::ifstream before(ari_ime::userPreferencePath());
         const std::string both((std::istreambuf_iterator<char>(before)),
                                std::istreambuf_iterator<char>());
-        check(both.find("妳\n") != std::string::npos &&
+        check(both.find("你好\n") != std::string::npos &&
                   both.find("您好\n") != std::string::npos,
               "stale context preserves another context's preference");
-        check(first.forgetUserPhrase("妳") > 0,
+        check(first.forgetUserPhrase("你好") > 0,
               "first context forgets its own preference");
         std::ifstream after(ari_ime::userPreferencePath());
         const std::string remaining((std::istreambuf_iterator<char>(after)),
                                     std::istreambuf_iterator<char>());
-        check(remaining.find("妳\n") == std::string::npos &&
+        check(remaining.find("你好\n") == std::string::npos &&
                   remaining.find("您好\n") != std::string::npos,
               "forgetting preserves another context's preference");
     }

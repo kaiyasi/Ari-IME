@@ -31,10 +31,13 @@ namespace {
 constexpr std::string_view kPreferenceHeader =
     "# Ari IME preferred phrases v1";
 
-bool validPreferencePhrase(std::string_view phrase) {
-    return !phrase.empty() && phrase.find('\t') == std::string_view::npos &&
-           phrase.find('\n') == std::string_view::npos &&
-           phrase.find('\r') == std::string_view::npos;
+// A single character has no context and can override libchewing's conversion
+// of every word that contains its reading.
+bool validPreferencePhrase(const std::string &phrase) {
+    return !phrase.empty() && phrase.find('\t') == std::string::npos &&
+           phrase.find('\n') == std::string::npos &&
+           phrase.find('\r') == std::string::npos &&
+           ari_ime::unicode::graphemeCount(phrase) >= 2;
 }
 
 using PhraseSet = std::unordered_set<std::string>;
@@ -599,7 +602,7 @@ int Zhuyin::addUserPhrase(const std::string &phrase,
         chewing_userphrase_add(ctx_, phrase.c_str(), reading.c_str());
     const bool exists =
         chewing_userphrase_lookup(ctx_, phrase.c_str(), reading.c_str()) == 1;
-    if (result > 0 || exists) {
+    if ((result > 0 || exists) && validPreferencePhrase(phrase)) {
         userPhraseCacheLoaded_ = true;
         // This sidecar records deliberate selected/imported preferences only
         // for Ari's portable bookkeeping. The libchewing user dictionary also
